@@ -179,3 +179,32 @@ body.plain { background-image: none; }
 .lens p { margin: 0 0 12px; max-width: 62ch; }
 
 .backlink { display: inline-block; margin: 40px 0 48px; font-family: var(--mono); font-size: 12px; }
+
+/* on-page table of contents */
+.layout { display: flex; gap: 40px; align-items: flex-start; }
+.layout > .prose { flex: 1 1 auto; min-width: 0; }
+.toc { flex: 0 0 168px; position: sticky; top: 24px; }
+.toc-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+.toc a {
+  display: block;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  padding: 3px 0 3px 10px;
+  margin-left: -12px;
+  border-left: 2px solid transparent;
+}
+.toc a:hover { color: var(--text); text-decoration: none; }
+.toc a.active { color: var(--cyan); border-left-color: var(--cyan); }
+
+@media (max-width: 760px) {
+  .layout { flex-direction: column; gap: 18px; }
+  .toc { position: static; flex-basis: auto; }
+}

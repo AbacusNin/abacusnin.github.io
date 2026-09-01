@@ -10,14 +10,6 @@
   <div class="wrap">
     <header class="site-header">
       <a class="handle" href="/">Abacus</a>
-      <nav class="nav" aria-label="Domains">
-        <a href="/cyber-ops/">Cyber Ops</a>
-        <a href="/grc/">GRC</a>
-        <a href="/intel/">Intel</a>
-        <a href="/ai-ml/">AI/ML</a>
-        <a href="/infra/">Infra</a>
-        <a href="/creative/">Creative</a>
-      </nav>
     </header>
 
     <main>
@@ -27,19 +19,24 @@
         <p class="lead"><!-- EDIT: a neutral one-line framing of the method, not a target --></p>
       </div>
 
-      <div class="prose">
-        <h2>Context</h2>
-        <p><!-- EDIT: the scenario, stated as training or synthetic up front --></p>
-        <h2>Method</h2>
-        <p><!-- EDIT: the shareable core. What you did and the reasoning behind it. --></p>
-        <h2>What it showed</h2>
-        <p><!-- EDIT: the finding or lesson at the method level --></p>
-        <h2>Transferable takeaway</h2>
-        <p><!-- EDIT: why this skill carries to defense, analysis, or governance --></p>
-        <h2>Deliberately omitted</h2>
-        <p>Operational specifics, targets, and any real data are withheld by design.</p>
-        <h2>Data note</h2>
-        <p>Synthetic or public sources only.</p>
+      <!-- The toc nav fills itself from the h2 headings below. If there are fewer
+           than two, it removes itself. -->
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <h2>Context</h2>
+          <p><!-- EDIT: the scenario, stated as training or synthetic up front --></p>
+          <h2>Method</h2>
+          <p><!-- EDIT: the shareable core. What you did and the reasoning behind it. --></p>
+          <h2>What it showed</h2>
+          <p><!-- EDIT: the finding or lesson at the method level --></p>
+          <h2>Transferable takeaway</h2>
+          <p><!-- EDIT: why this skill carries to defense, analysis, or governance --></p>
+          <h2>Deliberately omitted</h2>
+          <p>Operational specifics, targets, and any real data are withheld by design.</p>
+          <h2>Data note</h2>
+          <p>Synthetic or public sources only.</p>
+        </div>
       </div>
 
       <a class="backlink" href="/DOMAIN/">&lt;- back to DOMAIN</a>
@@ -47,8 +44,9 @@
 
     <footer class="site-footer">
       <span>Abacus</span>
-      <span>Contact: [ add alias here ]</span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
     </footer>
   </div>
+  <script src="/assets/js/toc.js"></script>
 </body>
 </html>
