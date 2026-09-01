@@ -6,7 +6,7 @@
   <title>Crypto - CTF Writeups</title>
   <link rel="stylesheet" href="/assets/css/site.css">
 </head>
-<body class="plain">
+<body>
   <div class="wrap">
     <header class="site-header">
       <a class="handle" href="/">Abacus</a>
@@ -16,26 +16,33 @@
       <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Crypto</p>
       <div class="page-head">
         <h1 class="page-title">Crypto</h1>
-        <p class="lead">Classical ciphers, weak randomness, and key-reuse bugs. Drafts below; full writeups are being added.</p>
+        <p class="lead">Classical ciphers, weak randomness, key-reuse bugs, and the occasional protocol that falls apart under an algebraic look.</p>
       </div>
 
-      <div class="layout">
-        <nav class="toc" data-toc aria-label="On this page"></nav>
-        <div class="prose">
-          <h2>Repeating-key XOR and base-9 encoding</h2>
-          <p>Detected a short repeating key against a known-plaintext crib, then peeled back a base-9 ASCII layer underneath. The interesting part was ordering the two: the encoding hid the key length until the outer layer came off. Full writeup coming.</p>
-
-          <h2>LCG jackpot</h2>
-          <p>A linear congruential generator seeded predictably, so recovering a few outputs was enough to reconstruct the state and roll the sequence forward. A reminder that a generator is only as strong as its unpredictability. Full writeup coming.</p>
-
-          <h2>RSA and ECDSA nonce reuse</h2>
-          <p>Two signatures sharing a nonce leak the private key through simple algebra. The defensive lesson is the one that matters: deterministic nonces exist for exactly this reason. Full writeup coming.</p>
-
-          <h2>Patterned password hashes</h2>
-          <p>Hashes of passwords that followed a fixed template collapsed the search space to almost nothing. The takeaway is about how structure in secrets becomes structure an attacker can walk. Full writeup coming.</p>
-
-          <h2>Pigpen and Atbash</h2>
-          <p>A layered classical puzzle: a pigpen substitution wrapped around an Atbash step. Mostly a warm-up, but a clean example of peeling layers in the right order. Full writeup coming.</p>
+      <div class="project-list">
+        <div class="project-item">
+          <h3><a href="/cyber-ops/ctf-writeups/crypto/rotation-and-recovery/">Rotation and Recovery</a><span class="tag">Writeup</span></h3>
+          <p>Recovering a 128-bit key from a stateful protocol through an adversary-in-the-middle position, a verification oracle, and reducible ring structure, then mapping the whole thing to detections and controls.</p>
+        </div>
+        <div class="project-item">
+          <h3>XOR and base-9 decoding<span class="tag">Planned</span></h3>
+          <p>Repeating-key XOR against a crib, with an encoding layer underneath.</p>
+        </div>
+        <div class="project-item">
+          <h3>LCG jackpot<span class="tag">Planned</span></h3>
+          <p>Reconstructing a linear congruential generator's state from its output.</p>
+        </div>
+        <div class="project-item">
+          <h3>RSA and ECDSA nonce reuse<span class="tag">Planned</span></h3>
+          <p>Two signatures, one nonce, and the private key that falls out.</p>
+        </div>
+        <div class="project-item">
+          <h3>Patterned password hashes<span class="tag">Planned</span></h3>
+          <p>How structure in a secret collapses the search space.</p>
+        </div>
+        <div class="project-item">
+          <h3>Pigpen and Atbash<span class="tag">Planned</span></h3>
+          <p>Layered classical ciphers, peeled in the right order.</p>
         </div>
       </div>
 
@@ -47,6 +54,5 @@
       <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
     </footer>
   </div>
-  <script src="/assets/js/toc.js"></script>
 </body>
 </html>

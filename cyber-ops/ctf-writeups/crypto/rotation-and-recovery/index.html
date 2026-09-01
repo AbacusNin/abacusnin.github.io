@@ -1,0 +1,1351 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rotation and Recovery - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+    </header>
+
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / <a href="/cyber-ops/ctf-writeups/crypto/">Crypto</a> / Rotation and Recovery</p>
+      <div class="page-head">
+        <h1 class="page-title">Rotation and Recovery</h1>
+        <p class="lead">Exploiting a stateful cryptographic protocol: recovering a 128-bit key through an adversary-in-the-middle position, a verification oracle, and reducible ring structure, while minimizing edit cost.</p>
+      </div>
+
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+<div class="tablewrap"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Cryptography, protocol exploitation, WebAssembly, adversary-in-the-middle simulation</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Advanced</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>MITM, message tampering, verification oracle, polynomial quotient-ring arithmetic over GF(2), CRT, two-stage residue lifting, WASM ABI, cost-objective optimization, detection engineering</td>
+</tr>
+<tr>
+<td>Scenario</td>
+<td>An adversary intercepts and edits protocol messages to recover a protected 128-bit key while minimizing weighted mutation cost.</td>
+</tr>
+</tbody>
+</table></div>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I controlled an adversarial position (MITM/AiTM) in a simulated message-exchange protocol with three other legitimate participants. I could see messages in flight, hold one at a time, edit it as long as I kept its length the same, release it back into the channel, and submit a recovered 16-byte key through a host-provided success function. Scoring was the combined cost of my nibble-level edits, billed as ink and whiteout.</p>
+<p>This scenario was predicated on a protocol whose endpoints assumed transport integrity while the channel underneath allowed mutation. The message surface included key-rotation messages, MAC-authenticated tokens carrying epoch context, verification requests, acknowledgements, and retries upon ACK loss. In the most basic form; the protocol exposed malleable and insufficiently authenticated messages, including state-changing key-rotation controls and an inadequately context-bound MAC.</p>
+<p>Threat Model:</p>
+<div class="tablewrap"><table>
+<thead>
+<tr>
+<th>Element</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Adversary</td>
+<td>An active network-positioned interceptor that can hold one message and send edits under a same-length constraint.</td>
+</tr>
+<tr>
+<td>Adversary objective</td>
+<td>Recover the target participant's initial 16-byte key and submit it through the success function.</td>
+</tr>
+<tr>
+<td>Defender position</td>
+<td>Endpoints verify MACs, rotate keys, and enforce delivery timing, but accept authenticated-looking messages without consistently binding security-critical fields to the authenticated context. The edit-cost accounting was a challenge scoring constraint, not a defensive control.</td>
+</tr>
+<tr>
+<td>Protected asset</td>
+<td>The target's initial MAC key, as it establishes MAC generation and the key-rotation schedule.</td>
+</tr>
+<tr>
+<td>Exposed surface</td>
+<td>Messages on the wire; MAC verification responses, key-rotation messages, acknowledgement behavior, and retry timing.</td>
+</tr>
+<tr>
+<td>Trust boundaries</td>
+<td>The network channel to the protocol endpoint; the parser to the state machine; the verification service to protected key state; the WASM guest to the host ABI; and any intermediary or broker to the end recipient. Sender, recipient, epoch, and rotation fields are security claims crossing those boundaries rather than trust boundaries themselves.</td>
+</tr>
+</tbody>
+</table></div>
+<p>Chaining two exploitable protocol primitives was pretty cool and represented substantial growth in skill. I combined chosen key transitions with a verification oracle, and the impact of that chain was amplified by a reducible quotient-ring structure in the key schedule. That let me turn a nominal 128-bit recovery into independent small-component searches whose oracle-query costs could be added rather than attempting a monolithic search. My deliverable was a WebAssembly client that talked only through allowed host imports and recovered the key at runtime from per-tick state.</p>
+<h2>2. Techniques, Tooling, and Actions Taken</h2>
+<h3>Initial Artifact Triage</h3>
+<ul>
+<li>The challenge archive gave me the execution model, the WebAssembly ABI, and a Python simulator. Pretty good starting stack. </li>
+<li>The ABI needed a WASM module that exported memory, scratch_ptr, scratch_cap, mallory_run, and importing host functions for advance, intercept, release, edit, and a gotcha. </li>
+<li>The simulator was deterministic under a 32-byte seed, so local reproduction was stable but that hid a trap where live scoring used per-tick seeds, so any solver tied to a specific local seed wouldn't survive runtime.</li>
+</ul>
+<h3>Two-track Methodology</h3>
+<p>My first attempt at solving was a proof-of-concept Web Assembly WASM module that hardcoded the recovered key for a local seed and called the success function directly. 
+The big takeaway was confirmation of the ABI mechanics; host imports resolved, memory layout was correct, and the success call was accepted. This was a throwaway for live submission and per-tick scoring.</p>
+<p>My second attempt needed a seed-independent solver that recovers the key from the protocol's runtime state and meant I'd need to dig into the key rotation's algebra and clarify semantics of the verification response.</p>
+<h3>Seed-Independent Solver</h3>
+<p>My solver chained five primitives:</p>
+<ol>
+<li>Held the target's initial key state as long as possible to capture a reference MAC-authenticated token under that key. I did this two separate ways: first by editing an attacker-initiated rotation message into an identity rotation, and second by routing it away from the target. Both landed in the same downstream state.</li>
+<li>Built a practical key-equivalence oracle out of the target's verification behavior. A captured token verified under rotation period <code>n</code> when the selected period used the same effective MAC key and authenticated input as the original, subject to the negligible probability of an HMAC collision and any tag-truncation assumptions.</li>
+<li>Forced key rotations by editing attacker-initiated rotation packets and encoding tests for the unknown key's residue modulo small polynomial factors.</li>
+<li>Resolved each factor by oracle scanning. For a repeated factor, I used a two-stage residue/coset lift from modulo <code>p</code> to modulo <code>p^2</code>, avoiding a full repeated-factor scan.</li>
+<li>CRT-recombined the residues into the full 128-bit key and called the success function.</li>
+</ol>
+<h3>Optimization Efforts</h3>
+<p>Once correctness was established, the problem shifted to cost minimization under King-of-the-Hill scoring. Optimization candidates were evaluated locally against published per-tick seeds:</p>
+<div class="tablewrap"><table>
+<thead>
+<tr>
+<th>Variant</th>
+<th>Class</th>
+<th>Outcome</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Brute-force repeated factor</td>
+<td>Direct scan of <code>2^10 = 1024</code> candidates for the squared factor</td>
+<td>Correct; but resulted in high oracle-query count</td>
+</tr>
+<tr>
+<td>Two-stage residue/coset lift</td>
+<td>Recover mod <code>p</code> (up to ~32 candidate checks), then enumerate the corresponding lifts mod <code>p^2</code> (up to ~32 more)</td>
+<td>My biggest single measured win on the tested seeds: approximately 30% off combined cost</td>
+</tr>
+<tr>
+<td>Runtime polynomial math</td>
+<td>Replace large precomputed CRT tables with compact runtime computation</td>
+<td>Smaller WASM, comparable or slightly improved cost on public seeds</td>
+</tr>
+<tr>
+<td>Suppress-first-rotation</td>
+<td>Route the attacker's first key-rotation packet away from the target instead of identity-editing it</td>
+<td>Approximately 0.05% measured improvement on the tested seeds (the saved cost of one identity-rotation edit, LOL); it did not yield a competitive advantage</td>
+</tr>
+<tr>
+<td>Retransmission-donor scheduler</td>
+<td>Suppress acknowledgements to force key-rotation retransmissions, then use those as cheaper rotation donors</td>
+<td>Not shipped, ran into a wall, see dead ends below</td>
+</tr>
+<tr>
+<td>Cost-aware payload selection</td>
+<td>Generate algebraically equivalent payloads, choose the one with lowest donor-to-target nibble cost</td>
+<td>Not shipped, time constraints and required deeper instrumentation of the edit-cost matrix</td>
+</tr>
+</tbody>
+</table></div>
+<h3>Dead End - A Retransmission Donor Scheduler</h3>
+<p>An interesting optimization I was looking into involved retransmission behavior under acknowledgement suppression. In my local simulator observations, when the attacker's acknowledgements did not reach the originating party, that party retransmitted its 32-byte key-rotation packet every 16 simulator ticks for the duration of the run. Each retransmission was a no-edit-cost, 32-byte donor message that could potentially reduce dependence on the periodic MAC-authenticated message stream for rotation donors.</p>
+<p>I tested three scheduler variants locally.</p>
+<ol>
+<li>Opportunistic donor selection to use retransmissions only when immediately interceptable. It ran safe but produced no measured improvement, noting that the alternative donor stream was almost always available. </li>
+<li>An all-retransmission donor with active acknowledgement suppression. Local runs blew past the time budgets and stalled.</li>
+<li>Hybrid skip-and-wait variant skipped available donors to wait for a retransmission but produced no improvement, and noting that higher skip counts crossed timing thresholds.</li>
+</ol>
+<p>The optimization baseline was predicated on these facts: 
+A. I could hold only one message at a time, and intercept, edit, and release all advanced simulator time. 
+B. Active acknowledgement suppression therefore had to juggle competing in-flight messages and ensure that no key-rotation packet slipped past during a host call. </p>
+<p>My development efforts ran into time constraints: 
+C. I couldn't generate precomputed CRT tables quickly enough to advance my runtime fork, my theorized donor scheduler needed additional development time, and each variant fork prevented active scoring.
+D. Similar to the runtime-computed tables, a real-time scheduler could probably realize a theoretical gain, but it needed careful message and priority queues plus digit-length boundary handling for rotation-field encoding.</p>
+<h3>Other Dead Ends</h3>
+<ul>
+<li>Treating the local deterministic seed as a live solution input. This was me figuring out how the challenge worked in real time.</li>
+<li>Submitting through a manually constructed API route when the live interface expected a WASM upload. Figuring out how the challenge worked consumed critical early cycles in HTTP debugging before I recognized the internal-runner mechanism.</li>
+<li>Assuming the mathematically canonical payload was the cheapest one to produce. It was not as edit cost was weighted by nibble transition and algebraically equivalent payloads could still cost different amounts of ink and whiteout against the same donor. This realization came too late, during live-event development and real-time scoring.</li>
+</ul>
+<h2>3. Tooling and Scripts</h2>
+<p>This section includes sanitized code patterns used or derived during the exercise.</p>
+<h3>Local WASM Execution</h3>
+<pre><code class="language-powershell"># Run a candidate WebAssembly solver against the local simulator.
+# Use a published test seed or a generated lab seed.
+python .\run_wasm.py .\&lt;solver-file&gt;.wasm --seed-hex &lt;64_HEX_SEED&gt;
+</code></pre>
+<h3>WAT to WASM Compilation Helper</h3>
+<pre><code class="language-python"># Compile a WebAssembly text module into binary form for local ABI tests.
+from pathlib import Path
+import wasmtime
+
+wat_path = Path(&quot;&lt;solver&gt;.wat&quot;)
+wasm_path = Path(&quot;&lt;solver&gt;.wasm&quot;)
+
+wasm_bytes = wasmtime.wat2wasm(wat_path.read_text())
+wasm_path.write_bytes(wasm_bytes)
+print(f&quot;wrote {wasm_path}&quot;)
+</code></pre>
+<h3>Edit-cost Calculator Primitive</h3>
+<pre><code class="language-python"># Sanitized cost-model helper. The real matrix is challenge-specific and
+# must be supplied explicitly from the local simulator. Failing closed avoids
+# accidentally benchmarking every mutation as free.
+
+REWRITE_COST: list[list[tuple[int, int]]] | None = None
+
+
+def edit_cost(old: bytes, new: bytes) -&gt; tuple[int, int]:
+    &quot;&quot;&quot;Return (ink, whiteout) required to rewrite old bytes into new bytes.
+
+    Edit length must match. Each byte is split into two 4-bit nibbles;
+    cost is summed over both nibbles per byte.
+    &quot;&quot;&quot;
+    if REWRITE_COST is None:
+        raise RuntimeError(&quot;load the challenge-specific rewrite-cost matrix&quot;)
+    if len(old) != len(new):
+        raise ValueError(&quot;same-length edits only&quot;)
+
+    ink = 0
+    whiteout = 0
+    for old_byte, new_byte in zip(old, new):
+        for shift in (4, 0):
+            old_nibble = (old_byte &gt;&gt; shift) &amp; 0xF
+            new_nibble = (new_byte &gt;&gt; shift) &amp; 0xF
+            delta_ink, delta_whiteout = REWRITE_COST[old_nibble][new_nibble]
+            ink += delta_ink
+            whiteout += delta_whiteout
+    return ink, whiteout
+</code></pre>
+<h3>Polynomial Multiplication and Reduction Over GF(2)</h3>
+<pre><code class="language-python"># GF(2)[x] multiplication and modular reduction.
+# The real degree-128 reduction polynomial must be supplied explicitly.
+
+
+def gf2_mul_mod(x: int, y: int, modulus: int) -&gt; int:
+    &quot;&quot;&quot;Multiply two polynomial elements over GF(2), then reduce by modulus.&quot;&quot;&quot;
+    if modulus &lt;= 0:
+        raise ValueError(&quot;modulus must be a nonzero polynomial&quot;)
+
+    product = 0
+    while y:
+        if y &amp; 1:
+            product ^= x
+        x &lt;&lt;= 1
+        y &gt;&gt;= 1
+
+    # Reduce terms at or above the modulus degree by XOR-shifting the modulus.
+    mod_bits = modulus.bit_length()
+    while product.bit_length() &gt;= mod_bits:
+        shift = product.bit_length() - mod_bits
+        product ^= modulus &lt;&lt; shift
+
+    degree = mod_bits - 1
+    return product &amp; ((1 &lt;&lt; degree) - 1)
+</code></pre>
+<h3>Two-stage Residue Coset Lift for Repeated-Factor Recovery</h3>
+<pre><code class="language-python"># A two-stage residue recovery for a squared polynomial factor.
+# It replaces one 2^(2*deg(p)) scan with two scans of at most 2^deg(p).
+
+def gf2_poly_mul(x: int, y: int) -&gt; int:
+    &quot;&quot;&quot;Carryless polynomial multiplication over GF(2), without reduction.&quot;&quot;&quot;
+    product = 0
+    while y:
+        if y &amp; 1:
+            product ^= x
+        x &lt;&lt;= 1
+        y &gt;&gt;= 1
+    return product
+
+
+def recover_repeated_factor(residues_mod_p, factor_p, oracle):
+    &quot;&quot;&quot;Recover q modulo p^2 using a base-residue scan and coset lift.&quot;&quot;&quot;
+    base = None
+
+    # Stage 1: recover q mod p.
+    for q0 in residues_mod_p:
+        if oracle(candidate_for_mod_p=q0):
+            base = q0
+            break
+
+    if base is None:
+        raise RuntimeError(&quot;no base residue found in mod-p search&quot;)
+
+    # Stage 2: lift to q mod p^2.
+    # Every lift has form q = q0 XOR (p * t) for some t in [0, 2^deg(p)).
+    for t in residues_mod_p:
+        lifted = base ^ gf2_poly_mul(factor_p, t)
+        if oracle(candidate_for_mod_p_squared=lifted):
+            return lifted
+
+    raise RuntimeError(&quot;no lifted residue found in mod-p^2 search&quot;)
+</code></pre>
+<h3>Benchmark Parser</h3>
+<pre><code class="language-python"># Parse benchmark notes into structured rows for analysis.
+import re
+from pathlib import Path
+
+BENCH_LINE = re.compile(
+    r&quot;tick\s+(?P&lt;tick&gt;\d+).*?ink\s+(?P&lt;ink&gt;\d+).*?whiteout\s+(?P&lt;whiteout&gt;\d+).*?combined\s+(?P&lt;combined&gt;\d+)&quot;,
+    re.IGNORECASE,
+)
+
+
+def parse_benchmark(path: str):
+    rows = []
+    for line in Path(path).read_text().splitlines():
+        match = BENCH_LINE.search(line)
+        if not match:
+            continue
+        rows.append({k: int(v) for k, v in match.groupdict().items()})
+    return rows
+</code></pre>
+<h3>Fallback Testing Checklist</h3>
+<pre><code class="language-bash"># 1. Confirm the WASM file exists and is non-empty.
+ls -lh &lt;solver-file&gt;.wasm
+
+# 2. Run against at least one known seed.
+python ./run_wasm.py ./&lt;solver-file&gt;.wasm --seed-hex &lt;64_HEX_SEED&gt;
+
+# 3. Confirm success and capture cost. Expected shape:
+#    Success: True
+#    Ink used: &lt;number&gt;
+#    Whiteout used: &lt;number&gt;
+#    Call counts: advance=&lt;n&gt; intercept=&lt;n&gt; release=&lt;n&gt; edit=&lt;n&gt; gotcha=1
+
+# 4. Repeat across multiple seeds to detect seed-specific failure modes.
+for seed in &lt;SEED_1&gt; &lt;SEED_2&gt; &lt;SEED_3&gt;; do
+    python ./run_wasm.py ./&lt;solver-file&gt;.wasm --seed-hex &quot;$seed&quot;
+done
+</code></pre>
+<h2>4. Concept Review</h2>
+<h3>The protocol's invariant failures</h3>
+<p>Two exploitable protocol primitives, amplified by the algebraic key-schedule structure, made recovery achievable.</p>
+<ol>
+<li>The first is that state-changing key-rotation messages are accepted based on protocol position without sufficient end-to-end authentication. 
+The target reads the first 16 bytes of a key-rotation message as a multiplier and the next 16 as an offset, then updates its key using an algebraic rule. Because I, as the attacker, could edit a rotation message in transit, I gained a chosen-key-transition primitive.</li>
+</ol>
+<p>Sanitized update rule:</p>
+<pre><code class="language-text">new_key = multiplier * (old_key XOR offset) mod REDACTED_MODULUS
+</code></pre>
+<ol start="2">
+<li>The second is that MAC-authenticated tokens carry a plaintext rotation-epoch selector and isn't covered by the token's authenticated scope, where verification chooses its key by reading that selector. 
+I could therefore capture a token from one epoch and replay it through a verification request that selected a different epoch's key. A VALID response overwhelmingly indicated that the selected epoch used the same effective MAC key and authenticated input as the original, assuming a full-length secure HMAC construction and negligible collision probability; I did not have to learn either key directly.</li>
+</ol>
+<h3>The Verification Oracle</h3>
+<p>The verifier becomes a practical key-equivalence oracle over the key schedule. 
+1. Given a captured token carrying a tag generated under key <code>K_a</code>, a verification request that selects key <code>K_b</code> returns VALID when the selected key and authenticated input reproduce the captured tag. 
+2. Under the challenge's HMAC assumptions, this overwhelmingly indicates <code>K_a == K_b</code>, although it is not a literal mathematical "if and only if" because collisions are theoretically possible and truncated tags can weaken inference. 
+3. Each query produces one binary observation; because I was testing candidate equality rather than balanced subsets, an <code>N</code>-candidate scan generally required linear rather than logarithmic query cost.</p>
+<h3>The Algebraic Structure</h3>
+<p>The 128-bit key is naturally an element of <code>GF(2)[x] / m(x)</code>, where <code>m(x)</code> is the fixed reduction polynomial used by the target. 
+In this ring XOR is addition and the key update is polynomial multiplication followed by modular reduction.</p>
+<ol>
+<li>The critical algebraic weakness is that the modulus is <strong>reducible</strong> in <code>GF(2)[x]</code>. If <code>m(x) = ∏ p_i(x)^{e_i}</code> with distinct irreducible factors <code>p_i</code>, the polynomial CRT gives an isomorphism from <code>GF(2)[x] / (m)</code> to the direct product of the smaller component rings <code>GF(2)[x] / (p_i^{e_i})</code>. </li>
+<li>The component cardinalities still multiply to <code>2^128</code>; what became manageable was the oracle-query cost, and; because I could recover the components independently, then the small scan costs instead of searching the full space monolithically. </li>
+<li>Reducibility alone would not disclose the key; it became exploitable because the chosen-transition primitive and verification oracle let me isolate and test those components.
+  A. Each ordinary factor of degree <code>d</code> contributes a residue space of <code>2^d</code> candidates. 
+  B. A squared factor <code>p^2</code> with <code>deg(p) = d</code> contains <code>2^(2d)</code> residues, but the available oracle let me recover it through a base-residue scan modulo <code>p</code> followed by a scan of the <code>2^d</code> corresponding coset lifts modulo <code>p^2</code>.</li>
+</ol>
+<h3>Why Two-Stage Residue Lift Matters</h3>
+<ol>
+<li>For a degree-5 factor <code>p</code>, naively scanning the <code>p^2</code> component enumerates 1024 residue candidates. </li>
+<li>The two-stage approach first recovers the base residue modulo <code>p</code> with up to 32 tests, then writes each lift modulo <code>p^2</code> as <code>q = q_0 XOR (p * t)</code> and searches the 32 possible values of <code>t</code>. </li>
+</ol>
+<p>That is at most about 64 candidate tests instead of 1024, and fewer on average when a scan stops as soon as it finds the matching candidate.</p>
+<p>The lift-candidate construction had a subtle, challenge-specific algebraic requirement. 
+A. In my implementation, when the solver maintained an accumulated affine state across rotations, the additive delta between the accumulated state and the test rotation reduced inside each targeted component to the generator <code>X</code>, not to the multiplicative identity; which meant an in-component value of <code>0x02</code>, not <code>X + 1</code> (<code>0x03</code>). 
+B. Using the wrong value shifted one recovered residue and caused final verification to fail. 
+C. This is the kind of bug that produced consistent good looking algebraics but still required me to commit component-level testing, during live scorin</p>
+<h3>Why Cost Optimization Matters</h3>
+<p>Edit cost was weighted asymmetrically: 
+1. Each old-to-new nibble transition carried an <code>(ink, whiteout)</code> cost. 
+2. Two algebraically equivalent test rotations could therefore have very different rewrite costs against the same donor message. </p>
+<p>Once I had a correct exploit, the rest became a weighted-mutation problem to minimize edit cost over: </p>
+<p>A. Which equivalent algebraic payloads I use
+B. Which donor I select
+C. How I ordered testing</p>
+<p>Cost optimization became an inflection point for me during this writeup. 
+1. Finding the vulnerability is one skill; 
+2. Engineering the exploit against an objective is a second one. </p>
+<p>In KoTH events or engagements with a constrained action budget, the second skill decides how you finish.</p>
+<h2>5. Exploit/Analysis Mechanics</h2>
+<h3>Step 1: Establish Primitives Over the Message Flow</h3>
+<p>The solver waits for interceptable messages and treats any sufficiently long in-flight message as a candidate donor. </p>
+<p>Operational constraints:
+a. I can only hold one message at a time.
+b. Edits preserve content length.
+c. Intercept, edit, and release all advance simulator time.
+d. Uncontrolled key-rotation messages can perturb a target's key state and desync the affine model.</p>
+<h3>Step 2: Preserve or Capture the Original Key State</h3>
+<p>The target starts at rotation epoch 0 with the protected initial key as <code>keys[0]</code>. 
+1. I, as the attacker, take the first initiated rotation and either edit it to an algebraic identity (<code>multiplier = 1</code>, <code>offset = 0</code>) or route it away from the target entirely. 
+2. Both produce the same relevant result: the target's MAC key remains the initial key, so the next MAC-authenticated message produced under Carol-style traffic carries a tag generated under the original secret.</p>
+<h3>Step 3: Capture a Reference MAC</h3>
+<p>The solver captures the first MAC-authenticated token produced after Step 2. 
+1. That token is my reference probe. 
+2. I do not have to forge it because the target hands me a valid tag under the initial key. 
+3. I can reuse the token and tag in later verification requests while altering the unauthenticated rotation selector.</p>
+<h3>Step 4: Build a Key-Equality Oracle</h3>
+<p>The solver then crafts verification requests that reuse the reference token and MAC while altering the rotation field to select a different epoch's key. 
+1. The verifier recomputes HMAC with the selected key. 
+2. A matching tag overwhelmingly indicates that the selected epoch uses the same effective MAC key and authenticated input as the original.
+3. This gave me a binary key-equivalence oracle over the rotation schedule.</p>
+<h3>Step 5: Drive Chosen Key Rotations</h3>
+<p>The immediate-test equation for a single rotation against the initial key is:</p>
+<pre><code class="language-text">multiplier * (K XOR offset) ≡ K (mod REDACTED_MODULUS)
+</code></pre>
+<p>In practice, I ran tests over a chain of rotations. 
+1. The state I needed to control was the accumulated affine pair <code>(alpha, beta)</code>, with <code>current_key = alpha * initial_key XOR beta</code>. 
+2. Each new test rotation <code>(a, b)</code> updates this to:</p>
+<pre><code class="language-text">alpha_new = a * alpha
+beta_new  = a * (beta XOR b)
+</code></pre>
+<p>I engineered the solver:
+3. To choose <code>(a, b)</code> so that the test for "current key equals initial key" or; equivalently <code>alpha * K XOR beta == K</code>, or <code>(alpha XOR 1) * K == beta</code>, encoded a chosen residue test on <code>K</code> modulo, which was the component of the factored modulus I was targeting. 
+4. My implementation kept <code>(alpha, beta)</code> per session and emitted each test rotation as an edit to an attacker-initiated rotation donor. 
+5. Correctness also depended on the chosen coefficient isolating the intended component without introducing multiple passing candidates through a zero divisor; that property was validated against the simulator and component tests.</p>
+<p>My proof sketch: 
+A. Let <code>c = alpha XOR 1</code>. Construct <code>c</code> and <code>beta</code> through CRT so that, in every non-target component, <code>c_j = 0</code> and <code>beta_j = 0</code>; satisfying <code>c_j * K_j = beta_j</code> automatically. 
+B. In the target component, choose <code>c_i</code> as a unit and set <code>beta_i = c_i * r</code> for the candidate residue <code>r</code>. 
+C. The equality test reduces to <code>c_i * (K_i XOR r) = 0</code>, which holds exactly when <code>K_i = r</code> because multiplication by a unit is injective. 
+D. For repeated-factor components, explicitly avoiding coefficients divisible by <code>p</code> prevents zero divisors from allowing multiple candidates to pass.</p>
+<h3>Step 6: Recover Residues Factor by Factor</h3>
+<p>For each ordinary factor of degree <code>d</code>, the solver scans up to <code>2^d</code> candidate residues. 
+1. The per-factor candidate counts stay small: 16 for the degree-4 factor, 32 for degree 5, 64 for degree 6, and 128 for degree 7. 
+2. Each test attempt produces either VALID or INVALID; under the challenge's oracle assumptions and my component-isolation construction. 
+3. The matching residue is the candidate that returns VALID.</p>
+<h3>Step 7: Recover the Repeated Factor Through a Two-Stage Residue Lift</h3>
+<p>Then I recover the squared factor in two stages. 
+1. First, I scan up to <code>2^d</code> candidates for the base residue modulo <code>p</code>. 
+2. Next, I express each lift as <code>q = q_0 XOR (p * t)</code> and scan up to <code>2^d</code> values of <code>t</code> to identify the matching residue modulo <code>p^2</code>. 
+3. The in-component algebra uses the challenge-specific scaling value noted in Section 4 (<code>X</code>, not <code>X + 1</code>), as encoded in the solver's stage table. 
+4. The worst-case number of candidate checks is approximately <code>2 * 2^d = 2^(d+1)</code>, rather than <code>2^(2d)</code>.</p>
+<h3>Step 8: Reconstruct the Full Key</h3>
+<p>After I recover all residues, the solver uses CRT to recombine them. 
+1. The reconstruction uses precomputed basis elements <code>E_i</code>, where each <code>E_i</code> is congruent to 1 modulo the <code>i</code>th prime-power component and 0 modulo every other component. 
+2. The recovered key is <code>XOR_i (residue_i * E_i)</code>.</p>
+<h3>Step 9: Submit the recovered key</h3>
+<p>Finally, 
+1. I have the solver write the reconstructed key into WASM memory at a known offset.
+2. Then, call the host success function with a pointer to that memory. 
+3. A successful return code confirms that my reconstruction matches the target's protected initial key.</p>
+<h2>6. Lessons Learned</h2>
+<h3>Methodology Validation</h3>
+<p>This challenge was explicit instruction to treat interactive protocols as a state machine, not a bag of random isolated messages. 
+1. The exploit did not come from one malformed packet.
+2. It came from chaining key rotation, MAC generation, verification, and replay into a single recovery workflow where the primitives composed under the protocol's own state transitions.
+3. Keep my concerns about the challenge environment separate from solver correctness. 
+  a. My initial fixed-seed validator wasn't a viable live solver, but it earned its place because it proved memory layout, import resolution, and call mechanics before I even touched the algebra. 
+  b. The big takeaway was to validate the runtime, then build the exploit.</p>
+<h3>Gaps and/or Inefficiencies</h3>
+<p>My biggest experienced inefficiency was me assuming that a mathematically correct payload was also cost-efficient. 
+1. Once the solver worked, the live scoring made donor choice and edit cost equally important as cryptographic correctness. 
+2. Recognizing that the problem shifted into cost efficiency and performance improvement took valuable cycles waiting for new seed to post. 
+3. These efforts required real-time R&amp;D and then deploy time, all taking away from live scoring cycles.</p>
+<p>The second gap I had was understanding the scheduler's fragility under host timing. 
+4. Several optimizations looked clean in my IDE but failed and wasted cycles.
+5. This is because each host call advanced simulator time and I could only hold one message. I</p>
+<p>In my post-mortem/AAR; big takeaway was on timing and queue state, that they are part of the attack surface for active protocol exploitation, not implementation considerations.</p>
+<p>The third, honestly, was tool selection. 
+6. My initial solver validated the ABI mechanics but left me grasping for a live solve. 
+7. Recognizing when an approach had hit its ceiling and pivoting decisively was an operational discipline the exercise underscored. 
+8. The adrenaline of live R&amp;D and implementation was exciting. 
+9. My unfamiliarity with the problem and with WebAssembly had me spending more R&amp;D time during live scoring, costing scoring cycles and creating frustration. </p>
+<p>FWIW, I was able to pivot to the live-solve mechanism, but at the cost of team scoring and performance optimization.</p>
+<h3>Transferable Principles</h3>
+<div class="tablewrap"><table>
+<thead>
+<tr>
+<th>Exercise behavior</th>
+<th>Operational behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Validate the ABI before optimizing</td>
+<td>Confirm access, telemetry, and control primitives before deeper tradecraft</td>
+</tr>
+<tr>
+<td>Treat verification results as oracles</td>
+<td>Hunt for endpoints that leak state through success/failure responses</td>
+</tr>
+<tr>
+<td>Model protocol state transitions</td>
+<td>Build state-machine hypotheses during incident reconstruction</td>
+</tr>
+<tr>
+<td>Separate local reproducibility from live assumptions</td>
+<td>Avoid overfitting to lab artifacts or test seeds</td>
+</tr>
+<tr>
+<td>Optimize mutation cost after correctness</td>
+<td>Tune detections and response actions for operational cost and reliability</td>
+</tr>
+<tr>
+<td>Account for host-side-effect timing</td>
+<td>Treat race conditions, retries, and queue state as part of the threat model</td>
+</tr>
+<tr>
+<td>Switch tools when one hits its ceiling</td>
+<td>Recognize when a chosen analytical approach has run out of leverage and escalate</td>
+</tr>
+</tbody>
+</table></div>
+<h2>7. Extrapolation</h2>
+<h3>How I Developed</h3>
+<p>The exercise demanded skills I had and required tooling/protocol knowledge I didn't. 
+I was forced in real-time to chain these together to not only understand the challenge and ID the weakness, but then engineer an exploit and cost optimize it. </p>
+<ol>
+<li>Reading and instrumenting a custom protocol simulator from source.</li>
+<li>Understanding WebAssembly and producing a compliant client.</li>
+<li>Translating source-code behavior into an exploit model.</li>
+<li>Recognizing oracle behavior in verification logic.</li>
+<li>Applying quotient-ring arithmetic, CRT, and two-stage residue lifting to a practical key-recovery workflow.</li>
+<li>Benchmarking variants in a live fire environment, with cost-objective scoring, live performance optimization.</li>
+</ol>
+<p>Adjacent skills I identified as deficient were protocol reverse engineering, state-machine fuzzing, test harness design, and exploit engineering. 
+I've committed myself to whiteboarding and upskilling on these skill opportunities. </p>
+<p>This is not a typical writeup. I have a specific need abstract &amp; extrapolate my learning; in this instance it was appplication to relevant security domains and skills. 
+A. The challenge was 33% of the effort. 
+B. The research into Blue and Purple team additives; Detections, SIGMA, YAML, frameworks, etc. was 33% of the effort. 
+C. Last 33% was this writeup and distilling efforts and thoughts.</p>
+<h3>SecOps, IR, and Threat Hunting</h3>
+<p>IRL, security practitioners would most reliably see this behavior through abnormal application-protocol state transitions: repeated validation failures, unusual key-rotation sequences, and retry storms. 
+1. Directly detecting in-flight message mutation would require specialized visibility, such as captures on both sides of an intermediary, instrumented relays, or endpoint pre-send and post-receive hashes. 
+2. My defensive extrapolation is that application behavior would likely produce the first useful detection before a known signature for cryptographic misuse popped off.</p>
+<p>These are my Threat Hunting hypotheses:</p>
+<p>A. Repeated verification attempts against the same MAC-authenticated object across multiple key epochs.
+B. Key-rotation messages with unusual frequency, sender, or recipient paths.
+C. Acknowledgement suppression followed by retransmission storms with stable content.
+D. Same-length message mutations with preserved framing, but only where instrumented transport, paired captures, or endpoint hashing provides before-and-after visibility.
+E. Verification failure bursts that eventually succeed after many candidates.</p>
+<p>Which then give way to these Incident Response implications:</p>
+<p>F. Preserve application-layer protocol logs, not just packet metadata.
+G. Log key-rotation identifiers and verification rotation indices.
+H. Alert on repeated use of older tokens against newer epochs.
+I. Treat retry behavior as a security signal when paired with validation anomalies.</p>
+<h3>Detection Engineering Theory</h3>
+<p>These are detection theories I want validate. </p>
+<ol>
+<li>Verification endpoints that leak success or failure across an attacker-controlled context selector should be treated as oracle surfaces and instrumented for repeated-query detection.</li>
+<li>Protocols whose MAC scope excludes attacker-controlled selectors such as rotation, epoch, or version should bind those fields—along with sender, recipient, message type, and freshness data—into a canonical authenticated context.</li>
+</ol>
+<p>Fidelity expectations:</p>
+<ol start="3">
+<li>Repeated invalid verifications combined with epoch diversity is the highest-fidelity primary signal. Either alone is noisier.</li>
+<li>Key-rotation volume alone is lower fidelity because legitimate retries during transport instability look similar.</li>
+<li>ACK suppression is higher fidelity when rotations and ACKs are paired through stable identifiers and unchanged repeated content; ACK loss alone can fire on broker outages or ordinary transport instability.</li>
+</ol>
+<p>False-positive surfaces:</p>
+<ol start="6">
+<li>Integration testing with stale tokens or replayed traffic.</li>
+<li>Distributed systems with delayed message delivery causing legitimate verification failures.</li>
+<li>Blue-team exercises and red-team engagements that intentionally replay MAC-authenticated or signed messages.</li>
+<li>Client version skew during rollout creating epoch mismatches.</li>
+</ol>
+<p>Tuning considerations:</p>
+<ol start="10">
+<li>Baseline normal verification failure rates per service before alerting.</li>
+<li>Suppress known load-test and migration windows.</li>
+<li>Require both failure volume and epoch diversity for the oracle-probing alert.</li>
+<li>Use a retransmission-ratio condition, not absolute counts, for the retry-storm alert.</li>
+</ol>
+<h3>Detection Pipeline Requirements</h3>
+<div class="tablewrap"><table>
+<thead>
+<tr>
+<th>Telemetry</th>
+<th>Required fields</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Verification audit logs</td>
+<td>token hash, rotation epoch, result, sender, recipient, timestamp</td>
+<td>Detect oracle probing</td>
+</tr>
+<tr>
+<td>Key-rotation logs</td>
+<td>rotation hash, sender, recipient, epoch, timestamp</td>
+<td>Detect abnormal rotation volume</td>
+</tr>
+<tr>
+<td>ACK / retry logs</td>
+<td>message hash, retry count, ACK state, timestamp</td>
+<td>Detect retransmission abuse</td>
+</tr>
+<tr>
+<td>Message mutation logs (instrumented environments)</td>
+<td>old hash, new hash, sender change, recipient change, observation point, mutation cost</td>
+<td>Detect active tampering only where an instrumented relay, paired capture points, or endpoint hashing can compare before-and-after messages</td>
+</tr>
+<tr>
+<td>Flow logs</td>
+<td>source, destination, protocol, byte count, connection timing</td>
+<td>Detect retry storms and path anomalies</td>
+</tr>
+</tbody>
+</table></div>
+<h2>8. Reusable Tools, Scripts, and Artifacts</h2>
+<h3>Triage Decision Tree</h3>
+<pre><code class="language-text">Start
+  Does the artifact define a custom runtime or ABI?
+    Yes: Identify imports, exports, memory layout, and host side effects.
+    No: Run standard file and metadata triage.
+
+  Does the protocol expose verification success or failure?
+    Yes: Test whether responses depend on hidden state.
+    No: Look for parser confusion, replay, or state desynchronization.
+
+  Can messages be modified in transit?
+    Yes: Identify length, routing, timing, and cost constraints.
+    No: Focus on passive leakage or endpoint compromise.
+
+  Is key material transformed by algebraic operations?
+    Yes: Inspect the quotient-ring or field assumptions, modulus factorization, and state invariants.
+    No: Model the state transition in ordinary protocol terms.
+
+  Is scoring cost-based?
+    Yes: Optimize donor choice, mutation cost, call count, and scheduler safety.
+    No: Prioritize reliability and final answer format.
+</code></pre>
+<h3>Reusable CTF Solve Checklist</h3>
+<div class="tablewrap"><table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Question</th>
+<th>Evidence to collect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ABI discovery</td>
+<td>What actions can the payload take?</td>
+<td>Import/export spec, host call behavior</td>
+</tr>
+<tr>
+<td>State model</td>
+<td>What entities and timers exist?</td>
+<td>Simulator source, state dump, message queues</td>
+</tr>
+<tr>
+<td>Mutation model</td>
+<td>What can be changed?</td>
+<td>Edit constraints, routing controls, length checks</td>
+</tr>
+<tr>
+<td>Oracle discovery</td>
+<td>What response leaks hidden state?</td>
+<td>VALID/INVALID, error codes, timing, retries</td>
+</tr>
+<tr>
+<td>Algebra model</td>
+<td>What operation transforms secrets?</td>
+<td>Key schedule, modulus, reduction logic</td>
+</tr>
+<tr>
+<td>Decomposition</td>
+<td>Can the problem be split?</td>
+<td>Factorization, CRT basis, subgroup tests</td>
+</tr>
+<tr>
+<td>Recombination</td>
+<td>How are partial results fused?</td>
+<td>CRT or equivalent reconstruction</td>
+</tr>
+<tr>
+<td>Cost model</td>
+<td>What is the scoring objective?</td>
+<td>Edit costs, call counts, timing, ranking data</td>
+</tr>
+<tr>
+<td>Live validation</td>
+<td>Does it hold outside the lab seed?</td>
+<td>Published seeds, live tick results, random seeds</td>
+</tr>
+</tbody>
+</table></div>
+<h3>Problem Identification - Oracle Abuse</h3>
+<pre><code class="language-text">1. Does verification accept a user-controlled epoch, key index, or rotation number?
+2. Can a valid object from one epoch be replayed into another epoch?
+3. Does the verifier reveal separate success and failure states?
+4. Does failure remove, blacklist, rotate, or otherwise change state?
+5. Can an attacker generate chosen state transitions before asking the oracle?
+6. Are retry or acknowledgement behaviors observable and attacker-influenceable?
+7. Are logs available for both request framing and verification result?
+8. Is the MAC or signature scope bound to sender, recipient, message type, epoch, and a monotonic counter?
+9. Are repeated verification failures aggregated and alerted on at the SIEM layer?
+</code></pre>
+<h3>Cost-Aware Payload Selection</h3>
+<pre><code class="language-python">from dataclasses import dataclass
+from typing import Callable
+
+@dataclass(frozen=True)
+class CandidatePayload:
+    content: bytes
+    sender: str
+    recipient: str
+    semantic_id: str
+
+
+def choose_cheapest_payload(
+    donor: bytes,
+    candidates: list[CandidatePayload],
+    cost_fn: Callable[[bytes, bytes], tuple[int, int]],
+    *,
+    ink_weight: int = 1,
+    whiteout_weight: int = 1,
+) -&gt; CandidatePayload:
+    &quot;&quot;&quot;Select the lowest weighted-cost payload among equivalent candidates.&quot;&quot;&quot;
+    same_length = [c for c in candidates if len(c.content) == len(donor)]
+    if not same_length:
+        raise ValueError(&quot;no same-length candidates available&quot;)
+
+    def score(candidate: CandidatePayload) -&gt; int:
+        ink, whiteout = cost_fn(donor, candidate.content)
+        return ink_weight * ink + whiteout_weight * whiteout
+
+    return min(same_length, key=score)
+</code></pre>
+<p>Usage notes:</p>
+<ol>
+<li>Generate multiple semantically equivalent payloads before calling this helper.</li>
+<li>Use the actual current donor bytes, not a generic template.</li>
+<li>Supply the actual scoring weights rather than assuming ink and whiteout have equal value.</li>
+<li>Reject candidates that are cheaper but destabilize the scheduler.</li>
+<li>Include host-call, delay, and failure-risk costs in a higher-level objective when they materially affect the live score.</li>
+</ol>
+<h2>9. Framework Mapping</h2>
+<p>Even though this effectively was a simulation, this mapping allowed me to take the attack full circle.
+I used ATT&amp;CK as the baseline, and where I could and it was accurate, I included CAPEC, D3FEND, and CWE as complementary lenses. </p>
+<div class="tablewrap"><table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>ID</th>
+<th>Name</th>
+<th>Mapping rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MITRE ATT&amp;CK</td>
+<td>T1557</td>
+<td>Adversary-in-the-Middle</td>
+<td>The adversary positions between communicating entities and manipulates traffic.</td>
+</tr>
+<tr>
+<td>MITRE ATT&amp;CK</td>
+<td>T1565.002</td>
+<td>Transmitted Data Manipulation</td>
+<td>The adversary alters in-flight messages to change protocol outcomes. This is a strong behavioral mapping, although ATT&amp;CK classifies the technique under Impact while the challenge objective was key recovery.</td>
+</tr>
+<tr>
+<td>MITRE CAPEC</td>
+<td>CAPEC-94</td>
+<td>Adversary in the Middle</td>
+<td>Attack pattern: intercept and alter data between participants.</td>
+</tr>
+<tr>
+<td>MITRE CAPEC</td>
+<td>CAPEC-272</td>
+<td>Protocol Manipulation</td>
+<td>The adversary exploits invalid protocol assumptions and manipulates state-changing protocol messages.</td>
+</tr>
+<tr>
+<td>MITRE CAPEC</td>
+<td>CAPEC-594</td>
+<td>Traffic Injection</td>
+<td>The adversary injects or rewrites traffic over an interceptable channel to influence protocol state.</td>
+</tr>
+<tr>
+<td>MITRE D3FEND</td>
+<td>D3-MAN</td>
+<td>Message Authentication</td>
+<td>Strong message authentication and context-binding mitigate replay and rotation abuse.</td>
+</tr>
+<tr>
+<td>MITRE D3FEND</td>
+<td>D3-NTSA</td>
+<td>Network Traffic Signature Analysis</td>
+<td>Protocol-aware signatures can identify repeated VERIFY and key-rotation abuse.</td>
+</tr>
+<tr>
+<td>MITRE D3FEND</td>
+<td>D3-PMAD</td>
+<td>Protocol Metadata Anomaly Detection</td>
+<td>Protocol metadata can expose unusual epoch selection, rotation frequency, and retry behavior.</td>
+</tr>
+<tr>
+<td>MITRE CWE</td>
+<td>CWE-203</td>
+<td>Observable Discrepancy</td>
+<td>The verifier exposes distinguishable VALID/INVALID responses that reveal key-equality information across rotation contexts.</td>
+</tr>
+<tr>
+<td>MITRE CWE</td>
+<td>CWE-345</td>
+<td>Insufficient Verification of Data Authenticity</td>
+<td>State-changing rotation data is accepted without sufficient end-to-end authentication and context binding.</td>
+</tr>
+<tr>
+<td>MITRE CWE</td>
+<td>CWE-294</td>
+<td>Authentication Bypass by Capture-Replay</td>
+<td>A valid MAC-authenticated token can be replayed through a different, attacker-selected rotation context.</td>
+</tr>
+<tr>
+<td>MITRE CWE</td>
+<td>CWE-1240</td>
+<td>Use of a Cryptographic Primitive with a Risky Implementation</td>
+<td>The protocol uses a custom, structurally weak key-transition construction rather than a standardized and independently analyzed key-management design.</td>
+</tr>
+</tbody>
+</table></div>
+<p>OWASP is omitted because this is not a web application vulnerability. </p>
+<p>STRIDE's explicit trust boundaries make it useful as a compact secondary check.</p>
+<div class="tablewrap"><table>
+<thead>
+<tr>
+<th>STRIDE category</th>
+<th>Application</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Spoofing</td>
+<td>Mutable sender, recipient, or epoch claims can be treated as authoritative.</td>
+</tr>
+<tr>
+<td>Tampering</td>
+<td>Rotation commands and verification requests are modified in transit.</td>
+</tr>
+<tr>
+<td>Repudiation</td>
+<td>Weakly authenticated control messages complicate attribution and audit reconstruction.</td>
+</tr>
+<tr>
+<td>Information disclosure</td>
+<td>Repeated oracle use ultimately discloses the protected initial key.</td>
+</tr>
+<tr>
+<td>Denial of service</td>
+<td>ACK suppression and retransmission manipulation can consume timing and queue budgets.</td>
+</tr>
+<tr>
+<td>Elevation of privilege</td>
+<td>The attacker gains unauthorized control over key state and verification context.</td>
+</tr>
+</tbody>
+</table></div>
+<h2>10. Threat Intel and Standards Integration</h2>
+<h3>STIX representation</h3>
+<p>The following STIX bundle is my attempt to link indicators, attack patterns, and a CoA through typed relationships to give threat teams a minimum useful structure. 
+1. It is intentionally illustrative rather than fully interoperable.
+2. The indicator pattern assumes a pre-aggregated custom protocol-event summary. 
+3. In production this SCO needs to be ran through a STIX 2.1 Extension Definition with a published schema, and calculate the counts and observation window in an external analytics pipeline.</p>
+<pre><code class="language-json">{
+  &quot;type&quot;: &quot;bundle&quot;,
+  &quot;id&quot;: &quot;bundle--00000000-0000-4000-8000-000000000001&quot;,
+  &quot;objects&quot;: [
+    {
+      &quot;type&quot;: &quot;attack-pattern&quot;,
+      &quot;spec_version&quot;: &quot;2.1&quot;,
+      &quot;id&quot;: &quot;attack-pattern--00000000-0000-4000-8000-000000000002&quot;,
+      &quot;created&quot;: &quot;2026-01-01T00:00:00.000Z&quot;,
+      &quot;modified&quot;: &quot;2026-01-01T00:00:00.000Z&quot;,
+      &quot;name&quot;: &quot;Application-layer adversary-in-the-middle message manipulation&quot;,
+      &quot;description&quot;: &quot;An adversary intercepts and modifies structured protocol messages to influence key state and verification outcomes.&quot;,
+      &quot;external_references&quot;: [
+        { &quot;source_name&quot;: &quot;mitre-attack&quot;, &quot;external_id&quot;: &quot;T1557&quot; },
+        { &quot;source_name&quot;: &quot;mitre-attack&quot;, &quot;external_id&quot;: &quot;T1565.002&quot; },
+        { &quot;source_name&quot;: &quot;capec&quot;, &quot;external_id&quot;: &quot;CAPEC-272&quot; }
+      ]
+    },
+    {
+      &quot;type&quot;: &quot;indicator&quot;,
+      &quot;spec_version&quot;: &quot;2.1&quot;,
+      &quot;id&quot;: &quot;indicator--00000000-0000-4000-8000-000000000003&quot;,
+      &quot;created&quot;: &quot;2026-01-01T00:00:00.000Z&quot;,
+      &quot;modified&quot;: &quot;2026-01-01T00:00:00.000Z&quot;,
+      &quot;name&quot;: &quot;Repeated verification failures across multiple key epochs&quot;,
+      &quot;description&quot;: &quot;Behavioral indicator over a pre-aggregated custom protocol-event summary: repeated INVALID verification results against the same MAC-authenticated token hash, spanning multiple key-rotation epochs in a defined observation window.&quot;,
+      &quot;indicator_types&quot;: [&quot;malicious-activity&quot;],
+      &quot;pattern_type&quot;: &quot;stix&quot;,
+      &quot;pattern&quot;: &quot;[x-protocol-event-summary:event_type = 'VerifyResultSummary' AND x-protocol-event-summary:invalid_count &gt;= 20 AND x-protocol-event-summary:distinct_rotation_epoch_count &gt;= 5 AND x-protocol-event-summary:window_seconds &lt;= 600]&quot;,
+      &quot;valid_from&quot;: &quot;2026-01-01T00:00:00.000Z&quot;
+    },
+    {
+      &quot;type&quot;: &quot;course-of-action&quot;,
+      &quot;spec_version&quot;: &quot;2.1&quot;,
+      &quot;id&quot;: &quot;course-of-action--00000000-0000-4000-8000-000000000004&quot;,
+      &quot;created&quot;: &quot;2026-01-01T00:00:00.000Z&quot;,
+      &quot;modified&quot;: &quot;2026-01-01T00:00:00.000Z&quot;,
+      &quot;name&quot;: &quot;Bind MACs or signatures to protocol context&quot;,
+      &quot;description&quot;: &quot;Require MACs or signatures to cover sender, recipient, message type, rotation epoch, key identifier, protocol version, and a monotonic replay-prevention counter. Alert on repeated verification failures across epochs.&quot;
+    },
+    {
+      &quot;type&quot;: &quot;relationship&quot;,
+      &quot;spec_version&quot;: &quot;2.1&quot;,
+      &quot;id&quot;: &quot;relationship--00000000-0000-4000-8000-000000000005&quot;,
+      &quot;created&quot;: &quot;2026-01-01T00:00:00.000Z&quot;,
+      &quot;modified&quot;: &quot;2026-01-01T00:00:00.000Z&quot;,
+      &quot;relationship_type&quot;: &quot;indicates&quot;,
+      &quot;source_ref&quot;: &quot;indicator--00000000-0000-4000-8000-000000000003&quot;,
+      &quot;target_ref&quot;: &quot;attack-pattern--00000000-0000-4000-8000-000000000002&quot;
+    },
+    {
+      &quot;type&quot;: &quot;relationship&quot;,
+      &quot;spec_version&quot;: &quot;2.1&quot;,
+      &quot;id&quot;: &quot;relationship--00000000-0000-4000-8000-000000000006&quot;,
+      &quot;created&quot;: &quot;2026-01-01T00:00:00.000Z&quot;,
+      &quot;modified&quot;: &quot;2026-01-01T00:00:00.000Z&quot;,
+      &quot;relationship_type&quot;: &quot;mitigates&quot;,
+      &quot;source_ref&quot;: &quot;course-of-action--00000000-0000-4000-8000-000000000004&quot;,
+      &quot;target_ref&quot;: &quot;attack-pattern--00000000-0000-4000-8000-000000000002&quot;
+    }
+  ]
+}
+</code></pre>
+<p>Deployment Consideration: 
+1. The UUIDS must be replaced with globally unique identifiers before exchange. 
+2. The STIX pattern does not calculate counts; it matches a summary object whose producing analytic has already calculated the ten-minute window, failure count, and epoch diversity.</p>
+<h3>STIG and CIS integration</h3>
+<p>STIG: N/A, as this exercise used a custom simulator rather than a deployed OS, APP, platform, etc. 
+CIS: Control concepts still map cleanly to CIS Controls and NIST SP 800-53 as the relevant defensive requirements are transport integrity, session authenticity, logging, monitoring, and cryptographic design review.</p>
+<h2>11. Controls Mapping and Mitigation Realization</h2>
+<h3>11a. Standards Mapping</h3>
+<div class="tablewrap"><table>
+<thead>
+<tr>
+<th>Standard</th>
+<th>Control</th>
+<th>Title</th>
+<th>Why it applies</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>SC-8</td>
+<td>Transmission Confidentiality and Integrity</td>
+<td>The exploit depends on in-transit message modification.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>SC-13</td>
+<td>Cryptographic Protection</td>
+<td>The protocol relies on MAC generation, verification, and key rotation that must be correctly designed and implemented.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>SC-23</td>
+<td>Session Authenticity</td>
+<td>Sender, recipient, and session context must be authenticated to prevent insertion and replay.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>SC-12</td>
+<td>Cryptographic Key Establishment and Management</td>
+<td>Key rotation and lifecycle operations require protected management.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>AU-12</td>
+<td>Audit Record Generation</td>
+<td>Detection depends on audit records for verification, rotation, and retry behavior.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>SI-4</td>
+<td>System Monitoring</td>
+<td>Repeated oracle probes and abnormal retransmissions should be monitored.</td>
+</tr>
+<tr>
+<td>CIS Controls v8.1</td>
+<td>8.2</td>
+<td>Collect Audit Logs</td>
+<td>Endpoint and application logs are required to reconstruct protocol abuse.</td>
+</tr>
+<tr>
+<td>CIS Controls v8.1</td>
+<td>13.1</td>
+<td>Centralize Security Event Alerting</td>
+<td>Correlation is needed across verification failures, retransmissions, and key rotations.</td>
+</tr>
+<tr>
+<td>CIS Controls v8.1</td>
+<td>13.3</td>
+<td>Deploy a Network Intrusion Detection Solution</td>
+<td>A protocol-aware sensor may identify unusual repeated protocol messages, although application audit logs are likely to carry higher-fidelity semantics.</td>
+</tr>
+<tr>
+<td>CIS Controls v8.1</td>
+<td>13.6</td>
+<td>Collect Network Traffic Flow Logs</td>
+<td>Flow-level telemetry can support identification of retry storms and unexpected communication paths, but it cannot normally prove application-message mutation.</td>
+</tr>
+</tbody>
+</table></div>
+<h3>11b. Mitigation Realization</h3>
+<div class="tablewrap"><table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Operational realization</th>
+<th>Example artifact</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SC-8</td>
+<td>Use authenticated transport and end-to-end message integrity protection for all protocol messages.</td>
+<td>Mutual TLS, an authenticated message bus, and authenticated envelopes that remain protected across intermediary hops.</td>
+</tr>
+<tr>
+<td>SC-13</td>
+<td>Use standardized, independently reviewed cryptographic and key-management constructions; prohibit custom key-transition algebra without formal analysis and misuse-resistance testing.</td>
+<td>Cryptographic design standard, approved-algorithm inventory, independent review record, and negative tests for replay and context confusion.</td>
+</tr>
+<tr>
+<td>SC-23</td>
+<td>Bind MACs or signatures to sender, recipient, message type, rotation epoch, protocol version, key identifier, and a monotonic counter.</td>
+<td>Canonical length-prefixed MAC input plus replay-state enforcement (see pseudo-code below).</td>
+</tr>
+<tr>
+<td>SC-12</td>
+<td>Require key-rotation messages to be authenticated, replay-protected, monotonic, and authorized independently of ordinary data-message keys.</td>
+<td>Rotation-command schema with an authenticated epoch, key identifier, nonce or counter, and a separate key purpose.</td>
+</tr>
+<tr>
+<td>AU-12</td>
+<td>Generate audit records for MAC/sign, verify, key-rotate, ACK, retry, and validation-result events.</td>
+<td>Application audit schema with token hash, rotation epoch, sender, recipient, result, timestamp, rotation identifier, and retry relationship.</td>
+</tr>
+<tr>
+<td>SI-4</td>
+<td>Alert on verification-oracle patterns and retransmission anomalies.</td>
+<td>SIEM correlation rules (see Section 12).</td>
+</tr>
+<tr>
+<td>CIS 8.2</td>
+<td>Collect application logs with protocol fields.</td>
+<td>Log pipeline with message_type, epoch, result, token_hash.</td>
+</tr>
+<tr>
+<td>CIS 13.1</td>
+<td>Centralize alerts for repeated verification failures and abnormal key rotations.</td>
+<td>SIEM dashboard and alert queue.</td>
+</tr>
+<tr>
+<td>CIS 13.3</td>
+<td>Monitor protocol signatures and message mutation indicators.</td>
+<td>NIDS or protocol-aware sensor.</td>
+</tr>
+<tr>
+<td>CIS 13.6</td>
+<td>Collect flow logs to identify retry storms.</td>
+<td>Zeek <code>conn.log</code> or equivalent cloud flow logs.</td>
+</tr>
+</tbody>
+</table></div>
+<h3>Secure Design Pseudo-Code</h3>
+<p>The original protocol's MAC input was not bound to the wider security context, which enabled the rotation-field replay. 
+1. A secure replacement should use explicit, canonical length prefixes, domain separation, protocol versioning, key identifiers and purposes, and receiver-enforced freshness. 
+2. A nonce or counter only prevents replay when the receiver verifies monotonicity or tracks prior use.</p>
+<pre><code class="language-python">import hashlib
+import hmac
+import struct
+from collections.abc import Mapping
+
+PROTOCOL_DOMAIN = b&quot;example-protocol/mac/v1&quot;
+ALGORITHM_ID = b&quot;HMAC-SHA-256&quot;
+
+
+def length_prefixed(*fields: bytes) -&gt; bytes:
+    &quot;&quot;&quot;Concatenate fields with explicit 4-byte big-endian length prefixes.
+
+    Length prefixes prevent canonicalization collisions: with a single-byte
+    delimiter, an attacker who controls one field can shift the boundary
+    between fields by including the delimiter in their value. Length
+    prefixing makes the encoding unambiguous.
+    &quot;&quot;&quot;
+    return b&quot;&quot;.join(struct.pack(&quot;&gt;I&quot;, len(f)) + f for f in fields)
+
+
+def mac_protocol_message(
+    key: bytes,
+    context: Mapping[str, object],
+    message: bytes,
+) -&gt; bytes:
+    &quot;&quot;&quot;Bind the MAC to protocol identity, state, purpose, and freshness.&quot;&quot;&quot;
+    canonical = length_prefixed(
+        PROTOCOL_DOMAIN,
+        ALGORITHM_ID,
+        str(context[&quot;protocol_version&quot;]).encode(),
+        str(context[&quot;key_id&quot;]).encode(),
+        str(context[&quot;key_purpose&quot;]).encode(),
+        str(context[&quot;sender&quot;]).encode(),
+        str(context[&quot;recipient&quot;]).encode(),
+        str(context[&quot;message_type&quot;]).encode(),
+        struct.pack(&quot;&gt;Q&quot;, int(context[&quot;rotation_epoch&quot;])),
+        struct.pack(&quot;&gt;Q&quot;, int(context[&quot;counter&quot;])),
+        bytes(context[&quot;nonce&quot;]),
+        message,
+    )
+    return hmac.new(key, canonical, hashlib.sha256).digest()
+
+
+def verify_protocol_mac(expected: bytes, supplied: bytes) -&gt; bool:
+    &quot;&quot;&quot;Use a constant-time comparison after freshness and authorization checks.&quot;&quot;&quot;
+    return hmac.compare_digest(expected, supplied)
+</code></pre>
+<h3>Example KQL Detection (Microsoft Sentinel / Azure Data Explorer)</h3>
+<pre><code class="language-kql">// Detect repeated verification failures spanning multiple key epochs.
+// Field names are illustrative; map to the local application audit schema.
+AppProtocolEvents
+| where EventType == &quot;VerifyResult&quot;
+| summarize
+    Failures = countif(Result == &quot;INVALID&quot;),
+    Successes = countif(Result == &quot;VALID&quot;),
+    EpochDiversity = dcount(RotationEpoch),
+    FirstSeen = min(TimeGenerated),
+    LastSeen = max(TimeGenerated)
+  by TokenHash, SrcEntity, DstEntity, bin(TimeGenerated, 10m)
+| where Failures &gt;= 20 and EpochDiversity &gt;= 5
+</code></pre>
+<p>This illustrative KQL uses fixed ten-minute bins rather than a true sliding window. 
+In production, I would need to consider the scheduled lookback and suppression behavior to prevent boundary misses.</p>
+<h3>Example Splunk SPL Detection</h3>
+<p>Verification-oracle analytic:</p>
+<pre><code class="language-spl">index=&lt;app_index&gt; sourcetype=&lt;protocol_audit&gt; EventType=&quot;VerifyResult&quot;
+| bin _time span=10m
+| stats
+    count(eval(Result=&quot;INVALID&quot;)) as invalid_verify,
+    dc(RotationEpoch) as unique_epochs,
+    count(eval(Result=&quot;VALID&quot;)) as valid_verify
+  by _time, TokenHash, SrcEntity, DstEntity
+| where invalid_verify &gt;= 20 AND unique_epochs &gt;= 5
+</code></pre>
+<p>Rotation and Acknowledgement Analytic:</p>
+<pre><code class="language-spl">index=&lt;app_index&gt; sourcetype=&lt;protocol_audit&gt;
+  (EventType=&quot;KeyRotationSent&quot; OR EventType=&quot;Ack&quot;)
+| eval CorrelationId=coalesce(RotationId, AckedRotationId, RotationHash)
+| bin _time span=10m
+| stats
+    count(eval(EventType=&quot;KeyRotationSent&quot;)) as rotations,
+    count(eval(EventType=&quot;Ack&quot;)) as acks
+  by _time, CorrelationId, SrcEntity, DstEntity
+| eval ack_ratio = if(rotations &gt; 0, acks / rotations, 1.0)
+| where rotations &gt;= 10 AND ack_ratio &lt; 0.2
+</code></pre>
+<p>The two behaviors are separated because: 
+1. Verification events and rotation/ACK events do not necessarily share <code>TokenHash</code>. 
+2. The retry analytic correlates ACKs through a stable rotation identifier or message hash; schemas in prod should normalize sender and recipient direction before calculating the ratio. 
+3. A threshold below 0.2 tolerates some background loss while still surfacing sustained retry behavior.</p>
+<h2>12. Indicators, Artifacts, and Detection Engineering</h2>
+<h3>Illustrative behavioral indicators</h3>
+<p>These are behavioral indicators, not static IOCs. </p>
+<div class="tablewrap"><table>
+<thead>
+<tr>
+<th>Indicator</th>
+<th>Type</th>
+<th>Detection value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Repeated INVALID verification results for the same MAC-authenticated token across multiple rotation epochs</td>
+<td>Application audit behavior</td>
+<td>High — direct behavioral signature of oracle probing under this protocol model</td>
+</tr>
+<tr>
+<td>Verification attempts against the same token spanning unusually many epochs in a short window</td>
+<td>Application audit behavior</td>
+<td>High — narrows oracle probing from generic failure noise</td>
+</tr>
+<tr>
+<td>Abnormally frequent key-rotation messages from a single source-recipient pair</td>
+<td>Protocol behavior</td>
+<td>Medium — possible attacker-controlled state manipulation</td>
+</tr>
+<tr>
+<td>ACK suppression followed by sustained retransmissions with stable content</td>
+<td>Protocol behavior</td>
+<td>Medium — possible retry abuse or transport tampering</td>
+</tr>
+<tr>
+<td>Same-length message rewrites with changed sender or recipient fields</td>
+<td>Specialized transport or endpoint telemetry</td>
+<td>Medium — requires paired captures, an instrumented relay, or pre-send/post-receive hashing; flow logs alone cannot establish mutation</td>
+</tr>
+<tr>
+<td>Bursts of validation failures followed by an eventual success against many candidates</td>
+<td>Application audit behavior</td>
+<td>High when combined with epoch diversity</td>
+</tr>
+</tbody>
+</table></div>
+<h3>Sigma rule: repeated verification failures across epochs</h3>
+<pre><code class="language-yaml">title: Protocol Verification Failure Events
+id: 00000000-0000-4000-8000-000000000100
+status: experimental
+description: Selects INVALID protocol-verification events for correlation.
+references:
+  - https://attack.mitre.org/techniques/T1557/
+  - https://attack.mitre.org/techniques/T1565/002/
+  - https://capec.mitre.org/data/definitions/94.html
+  - https://cwe.mitre.org/data/definitions/203.html
+author: portfolio-sanitized
+date: 2026-01-01
+tags:
+  - attack.t1557
+  - attack.t1565.002
+logsource:
+  product: application
+  service: protocol-audit
+detection:
+  selection:
+    EventType: VerifyResult
+    Result: INVALID
+  condition: selection
+fields:
+  - TimeGenerated
+  - SrcEntity
+  - DstEntity
+  - TokenHash
+  - RotationEpoch
+  - Result
+falsepositives:
+  - Protocol migration testing across epoch changes
+  - Load testing with deliberately invalid tokens
+  - Client clock or epoch desynchronization during deployment
+level: medium
+---
+title: Repeated Protocol Verification Failures
+id: 00000000-0000-4000-8000-000000000101
+status: experimental
+correlation:
+  type: event_count
+  rules:
+    - 00000000-0000-4000-8000-000000000100
+  group-by:
+    - TokenHash
+    - SrcEntity
+    - DstEntity
+  timespan: 10m
+  condition:
+    gte: 20
+level: medium
+---
+title: Protocol Verification Failures Across Multiple Epochs
+id: 00000000-0000-4000-8000-000000000103
+status: experimental
+correlation:
+  type: value_count
+  rules:
+    - 00000000-0000-4000-8000-000000000100
+  group-by:
+    - TokenHash
+    - SrcEntity
+    - DstEntity
+  timespan: 10m
+  condition:
+    field: RotationEpoch
+    gte: 5
+level: medium
+</code></pre>
+<h3>Sigma rule: High-Volume Key-Rotation Transmissions</h3>
+<pre><code class="language-yaml">title: Key Rotation Sent Events
+id: 00000000-0000-4000-8000-000000000104
+status: experimental
+description: Selects key-rotation transmission events for correlation.
+references:
+  - https://attack.mitre.org/techniques/T1565/002/
+  - https://attack.mitre.org/techniques/T1557/
+author: portfolio-sanitized
+date: 2026-01-01
+tags:
+  - attack.t1557
+  - attack.t1565.002
+logsource:
+  product: application
+  service: protocol-audit
+detection:
+  selection:
+    EventType: KeyRotationSent
+  condition: selection
+fields:
+  - TimeGenerated
+  - SrcEntity
+  - DstEntity
+  - RotationId
+  - RotationHash
+  - AckReceived
+falsepositives:
+  - Network instability or message broker outage
+  - Planned resiliency testing
+  - Application restart causing legitimate re-rotation
+level: low
+---
+title: High Volume of Key Rotation Transmissions
+id: 00000000-0000-4000-8000-000000000102
+status: experimental
+correlation:
+  type: event_count
+  rules:
+    - 00000000-0000-4000-8000-000000000104
+  group-by:
+    - SrcEntity
+    - DstEntity
+  timespan: 10m
+  condition:
+    gte: 10
+level: low
+</code></pre>
+<h2>13. Visual Artifact</h2>
+<p>A kill-chain flow is the best fit because the exercise follows a clear temporal sequence from positioning through oracle construction, residue recovery, reconstruction, and submission. 
+Defensive controls and detection artifacts are annotated as dashed-edge nodes off the relevant stage.</p>
+<figure class="diagram"><svg viewBox="0 0 360 434" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Kill chain from adversary-in-the-middle position to key submission"><defs><marker id="ah" markerWidth="9" markerHeight="9" refX="4.5" refY="8" orient="auto"><path d="M0,0 L9,0 L4.5,8 Z" fill="#35e0d0"/></marker></defs><rect x="6" y="6" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="27" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">T1557</text><text x="20" y="45" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">AiTM position</text><line x1="180" y1="58" x2="180" y2="78" stroke="#35e0d0" stroke-width="1.6" marker-end="url(#ah)"/><rect x="6" y="80" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="101" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">T1565.002</text><text x="20" y="119" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">Modify key-rotation traffic</text><line x1="180" y1="132" x2="180" y2="152" stroke="#35e0d0" stroke-width="1.6" marker-end="url(#ah)"/><rect x="6" y="154" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="175" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">CWE-203</text><text x="20" y="193" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">Verification oracle</text><line x1="180" y1="206" x2="180" y2="226" stroke="#35e0d0" stroke-width="1.6" marker-end="url(#ah)"/><rect x="6" y="228" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="249" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">Recover</text><text x="20" y="267" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">Factor modulus, recover residues</text><line x1="180" y1="280" x2="180" y2="300" stroke="#35e0d0" stroke-width="1.6" marker-end="url(#ah)"/><rect x="6" y="302" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="323" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">CRT</text><text x="20" y="341" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">Reconstruct the 128-bit key</text><line x1="180" y1="354" x2="180" y2="374" stroke="#35e0d0" stroke-width="1.6" marker-end="url(#ah)"/><rect x="6" y="376" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="397" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">Outcome</text><text x="20" y="415" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">Submit recovered key</text></svg><figcaption>Kill chain, from position to key submission. The mitigation and detection mapped to each stage are in the controls and detection tables above.</figcaption></figure>
+<h2>14. References</h2>
+<ol>
+<li>MITRE ATT&amp;CK, T1557 Adversary-in-the-Middle: https://attack.mitre.org/techniques/T1557/</li>
+<li>MITRE ATT&amp;CK, T1565.002 Transmitted Data Manipulation: https://attack.mitre.org/techniques/T1565/002/</li>
+<li>MITRE CAPEC-94, Adversary in the Middle: https://capec.mitre.org/data/definitions/94.html</li>
+<li>MITRE CAPEC-272, Protocol Manipulation: https://capec.mitre.org/data/definitions/272.html</li>
+<li>MITRE CAPEC-594, Traffic Injection: https://capec.mitre.org/data/definitions/594.html</li>
+<li>MITRE D3FEND, D3-MAN Message Authentication: https://d3fend.mitre.org/technique/d3f:MessageAuthentication/</li>
+<li>MITRE D3FEND, D3-NTSA Network Traffic Signature Analysis: https://d3fend.mitre.org/technique/d3f:NetworkTrafficSignatureAnalysis/</li>
+<li>MITRE D3FEND, D3-PMAD Protocol Metadata Anomaly Detection: https://d3fend.mitre.org/technique/d3f:ProtocolMetadataAnomalyDetection/</li>
+<li>MITRE CWE-203, Observable Discrepancy: https://cwe.mitre.org/data/definitions/203.html</li>
+<li>MITRE CWE-345, Insufficient Verification of Data Authenticity: https://cwe.mitre.org/data/definitions/345.html</li>
+<li>MITRE CWE-294, Authentication Bypass by Capture-Replay: https://cwe.mitre.org/data/definitions/294.html</li>
+<li>MITRE CWE-1240, Use of a Cryptographic Primitive with a Risky Implementation: https://cwe.mitre.org/data/definitions/1240.html</li>
+<li>NIST SP 800-53 Rev. 5, Security and Privacy Controls for Information Systems and Organizations: https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final</li>
+<li>NIST SP 800-175B Rev. 1, Guideline for Using Cryptographic Standards in the Federal Government: https://csrc.nist.gov/pubs/sp/800/175/b/r1/final</li>
+<li>CIS Controls v8.1: https://www.cisecurity.org/controls/v8</li>
+<li>OASIS STIX 2.1 Specification: https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html</li>
+<li>Sigma Rule Specification: https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-rules-specification.md</li>
+<li>Sigma Correlation Rule Specification: https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-correlation-rules-specification.md</li>
+<li>Cohen, H., <em>A Course in Computational Algebraic Number Theory</em>, Springer GTM 138, 1993 </li>
+</ol>
+        </div>
+      </div>
+
+      <a class="backlink" href="/cyber-ops/ctf-writeups/crypto/">&lt;- back to Crypto</a>
+    </main>
+
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js"></script>
+</body>
+</html>
