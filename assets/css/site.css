@@ -237,3 +237,37 @@ body.plain { background-image: none; }
 .diagram { margin: 10px 0 22px; }
 .diagram svg { max-width: 360px; width: 100%; height: auto; display: block; }
 .diagram figcaption { font-size: 13px; color: var(--muted); margin-top: 10px; max-width: 60ch; }
+
+/* landing quote strip */
+.ticker {
+  overflow: hidden;
+  white-space: nowrap;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: .04em;
+  color: var(--muted);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+}
+.ticker-track { display: flex; width: max-content; }
+.ticker-item { flex: none; }
+.ticker-item::after { content: "//"; color: var(--cyan); margin: 0 18px; }
+.ticker-by { color: var(--text); }
+
+.ticker.run .ticker-track { animation: ticker var(--ticker-time, 40s) linear infinite; }
+.ticker.run:hover .ticker-track,
+.ticker.run:focus-within .ticker-track,
+.ticker.run:focus .ticker-track { animation-play-state: paused; }
+@keyframes ticker { to { transform: translateX(-50%); } }
+
+.ticker.still { -webkit-mask-image: none; mask-image: none; white-space: normal; }
+.ticker.still .ticker-track { display: block; width: auto; }
+.ticker.still .ticker-item { display: none; }
+.ticker.still .ticker-item.on { display: inline; }
+.ticker.still .ticker-item::after { content: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker .ticker-track { animation: none; }
+}
