@@ -90,27 +90,30 @@
   const start = Math.floor(Math.random() * quotes.length);
   const order = quotes.slice(start).concat(quotes.slice(0, start));
 
-  const item = (q) => {
-    const s = document.createElement("span");
-    s.className = "ticker-item";
-    s.textContent = q.text;
+  const fill = (s, q) => {
+    s.replaceChildren(q.text);
     if (q.by) {
       const b = document.createElement("span");
       b.className = "ticker-by";
       b.textContent = q.by;
       s.append(" - ", b);
     }
+  };
+  const item = (q) => {
+    const s = document.createElement("span");
+    s.className = "ticker-item";
+    fill(s, q);
     return s;
   };
 
   const track = document.createElement("div");
   track.className = "ticker-track";
-  order.forEach((q) => track.append(item(q)));
   box.append(track);
   box.hidden = false;
 
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     box.classList.add("still");
+    order.forEach((q) => track.append(item(q)));
     const items = Array.from(track.children);
     let i = 0;
     items[0].classList.add("on");
@@ -123,19 +126,34 @@
     return;
   }
 
-  // a short list leaves a gap in the loop, so repeat it until it spans the strip
-  while (track.scrollWidth < box.clientWidth && track.children.length < 200) {
-    order.forEach((q) => track.append(item(q)));
-  }
-
-  // second copy makes the loop seamless; hidden from readers so each quote is heard once
-  Array.from(track.children).forEach((s) => {
-    const c = s.cloneNode(true);
-    c.setAttribute("aria-hidden", "true");
-    track.append(c);
-  });
-
-  // fixed pace no matter how long the list gets
-  box.style.setProperty("--ticker-time", Math.round(track.scrollWidth / 2 / 60) + "s");
+  // the whole list in one layer gets very wide and browsers stutter moving it,
+  // so keep only enough spans to cover the strip twice and recycle them
   box.classList.add("run");
+  let next = 0;
+  const take = () => order[next++ % order.length];
+
+  const speed = 60;
+  let pos = 0;
+  let last = 0;
+  const step = (now) => {
+    // top up here rather than once at load, so a resize never opens a gap
+    while (track.scrollWidth + pos < box.clientWidth * 2 && track.children.length < 100) {
+      track.append(item(take()));
+    }
+    if (last && !box.matches(":hover, :focus, :focus-within")) {
+      // clamp so a tab left in the background does not jump on return
+      pos -= Math.min(now - last, 100) * speed / 1000;
+      let first = track.firstElementChild;
+      while (first && first.offsetWidth && -pos >= first.offsetWidth) {
+        pos += first.offsetWidth;
+        fill(first, take());
+        track.append(first);
+        first = track.firstElementChild;
+      }
+      track.style.transform = "translateX(" + pos + "px)";
+    }
+    last = now;
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 })();

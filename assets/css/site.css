@@ -256,11 +256,7 @@ body.plain { background-image: none; }
 .ticker-item::after { content: "//"; color: var(--cyan); margin: 0 18px; }
 .ticker-by { color: var(--text); }
 
-.ticker.run .ticker-track { animation: ticker var(--ticker-time, 40s) linear infinite; }
-.ticker.run:hover .ticker-track,
-.ticker.run:focus-within .ticker-track,
-.ticker.run:focus .ticker-track { animation-play-state: paused; }
-@keyframes ticker { to { transform: translateX(-50%); } }
+.ticker.run .ticker-track { will-change: transform; }
 
 .ticker.still { -webkit-mask-image: none; mask-image: none; white-space: normal; }
 .ticker.still .ticker-track { display: block; width: auto; }
@@ -269,5 +265,5 @@ body.plain { background-image: none; }
 .ticker.still .ticker-item::after { content: none; }
 
 @media (prefers-reduced-motion: reduce) {
-  .ticker .ticker-track { animation: none; }
+  .ticker.run .ticker-track { transform: none !important; }
 }
