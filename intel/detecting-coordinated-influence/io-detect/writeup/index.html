@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>io-detect: writeup</title>
+  <link rel="stylesheet" href="/assets/css/site.css">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+    </header>
+
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/intel/">Intelligence</a> / <a href="/intel/detecting-coordinated-influence/">Detecting coordinated influence</a> / <a href="/intel/detecting-coordinated-influence/io-detect/">io-detect</a> / Writeup</p>
+      <div class="page-head">
+        <h1 class="page-title">io-detect: writeup</h1>
+        <p class="lead">How a coordination-detection pipeline was built, and what it measured against a labeled influence-operation corpus.</p>
+      </div>
+
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+
+          <h2>Data</h2>
+          <table>
+            <tbody>
+              <tr><th>Corpus</th><td>Indiana University, "Labeled Datasets for Research on Information Operations"</td></tr>
+              <tr><th>DOI</th><td>10.5281/zenodo.14141549</td></tr>
+              <tr><th>License</th><td>CC-BY-NC-ND-4.0</td></tr>
+              <tr><th>Access</th><td>Restricted. Login and academic affiliation required, one file per researcher per day.</td></tr>
+              <tr><th>Campaign scored</th><td>Russia_2, 21 gzip-parquet parts</td></tr>
+              <tr><th>Archive</th><td>14189072.zip, 150,597,200 bytes</td></tr>
+              <tr><th>Archive sha256</th><td><code>0ce1ce1e197b63faa4cdc158215f31eb1323e0287359e785e104420a1a65628c</code></td></tr>
+            </tbody>
+          </table>
+          <p>The corpus is gated and no-derivatives, so none of it is redistributed. Anyone reproducing this fetches their own copy from Zenodo under the same terms and verifies it against the checksum above.</p>
+          <p>A second corpus, the FiveThirtyEight release of the Clemson/Linvill-Warren IRA tweets, ingests through the same canonical schema. It is positives-only and carries no control class, so nothing is scored on it.</p>
+
+          <h2>Method</h2>
+          <ol>
+            <li>Normalize the source into one canonical record schema.</li>
+            <li>Compute behavioral signals per account and per account pair: co-repost timing, duplicate text, hashtag flooding, mention and reply swarming, automation.</li>
+            <li>Build a weighted co-activity network from those signals.</li>
+            <li>Extract dense clusters from that network. A coordinated group knots together into a small, heavily weighted cluster that stands out from the sparse web ordinary accounts sit in.</li>
+            <li>Sort each flagged cluster into a likely-automated core and the accounts that amplify.</li>
+            <li>Tag behaviors with DISARM techniques and score the flagged set against the corpus labels.</li>
+          </ol>
+          <p>DISARM tags are output. Nothing in the feature, detection, or scoring path reads a tag or a label to decide what to flag.</p>
+
+          <h2>Results</h2>
+          <p>Russia_2, scored at account granularity.</p>
+          <table>
+            <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+            <tbody>
+              <tr><td>Precision</td><td>0.5436</td></tr>
+              <tr><td>Recall</td><td>0.6731</td></tr>
+              <tr><td>True positives</td><td>243</td></tr>
+              <tr><td>False positives</td><td>204</td></tr>
+              <tr><td>False negatives</td><td>118</td></tr>
+              <tr><td>IO-labeled accounts</td><td>361</td></tr>
+              <tr><td>Accounts flagged</td><td>447</td></tr>
+              <tr><td>Clusters detected</td><td>22</td></tr>
+            </tbody>
+          </table>
+          <p>Corpus: 1,011,052 posts across 21 parts. 920,761 IO rows, 90,291 control rows. 2,536 unique accounts, of which 361 are IO-labeled and 2,175 control-labeled. Load 0.29s, pipeline 4.04s.</p>
+          <p>Cluster sizes: 147, 64, 54, 43, 16, 16, 14, 10, 9, 9, 9, 8, 8, 7, 6, 5, 4, 4, 4, 4, 3, 3.</p>
+
+          <h2>Scoring and controls</h2>
+          <p>The negative class is the corpus's own <code>is_control</code> field: Indiana ships organic control posts beside the campaign posts, drawn from accounts discussing the same topics in the same windows. Without a native control class there is nothing for the detector to be wrong about, so there is no honest precision figure to report.</p>
+          <p>The pipeline flags accounts, so scoring happens at account level. Each account gets a majority vote over its own posts: an account counts as IO if at least half its posts are labeled as campaign posts. The flagged set is then compared against those labels.</p>
+
+          <h2>Limits</h2>
+          <p>Lab metrics like these are an upper bound: this is a fixed, curated, labeled historical corpus with a native control class, and live traffic has none of that structure.</p>
+          <p>Russia_2 is built to be 91% IO rows, far above what any real feed looks like, and precision degrades as the base rate drops toward natural, much lower levels of IO. The same false-positive rate produces much worse precision at that lower rate. The 0.54 above describes this corpus. It does not predict what a live feed would produce.</p>
+          <p>Co-repost timing, duplicate content, hashtag floods and mention swarms are signals of coordination. They say nothing about authenticity, and a tightly organized genuine community can trip the same thresholds as a paid one. A flag from this pipeline is not attribution, and it is not proof that an account is fake. Someone still has to look at it before anyone acts on the result.</p>
+          <p>The posting-application field in the parquet release is hashed rather than a readable client string, which kills the automation signal on this corpus. Russia_2 carries 304 distinct hash values, none matching the literal markers the automation check looks for, so the automated share comes back 0.0 for every account, the bot-account technique never fires, and triage gets no automation signal here. The zero is an artifact of the anonymized field, not evidence about the campaign: it says nothing about whether Russia_2 actually used automation, and no automation results were invented to fill the gap.</p>
+
+          <h2>Schema notes</h2>
+          <p>The second corpus forced three decisions.</p>
+          <p>The two sources don't share a control class. Indiana has one; Clemson is positives-only. A bare boolean would have hidden that difference. A label field plus a label-scheme field records where the class came from, and the original boolean survives as a projection of it, so the scoring code did not change. A third source writes its own scheme value rather than overloading an existing one.</p>
+          <p>Repost linkage and entity fields do not survive Clemson. Indiana gives the reposted post and account for each retweet. Clemson's retweet column is a bare flag with no pointer back to the original, so those fields stay null. Clemson also embeds hashtags and mentions in the tweet text rather than shipping them as fields, so both come back empty instead of guessed at, and a detector reading those fields sees a real absence, not a fabricated value.</p>
+          <p>The analyst-coded persona label is annotation. Clemson ships Linvill and Warren's own categories (RightTroll, NewsFeed, and so on). They exist only on Clemson rows, and nothing in the detection path reads them. Building on them would make results source-dependent.</p>
+
+          <h2>Build</h2>
+          <p>Python. polars for data, networkx for graphs. Test-first, 30 tests. Apache 2.0. A synthetic fixture drives a one-command demo of the full pipeline, so the tool is runnable without the gated corpus.</p>
+
+          <h2>Data note</h2>
+          <p>Public and licensed research corpora only. No dataset is redistributed here, and no account identifiers, cluster memberships, or post content are published. Only aggregate measurements appear on this page. Nothing here identifies individuals, and nothing here attributes the campaign to an actor.</p>
+
+        </div>
+      </div>
+
+      <a class="backlink" href="/intel/detecting-coordinated-influence/io-detect/">&lt;- back to io-detect</a>
+    </main>
+
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js"></script>
+</body>
+</html>
