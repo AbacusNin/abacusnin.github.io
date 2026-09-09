@@ -1,0 +1,1075 @@
+[
+  {
+    "id": "A1",
+    "name": "Flattery",
+    "family": "elicitation",
+    "technique_class": "ego",
+    "definition": "Praise aimed at a person's competence, expertise, or standing, offered to loosen their discretion before a follow-up question.",
+    "mechanism": "Praise competence or standing so pride loosens discretion",
+    "recognition_cue": "Praise out of proportion to the setting; being cast as the expert",
+    "countermeasure": "Acknowledge professionally, do not expand; notice praise that precedes a question",
+    "sources": [
+      "fbi-elicitation",
+      "osac-elicitation-guide-2018",
+      "cdse-accidental-conversations-2025"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "A2",
+    "name": "Provocation / feigned incredulity",
+    "family": "elicitation",
+    "technique_class": "ego",
+    "definition": "Displaying deliberate skepticism toward a claim so the target elaborates to prove it, or answers out of irritation at being doubted.",
+    "mechanism": "Show disbelief so the target explains in detail or answers out of irritation",
+    "recognition_cue": "Staged doubt that invites you to defend a claim",
+    "countermeasure": "Stay composed; do not prove capability with detail",
+    "sources": [
+      "fbi-elicitation",
+      "osac-elicitation-guide-2018",
+      "ncsc-elicitation-brochure",
+      "cdse-accidental-conversations-2025",
+      "dcsa-elicitation-brochure-2021"
+    ],
+    "confidence": "corroborated",
+    "default_weight": 1.0
+  },
+  {
+    "id": "A3",
+    "name": "Deliberate false statement",
+    "family": "elicitation",
+    "technique_class": "ego",
+    "definition": "An intentionally incorrect statement offered so the target supplies the accurate version in the act of correcting it.",
+    "mechanism": "State something wrong so the target corrects it with the truth",
+    "recognition_cue": "An obvious error that seems set up for your correction",
+    "countermeasure": "Resist correcting; ask a clarifying question instead",
+    "sources": [
+      "fbi-elicitation",
+      "osac-elicitation-guide-2018",
+      "ncsc-elicitation-brochure",
+      "cdse-accidental-conversations-2025",
+      "dcsa-elicitation-brochure-2021"
+    ],
+    "confidence": "corroborated",
+    "default_weight": 1.0
+  },
+  {
+    "id": "A4",
+    "name": "Criticism",
+    "family": "elicitation",
+    "technique_class": "ego",
+    "definition": "Criticism of the target's work, employer, or a rival, offered to provoke a defensive rebuttal that discloses detail.",
+    "mechanism": "Attack the target's work, employer, or rival to draw a defensive rebuttal",
+    "recognition_cue": "An urge to defend what you are proud of",
+    "countermeasure": "Recognize the ego-bait; decline to defend with specifics",
+    "sources": [
+      "fbi-elicitation",
+      "osac-elicitation-guide-2018",
+      "ncsc-elicitation-brochure",
+      "cdse-accidental-conversations-2025",
+      "dcsa-elicitation-brochure-2021"
+    ],
+    "confidence": "corroborated",
+    "default_weight": 1.0
+  },
+  {
+    "id": "A5",
+    "name": "One-upper / can-you-top-this",
+    "family": "elicitation",
+    "technique_class": "ego",
+    "definition": "A modest or exaggerated claim offered first so the target feels a competitive pull to top it with a larger, more specific one.",
+    "mechanism": "Share a lesser claim to bait a larger one",
+    "recognition_cue": "A competitive pull to top a story or figure",
+    "countermeasure": "Do not reciprocate the escalation",
+    "sources": [
+      "fbi-elicitation",
+      "osac-elicitation-guide-2018",
+      "ncsc-elicitation-brochure",
+      "cdse-accidental-conversations-2025",
+      "dcsa-elicitation-brochure-2021"
+    ],
+    "confidence": "corroborated",
+    "default_weight": 1.0
+  },
+  {
+    "id": "A6",
+    "name": "Feigned ignorance",
+    "family": "elicitation",
+    "technique_class": "social_pressure",
+    "definition": "A pose of ignorance about a subject the target knows well, meant to draw out an explanatory answer aimed at a supposed novice.",
+    "mechanism": "Play ignorant so the target teaches",
+    "recognition_cue": "A pull to instruct a supposed novice",
+    "countermeasure": "Refer to public documentation; do not fill gaps for strangers",
+    "sources": [
+      "fbi-elicitation",
+      "osac-elicitation-guide-2018",
+      "ncsc-elicitation-brochure",
+      "cdse-accidental-conversations-2025",
+      "dcsa-elicitation-brochure-2021"
+    ],
+    "confidence": "corroborated",
+    "default_weight": 1.0
+  },
+  {
+    "id": "A7",
+    "name": "Confidential bait",
+    "family": "elicitation",
+    "technique_class": "reciprocity",
+    "definition": "A disclosure framed as confidential, offered first so the target feels invited to trade a confidence of their own.",
+    "mechanism": "Share a supposed confidence to trigger a reciprocal one",
+    "recognition_cue": "\"Just between us\" openers",
+    "countermeasure": "Do not match confidences",
+    "sources": [
+      "fbi-elicitation",
+      "osac-elicitation-guide-2018",
+      "ncsc-elicitation-brochure",
+      "cdse-accidental-conversations-2025",
+      "dcsa-elicitation-brochure-2021"
+    ],
+    "confidence": "corroborated",
+    "default_weight": 1.0
+  },
+  {
+    "id": "A8",
+    "name": "Quid pro quo / volunteering / trading confidences",
+    "family": "elicitation",
+    "technique_class": "reciprocity",
+    "definition": "An offer of a fact, favor, or personal disclosure made first so the target feels a social debt to reciprocate with information of their own.",
+    "mechanism": "Give a fact or favor first so the target feels owed",
+    "recognition_cue": "An unsolicited disclosure tied to a follow-up ask",
+    "countermeasure": "Recognize the felt debt is not real; decline to trade",
+    "sources": [
+      "fbi-elicitation",
+      "ncsc-elicitation-brochure",
+      "cdse-accidental-conversations-2025"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "A9",
+    "name": "Good listener",
+    "family": "elicitation",
+    "technique_class": "reciprocity",
+    "definition": "Sustained, warm attention and active listening used to keep the target talking and steer the conversation toward a topic of interest.",
+    "mechanism": "Warm, patient attention that keeps the target talking",
+    "recognition_cue": "Unusual attentiveness paired with topic-steering",
+    "countermeasure": "Watch conversational momentum; limit work talk with new contacts",
+    "sources": [
+      "fbi-elicitation",
+      "osac-elicitation-guide-2018",
+      "ncsc-elicitation-brochure",
+      "cdse-accidental-conversations-2025",
+      "dcsa-elicitation-brochure-2021"
+    ],
+    "confidence": "corroborated",
+    "default_weight": 1.0
+  },
+  {
+    "id": "A10",
+    "name": "Mutual interest",
+    "family": "elicitation",
+    "technique_class": "reciprocity",
+    "definition": "A manufactured sense of shared interest or background, built quickly so cooperation and disclosure feel like a natural next step.",
+    "mechanism": "Manufacture shared ground so cooperation feels natural",
+    "recognition_cue": "Fast rapport over convenient common interests",
+    "countermeasure": "Question whether shared interest justifies disclosure",
+    "sources": [
+      "fbi-elicitation",
+      "osac-elicitation-guide-2018",
+      "ncsc-elicitation-brochure",
+      "cdse-accidental-conversations-2025",
+      "dcsa-elicitation-brochure-2021"
+    ],
+    "confidence": "corroborated",
+    "default_weight": 1.0
+  },
+  {
+    "id": "A11",
+    "name": "Mirroring",
+    "family": "elicitation",
+    "technique_class": "reciprocity",
+    "definition": "Matching the target's body language, tone, and phrasing to build unconscious rapport that keeps the conversation open.",
+    "mechanism": "Match body language and echo phrases to build rapport",
+    "recognition_cue": "Subtle imitation that lingers on one topic",
+    "countermeasure": "Note the synchrony; keep professional distance",
+    "sources": [
+      "cdse-accidental-conversations-2025"
+    ],
+    "confidence": "medium",
+    "default_weight": 0.5
+  },
+  {
+    "id": "A12",
+    "name": "Assumed knowledge",
+    "family": "elicitation",
+    "technique_class": "cognitive_cue",
+    "definition": "Speech that presumes the listener already knows the sensitive detail, so confirming or correcting it feels like the natural response.",
+    "mechanism": "Speak as if already inside so confirming feels natural",
+    "recognition_cue": "Statements that assume facts you never shared",
+    "countermeasure": "Verify what they actually know before responding; do not correct a false assumption",
+    "sources": [
+      "fbi-elicitation",
+      "osac-elicitation-guide-2018",
+      "ncsc-elicitation-brochure",
+      "cdse-accidental-conversations-2025",
+      "dcsa-elicitation-brochure-2021"
+    ],
+    "confidence": "corroborated",
+    "default_weight": 1.0
+  },
+  {
+    "id": "A13",
+    "name": "Bracketing",
+    "family": "elicitation",
+    "technique_class": "cognitive_cue",
+    "definition": "A deliberately wide or wrong numeric range offered so the target narrows it toward the true figure.",
+    "mechanism": "Offer a high/low range to bait the exact figure",
+    "recognition_cue": "A wrong numeric range about your work",
+    "countermeasure": "Refuse to narrow the range or confirm an estimate",
+    "sources": [
+      "fbi-elicitation",
+      "osac-elicitation-guide-2018",
+      "ncsc-elicitation-brochure",
+      "cdse-accidental-conversations-2025",
+      "dcsa-elicitation-brochure-2021"
+    ],
+    "confidence": "corroborated",
+    "default_weight": 1.0
+  },
+  {
+    "id": "A14",
+    "name": "Leading question / embedded presumption",
+    "family": "elicitation",
+    "technique_class": "cognitive_cue",
+    "definition": "A question built around a hidden presumption, so any direct answer accepts a fact the target never actually confirmed.",
+    "mechanism": "Ask a question whose answer must accept a presumption",
+    "recognition_cue": "Yes/no framing loaded with an assumption",
+    "countermeasure": "Reject the frame; answer on your own terms",
+    "sources": [
+      "fbi-elicitation",
+      "osac-elicitation-guide-2018",
+      "ncsc-elicitation-brochure",
+      "cdse-accidental-conversations-2025",
+      "dcsa-elicitation-brochure-2021"
+    ],
+    "confidence": "corroborated",
+    "default_weight": 1.0
+  },
+  {
+    "id": "A15",
+    "name": "Macro to micro (to macro)",
+    "family": "elicitation",
+    "technique_class": "cognitive_cue",
+    "definition": "A conversation that opens broad, narrows to a single sensitive detail, then widens out again so the narrowing goes unnoticed.",
+    "mechanism": "Start broad, funnel to the specific, then broaden again to disguise it",
+    "recognition_cue": "A conversation that narrows to one detail then eases off",
+    "countermeasure": "Notice the funnel; redirect",
+    "sources": [
+      "fbi-elicitation",
+      "osac-elicitation-guide-2018",
+      "ncsc-elicitation-brochure",
+      "cdse-accidental-conversations-2025",
+      "dcsa-elicitation-brochure-2021"
+    ],
+    "confidence": "corroborated",
+    "default_weight": 1.0
+  },
+  {
+    "id": "A16",
+    "name": "Oblique reference / analogy",
+    "family": "elicitation",
+    "technique_class": "cognitive_cue",
+    "definition": "Discussion of a related or comparable system, meant to draw the target into using their own work as an unwitting reference point.",
+    "mechanism": "Discuss a related system so the target uses their own work as the reference",
+    "recognition_cue": "Talk about an adjacent topic that keeps circling back to yours",
+    "countermeasure": "Do not elaborate; avoid comparative analysis of your systems",
+    "sources": [
+      "fbi-elicitation",
+      "osac-elicitation-guide-2018",
+      "ncsc-elicitation-brochure",
+      "cdse-accidental-conversations-2025",
+      "dcsa-elicitation-brochure-2021"
+    ],
+    "confidence": "corroborated",
+    "default_weight": 1.0
+  },
+  {
+    "id": "A17",
+    "name": "Quote reported facts",
+    "family": "elicitation",
+    "technique_class": "cognitive_cue",
+    "definition": "A citation of already-public data, used as a springboard toward the unpublished detail that would confirm or extend it.",
+    "mechanism": "Cite published data to draw out the unpublished",
+    "recognition_cue": "\"The press release said X, so I assume Y?\"",
+    "countermeasure": "Do not fill the gap past what is already public",
+    "sources": [
+      "cdse-accidental-conversations-2025"
+    ],
+    "confidence": "medium",
+    "default_weight": 0.5
+  },
+  {
+    "id": "A18",
+    "name": "Word repetition",
+    "family": "elicitation",
+    "technique_class": "cognitive_cue",
+    "definition": "The target's own key word or phrase, echoed back as a prompt for further elaboration on it.",
+    "mechanism": "Echo the target's key term to prompt elaboration",
+    "recognition_cue": "Your own phrase repeated back as a prompt",
+    "countermeasure": "Notice the echo; stop expanding",
+    "sources": [
+      "fbi-elicitation",
+      "osac-elicitation-guide-2018",
+      "ncsc-elicitation-brochure",
+      "cdse-accidental-conversations-2025",
+      "dcsa-elicitation-brochure-2021"
+    ],
+    "confidence": "corroborated",
+    "default_weight": 1.0
+  },
+  {
+    "id": "A19",
+    "name": "Direct question / survey",
+    "family": "elicitation",
+    "technique_class": "social_pressure",
+    "definition": "A blunt, direct question that relies on the social norm that a question posed deserves an answer.",
+    "mechanism": "Blunt asks that bank on the norm that questions get answered",
+    "recognition_cue": "Immediate bluntness about specifics",
+    "countermeasure": "Pause; judge whether disclosure is appropriate",
+    "sources": [
+      "fbi-elicitation",
+      "osac-elicitation-guide-2018",
+      "ncsc-elicitation-brochure",
+      "cdse-accidental-conversations-2025",
+      "dcsa-elicitation-brochure-2021"
+    ],
+    "confidence": "corroborated",
+    "default_weight": 1.0
+  },
+  {
+    "id": "A20",
+    "name": "Questionnaires and surveys",
+    "family": "elicitation",
+    "technique_class": "social_pressure",
+    "definition": "A survey or questionnaire that buries sensitive questions among benign ones under a plausible cover purpose.",
+    "mechanism": "Bury target questions among benign ones under a plausible purpose",
+    "recognition_cue": "A survey mixing harmless items with work specifics",
+    "countermeasure": "Answer only public items; refer to the security office",
+    "sources": [
+      "fbi-elicitation",
+      "osac-elicitation-guide-2018",
+      "ncsc-elicitation-brochure",
+      "cdse-accidental-conversations-2025",
+      "dcsa-elicitation-brochure-2021"
+    ],
+    "confidence": "corroborated",
+    "default_weight": 1.0
+  },
+  {
+    "id": "A21",
+    "name": "Ruse interview",
+    "family": "elicitation",
+    "technique_class": "social_pressure",
+    "definition": "A fabricated interview, often posing as a recruiter or headhunter, staged to justify probing questions about recent work.",
+    "mechanism": "Pose as a recruiter or headhunter to justify probing",
+    "recognition_cue": "An unsolicited recruiter pressing on recent project detail",
+    "countermeasure": "Verify identity and authorization through an independent channel",
+    "sources": [
+      "fbi-elicitation",
+      "osac-elicitation-guide-2018",
+      "ncsc-elicitation-brochure",
+      "cdse-accidental-conversations-2025",
+      "dcsa-elicitation-brochure-2021"
+    ],
+    "confidence": "corroborated",
+    "default_weight": 1.0
+  },
+  {
+    "id": "A22",
+    "name": "Target associates / target the outsider",
+    "family": "elicitation",
+    "technique_class": "social_pressure",
+    "definition": "An approach routed through a relative or colleague, or questions about a group the target does not belong to, to reach information indirectly.",
+    "mechanism": "Approach through a relative or colleague, or ask about a group you are not in",
+    "recognition_cue": "Questions routed through people close to you",
+    "countermeasure": "Protect third-party information",
+    "sources": [
+      "fbi-elicitation",
+      "osac-elicitation-guide-2018",
+      "ncsc-elicitation-brochure",
+      "cdse-accidental-conversations-2025",
+      "dcsa-elicitation-brochure-2021"
+    ],
+    "confidence": "corroborated",
+    "default_weight": 1.0
+  },
+  {
+    "id": "A23",
+    "name": "Exploiting the urge to complain",
+    "family": "elicitation",
+    "technique_class": "social_pressure",
+    "definition": "An invitation to vent about work frustration, used to surface setbacks, staffing gaps, and delays the target would not otherwise volunteer.",
+    "mechanism": "Prompt a gripe to surface setbacks, staffing gaps, and delays",
+    "recognition_cue": "An invitation to vent about work pressure",
+    "countermeasure": "Do not discuss schedules, staffing, or resource constraints with unauthorized people",
+    "sources": [
+      "fbi-elicitation",
+      "osac-elicitation-guide-2018",
+      "ncsc-elicitation-brochure",
+      "cdse-accidental-conversations-2025",
+      "dcsa-elicitation-brochure-2021"
+    ],
+    "confidence": "corroborated",
+    "default_weight": 1.0
+  },
+  {
+    "id": "A24",
+    "name": "Paper review / academic solicitation",
+    "family": "elicitation",
+    "technique_class": "social_pressure",
+    "definition": "An unsolicited request to review a paper or proposal, framed to draw the target's sensitive expertise into the response.",
+    "mechanism": "Request peer review so the target applies sensitive knowledge",
+    "recognition_cue": "An unsolicited review request touching your program",
+    "countermeasure": "Consult the security office before accepting; release only authorized material",
+    "sources": [
+      "fbi-elicitation",
+      "osac-elicitation-guide-2018",
+      "ncsc-elicitation-brochure",
+      "cdse-accidental-conversations-2025",
+      "dcsa-elicitation-brochure-2021"
+    ],
+    "confidence": "corroborated",
+    "default_weight": 1.0
+  },
+  {
+    "id": "A25",
+    "name": "Offering assistance",
+    "family": "elicitation",
+    "technique_class": "reciprocity",
+    "definition": "Genuine, unsolicited help offered to a target, used to surface their interests and needs and to build a sense of obligation.",
+    "mechanism": "Offer genuine help to surface the target's interests (FM 34-60)",
+    "recognition_cue": "Help that arrives with an interest in your work",
+    "countermeasure": "Recognize the obligation chain; report offered inducements",
+    "sources": [
+      "fbi-elicitation",
+      "osac-elicitation-guide-2018",
+      "ncsc-elicitation-brochure",
+      "cdse-accidental-conversations-2025",
+      "dcsa-elicitation-brochure-2021",
+      "fm-34-60"
+    ],
+    "confidence": "corroborated",
+    "default_weight": 1.0
+  },
+  {
+    "id": "A26",
+    "name": "Hypothetical situation",
+    "family": "elicitation",
+    "technique_class": "cognitive_cue",
+    "definition": "A hypothetical scenario built directly on something the target just said, inviting them to reason through sensitive ground as if it were speculation.",
+    "mechanism": "Pose a hypothetical tied to the target's own idea (FM 34-60)",
+    "recognition_cue": "A \"what if\" built on something you just said",
+    "countermeasure": "Do not engage the hypothetical on sensitive ground",
+    "sources": [
+      "fbi-elicitation",
+      "osac-elicitation-guide-2018",
+      "ncsc-elicitation-brochure",
+      "cdse-accidental-conversations-2025",
+      "dcsa-elicitation-brochure-2021",
+      "fm-34-60"
+    ],
+    "confidence": "corroborated",
+    "default_weight": 1.0
+  },
+  {
+    "id": "A27",
+    "name": "Setting manipulation",
+    "family": "elicitation",
+    "technique_class": "social_pressure",
+    "definition": "A deliberate shift of the conversation to a relaxed, off-work setting, sometimes involving alcohol, to lower the target's guard.",
+    "mechanism": "Move the exchange to relaxed, off-work surroundings, sometimes with alcohol",
+    "recognition_cue": "A push toward private, informal, unobservable settings",
+    "countermeasure": "Treat off-site chats with the same guard as the office",
+    "sources": [
+      "fbi-elicitation",
+      "osac-elicitation-guide-2018",
+      "ncsc-elicitation-brochure",
+      "cdse-accidental-conversations-2025",
+      "dcsa-elicitation-brochure-2021"
+    ],
+    "confidence": "corroborated",
+    "default_weight": 1.0
+  },
+  {
+    "id": "A28",
+    "name": "The Scharff technique",
+    "family": "elicitation",
+    "technique_class": "composite",
+    "definition": "A structured approach that pairs a friendly, non-confrontational tone with the impression the interviewer already knows most of what is being discussed, drawing confirmation or denial without ever asking directly.",
+    "mechanism": "A friendly approach, an illusion of already knowing it all, never pressing, floating claims to confirm or deny, and downplaying what you reveal",
+    "recognition_cue": "A pleasant conversation where the other person seems to know most of it and never actually asks; you leave feeling you gave away nothing",
+    "countermeasure": "Recognize the profile; note that \"they already know it\" is a trap belief. Awareness alone is weak here, so this needs practiced response, not just a warning",
+    "sources": [
+      "granhag-scharff",
+      "luke-granhag-meta-analysis-2020"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "B1",
+    "name": "Direct",
+    "family": "interrogation",
+    "technique_class": "none",
+    "definition": "Plain, pertinent questions asked without pretext, historically the single most effective interrogation approach.",
+    "mechanism": "Plain pertinent questions; historically 85 to 95 percent effective",
+    "recognition_cue": "Direct questions with no pretext",
+    "countermeasure": "No obligation to answer; declining is the counter",
+    "sources": [
+      "fm-2-22-3",
+      "ar-381-12"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "B2",
+    "name": "Incentive",
+    "family": "interrogation",
+    "technique_class": "none",
+    "definition": "A material or emotional reward, or the removal of a negative, offered contingent on the source providing information.",
+    "mechanism": "Trade a material or emotional reward, or removal of a negative, for information",
+    "recognition_cue": "Offers or favors made contingent on your talking",
+    "countermeasure": "Refuse the obligation chain; report inducements (maps to AR 381-12 3-1i)",
+    "sources": [
+      "fm-2-22-3",
+      "ar-381-12"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "B3",
+    "name": "Emotional Love",
+    "family": "interrogation",
+    "technique_class": "none",
+    "definition": "An approach that directs the source's genuine love of family, homeland, or comrades toward cooperating with the interviewer.",
+    "mechanism": "Direct love of family, homeland, or comrades toward cooperation",
+    "recognition_cue": "Talk returns to family or comrades and what you could do \"for them\"",
+    "countermeasure": "See the manufactured link between an emotional object and disclosure",
+    "sources": [
+      "fm-2-22-3",
+      "ar-381-12"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "B4",
+    "name": "Emotional Hate",
+    "family": "interrogation",
+    "technique_class": "none",
+    "definition": "An approach that builds on the source's genuine hate or desire for revenge until it overrides their judgment about disclosure.",
+    "mechanism": "Build on genuine hate or desire for revenge until it overrides judgment",
+    "recognition_cue": "Someone amplifying your grievances and offering revenge through disclosure",
+    "countermeasure": "Note that grievance is being weaponized to bypass judgment",
+    "sources": [
+      "fm-2-22-3",
+      "ar-381-12"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "B5",
+    "name": "Fear-Up",
+    "family": "interrogation",
+    "technique_class": "none",
+    "definition": "A fear identified or created in the source, with its removal offered in exchange for cooperation.",
+    "mechanism": "Identify or create a fear, then link its removal to cooperation",
+    "recognition_cue": "Threat framing, specific or vague, with talking as the exit",
+    "countermeasure": "Recognize the fear-then-relief structure; doctrine notes overshooting makes the source unresponsive",
+    "sources": [
+      "fm-2-22-3",
+      "ar-381-12"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "B6",
+    "name": "Fear-Down",
+    "family": "interrogation",
+    "technique_class": "none",
+    "definition": "A reduction of an existing fear, positioning the interviewer as a protector the source feels indebted to.",
+    "mechanism": "Reduce an existing fear so the source feels indebted to the \"protector\"",
+    "recognition_cue": "A calming interlocutor after a stressful event",
+    "countermeasure": "Emotional relief is not a reason to disclose",
+    "sources": [
+      "fm-2-22-3",
+      "ar-381-12"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "B7",
+    "name": "Pride and Ego-Up",
+    "family": "interrogation",
+    "technique_class": "none",
+    "definition": "Sustained flattery aimed at low self-esteem, meant to draw the source into talking to earn credit or recognition.",
+    "mechanism": "Flatter low self-esteem into talking to gain credit",
+    "recognition_cue": "Sustained flattery, then rising technical curiosity",
+    "countermeasure": "This is the interrogation cousin of elicitation flattery; the drilldown is the tell",
+    "sources": [
+      "fm-2-22-3",
+      "ar-381-12"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "B8",
+    "name": "Pride and Ego-Down",
+    "family": "interrogation",
+    "technique_class": "none",
+    "definition": "A direct attack on the source's ego or competence, meant to provoke disclosure offered in self-justification.",
+    "mechanism": "Attack the ego so the source reveals information to justify itself",
+    "recognition_cue": "Belittling of your ability or loyalty, inviting you to set the record straight",
+    "countermeasure": "Do not take the bait to justify yourself",
+    "sources": [
+      "fm-2-22-3",
+      "ar-381-12"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "B9",
+    "name": "Futility",
+    "family": "interrogation",
+    "technique_class": "none",
+    "definition": "An argument that resistance is hopeless, meant to convince the source that cooperation is the only remaining option.",
+    "mechanism": "Convince the source resistance is hopeless",
+    "recognition_cue": "\"Everyone else already talked\" / \"your side has lost\"",
+    "countermeasure": "The \"everybody cooperated\" claim is the signature; futility alone rarely works",
+    "sources": [
+      "fm-2-22-3",
+      "ar-381-12"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "B10",
+    "name": "We Know All",
+    "family": "interrogation",
+    "technique_class": "none",
+    "definition": "An implication that the interviewer already knows everything the source could offer, meant to make disclosure feel harmless.",
+    "mechanism": "Imply all the source's information is already known",
+    "recognition_cue": "Interviewer acts bored, finishes your sentences, implies you are redundant",
+    "countermeasure": "A source who says \"then you don't need me\" defeats it",
+    "sources": [
+      "fm-2-22-3",
+      "ar-381-12"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "B11",
+    "name": "File and Dossier",
+    "family": "interrogation",
+    "technique_class": "none",
+    "definition": "A padded or fabricated file referenced, but never shown, to imply the interviewer already knows more than they do.",
+    "mechanism": "A padded file implies more is known than is",
+    "recognition_cue": "A thick \"file on you\" referenced but never handed over",
+    "countermeasure": "Depends on the source's naivete; the We Know All refusal logic applies",
+    "sources": [
+      "fm-2-22-3",
+      "ar-381-12"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "B12",
+    "name": "Establish Your Identity",
+    "family": "interrogation",
+    "technique_class": "none",
+    "definition": "A false insistence that the source is a different, wanted person, meant to provoke an over-explanation offered to clear their name.",
+    "mechanism": "Insist the source is a wanted person so they over-explain to clear themselves",
+    "recognition_cue": "Accusation of being someone else, pressing you to prove who you are",
+    "countermeasure": "\"Proving your identity\" is the extraction vector; volunteer nothing beyond required ID",
+    "sources": [
+      "fm-2-22-3",
+      "ar-381-12"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "B13",
+    "name": "Repetition",
+    "family": "interrogation",
+    "technique_class": "none",
+    "definition": "The same question and answer, repeated until boredom or fatigue loosens the source into a more candid response.",
+    "mechanism": "Repeat question and answer until boredom produces candor",
+    "recognition_cue": "The same question and answer echoed repeatedly",
+    "countermeasure": "Ineffective against self-control; it can let you regain composure",
+    "sources": [
+      "fm-2-22-3",
+      "ar-381-12"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "B14",
+    "name": "Rapid Fire",
+    "family": "interrogation",
+    "technique_class": "none",
+    "definition": "Overlapping, rapid questions meant to induce a contradiction, which the interviewer then confronts the source with.",
+    "mechanism": "Overlapping questions induce contradiction, then confront it",
+    "recognition_cue": "Interrupting questions; being told you contradicted yourself",
+    "countermeasure": "The trap is the urge to reconcile on demand; slow down and decline",
+    "sources": [
+      "fm-2-22-3",
+      "ar-381-12"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "B15",
+    "name": "Silent",
+    "family": "interrogation",
+    "technique_class": "none",
+    "definition": "Deliberate, prolonged silence used as pressure to make the source fill the gap with speech.",
+    "mechanism": "Silence as pressure to make the source fill it",
+    "recognition_cue": "Prolonged deliberate silence and eye contact",
+    "countermeasure": "Silence is a prompt, not an obligation",
+    "sources": [
+      "fm-2-22-3",
+      "ar-381-12"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "B16",
+    "name": "Change of Scenery",
+    "family": "interrogation",
+    "technique_class": "none",
+    "definition": "A shift to an informal setting where the questioning continues quietly under the appearance of a relaxed conversation.",
+    "mechanism": "Move to an informal setting where questioning quietly continues",
+    "recognition_cue": "A shift to a relaxed venue where questions keep coming",
+    "countermeasure": "Bridges into elicitation; the venue does not change what is sensitive",
+    "sources": [
+      "fm-2-22-3",
+      "ar-381-12"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "B17",
+    "name": "Mutt and Jeff",
+    "family": "interrogation",
+    "technique_class": "none",
+    "definition": "A harsh interviewer followed by a sympathetic one, meant to make the source bond with and disclose to the second.",
+    "mechanism": "A harsh then a sympathetic interviewer; the source bonds with the second",
+    "recognition_cue": "Classic good-cop/bad-cop pairing",
+    "countermeasure": "The friendly one runs the same objective; requires O-6 approval in doctrine",
+    "sources": [
+      "fm-2-22-3",
+      "ar-381-12"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "B18",
+    "name": "False Flag",
+    "family": "interrogation",
+    "technique_class": "none",
+    "definition": "A false claim of nationality or affiliation, meant to convince the source a friendlier third party is doing the questioning.",
+    "mechanism": "Convince the source a friendlier third country is questioning them",
+    "recognition_cue": "Claimed nationality or affiliation designed to make you feel safer",
+    "countermeasure": "Verify who is actually asking; misrepresented affiliation is the manipulation",
+    "sources": [
+      "fm-2-22-3",
+      "ar-381-12"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "C1",
+    "name": "Pretexting",
+    "family": "se_vector",
+    "technique_class": "none",
+    "definition": "A fabricated scenario or identity constructed to justify a request for information or access.",
+    "mechanism": "A fabricated scenario or identity justifies a request",
+    "recognition_cue": "A complete backstory paired with pressure to skip verification",
+    "countermeasure": "Verify identity through an independently sourced channel, never the contact details in the request",
+    "sources": [
+      "cisa-social-engineering-guidance",
+      "enisa-threat-landscape-social-engineering"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "C2",
+    "name": "Phishing",
+    "family": "se_vector",
+    "technique_class": "none",
+    "definition": "Deceptive mass email or a lookalike site, built to solicit data or an action from whoever falls for it.",
+    "mechanism": "Deceptive mass email or sites solicit data or action",
+    "recognition_cue": "Unsolicited requests, lookalike domains, urgency",
+    "countermeasure": "Phishing-resistant MFA, filtering, verify links via known numbers, report",
+    "sources": [
+      "cisa-social-engineering-guidance",
+      "mitre-attack-t1566"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "C3",
+    "name": "Spear-phishing",
+    "family": "se_vector",
+    "technique_class": "none",
+    "definition": "Phishing personalized with open-source detail about the target's role, so the message reads as legitimately informed.",
+    "mechanism": "Phishing personalized from OSINT",
+    "recognition_cue": "A message that knows too much about your role and uses it",
+    "countermeasure": "Same as phishing plus reduced public detail and out-of-band verification",
+    "sources": [
+      "cisa-social-engineering-guidance",
+      "mitre-attack-t1566"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "C4",
+    "name": "Whaling",
+    "family": "se_vector",
+    "technique_class": "none",
+    "definition": "Spear-phishing aimed specifically at executives, using urgency and confidentiality framing to route around normal process.",
+    "mechanism": "Spear-phishing aimed at executives",
+    "recognition_cue": "\"Urgent and confidential\" requests routing around process",
+    "countermeasure": "Executive impersonation controls, mandatory verification workflows",
+    "sources": [
+      "cisa-social-engineering-guidance",
+      "fbi-ic3"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "C5",
+    "name": "Vishing",
+    "family": "se_vector",
+    "technique_class": "none",
+    "definition": "Voice-call social engineering, often using spoofed caller ID, to extract information or codes over the phone.",
+    "mechanism": "Voice-call social engineering, VoIP caller-ID spoofing",
+    "recognition_cue": "Urgency by phone, discouraged callbacks, requests for codes",
+    "countermeasure": "Call back on a known number; out-of-band confirmation for resets and transfers",
+    "sources": [
+      "cisa-social-engineering-guidance",
+      "mitre-attack-t1566"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "C6",
+    "name": "Smishing",
+    "family": "se_vector",
+    "technique_class": "none",
+    "definition": "A text message carrying a malicious link or callback number, disguised as an account or delivery alert.",
+    "mechanism": "SMS carrying links or callback numbers",
+    "recognition_cue": "Unexpected texts with links or \"alerts\"",
+    "countermeasure": "Do not click; verify via the official app or known number",
+    "sources": [
+      "cisa-social-engineering-guidance"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "C7",
+    "name": "Baiting",
+    "family": "se_vector",
+    "technique_class": "none",
+    "definition": "An object or offer, such as a dropped USB drive or a free file, designed to bait curiosity into a compromising action.",
+    "mechanism": "Curiosity or reward (a dropped USB, a free file) induces a compromising action",
+    "recognition_cue": "Found media, \"too good\" offers, unsolicited exclusive files",
+    "countermeasure": "Prohibit unknown USB media; block autorun; training",
+    "sources": [
+      "enisa-threat-landscape-social-engineering"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "C8",
+    "name": "Quid pro quo (cyber)",
+    "family": "se_vector",
+    "technique_class": "none",
+    "definition": "Unsolicited technical help offered in trade for account access or data.",
+    "mechanism": "Offered \"help\" traded for access or data",
+    "recognition_cue": "Unsolicited IT-support offers conditioned on access",
+    "countermeasure": "Verify support contacts through the internal help desk",
+    "sources": [
+      "enisa-threat-landscape-social-engineering"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "C9",
+    "name": "Tailgating / piggybacking",
+    "family": "se_vector",
+    "technique_class": "none",
+    "definition": "Following an authorized person through a controlled door without independently badging in.",
+    "mechanism": "Follow an authorized person through a controlled door",
+    "recognition_cue": "Someone without a badge follows or asks you to hold the door",
+    "countermeasure": "Badge per person, challenge culture, visitor escort",
+    "sources": [
+      "enisa-threat-landscape-social-engineering"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "C10",
+    "name": "Watering-hole",
+    "family": "se_vector",
+    "technique_class": "none",
+    "definition": "Compromise of a website the target group is known to frequent, so a trusted destination becomes the delivery point.",
+    "mechanism": "Compromise a site the target group frequents",
+    "recognition_cue": "Hard to see; unexpected prompts on a trusted industry site",
+    "countermeasure": "Patching, browser isolation, EDR, egress monitoring",
+    "sources": [
+      "enisa-threat-landscape-social-engineering"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "C11",
+    "name": "Business email compromise",
+    "family": "se_vector",
+    "technique_class": "none",
+    "definition": "A compromised or lookalike executive or vendor email account, used to redirect a payment or sensitive data.",
+    "mechanism": "Compromised or lookalike executive/vendor email redirects payment or data",
+    "recognition_cue": "Last-minute change to wire instructions; almost-correct sender",
+    "countermeasure": "Out-of-band verification of any payment change; report to ic3.gov",
+    "sources": [
+      "fbi-ic3"
+    ],
+    "confidence": "high",
+    "default_weight": 1.0
+  },
+  {
+    "id": "D1",
+    "name": "Requests for information",
+    "family": "collection_method",
+    "technique_class": "none",
+    "definition": "An unsolicited request for information arriving from an unknown or unverified, potentially foreign, source.",
+    "mechanism": "Unsolicited requests from unknown or foreign sources",
+    "recognition_cue": "A request for information that arrives from someone whose identity or affiliation cannot be confirmed",
+    "countermeasure": "Verify identity and authorization before responding; do not respond if unverifiable; report",
+    "sources": [
+      "cdse-foreign-collection-methods-2024",
+      "dcsa-targeting-us-technologies-2025"
+    ],
+    "confidence": "medium",
+    "default_weight": 1.0
+  },
+  {
+    "id": "D2",
+    "name": "Solicitation and marketing of services",
+    "family": "collection_method",
+    "technique_class": "none",
+    "definition": "The placement of foreign personnel inside a business relationship through a joint venture, distributorship, or service offer.",
+    "mechanism": "Placing foreign personnel via ventures or service offers",
+    "recognition_cue": "A foreign national embedded in a joint venture, distributorship, or service contract with access beyond the deal's actual scope",
+    "countermeasure": "Review outgoing documents, give foreign representatives stand-alone computers, limit sharing to the venture scope, build a Technology Control Plan",
+    "sources": [
+      "cdse-foreign-collection-methods-2024",
+      "dcsa-targeting-us-technologies-2025"
+    ],
+    "confidence": "medium",
+    "default_weight": 1.0
+  },
+  {
+    "id": "D3",
+    "name": "Suspicious network activity",
+    "family": "collection_method",
+    "technique_class": "none",
+    "definition": "Hacking, malware, or phishing used against an organization's network, the fastest-growing of the collection methods.",
+    "mechanism": "The fastest-growing method: hacking, malware, phishing",
+    "recognition_cue": "Unexplained system activity, an unfamiliar process, or an unsolicited link or attachment tied to a work topic",
+    "countermeasure": "Audit systems, do not rely on firewalls alone, report intrusion attempts, do not click unknown links",
+    "sources": [
+      "cdse-foreign-collection-methods-2024",
+      "dcsa-targeting-us-technologies-2025"
+    ],
+    "confidence": "medium",
+    "default_weight": 1.0
+  },
+  {
+    "id": "D4",
+    "name": "Academic solicitation",
+    "family": "collection_method",
+    "technique_class": "none",
+    "definition": "The use of students, professors, or researchers to collect sensitive information under the cover of legitimate academic activity.",
+    "mechanism": "Students, professors, and researchers used to collect under academic pretense",
+    "recognition_cue": "An unsolicited research collaboration, review request, or conference invitation from an unverified academic contact",
+    "countermeasure": "Treat unsolicited academic requests with suspicion, respond only to verified individuals, release only authorized information",
+    "sources": [
+      "cdse-foreign-collection-methods-2024",
+      "dcsa-targeting-us-technologies-2025"
+    ],
+    "confidence": "medium",
+    "default_weight": 1.0
+  },
+  {
+    "id": "D5",
+    "name": "Foreign visits",
+    "family": "collection_method",
+    "technique_class": "none",
+    "definition": "Information gathering carried out during an official or unofficial visit to a facility.",
+    "mechanism": "Suspicious gathering during facility visits",
+    "recognition_cue": "A visitor who strays from the planned route, lingers near controlled areas, or asks questions outside the visit's stated purpose",
+    "countermeasure": "Coordinate with DCSA before the visit, brief hosts and escorts, walk the route, bar recording devices",
+    "sources": [
+      "cdse-foreign-collection-methods-2024",
+      "dcsa-targeting-us-technologies-2025"
+    ],
+    "confidence": "medium",
+    "default_weight": 1.0
+  },
+  {
+    "id": "D6",
+    "name": "Conferences, conventions, and trade shows",
+    "family": "collection_method",
+    "technique_class": "none",
+    "definition": "The use of conferences, conventions, and trade shows to link a targeted program to the people who know it best.",
+    "mechanism": "Linking targeted programs to knowledgeable people",
+    "recognition_cue": "A conference contact whose questions track your program rather than the show's general subject matter",
+    "countermeasure": "Brief travelers on elicitation response, display mock-ups rather than real equipment, debrief attendees",
+    "sources": [
+      "cdse-foreign-collection-methods-2024",
+      "dcsa-targeting-us-technologies-2025"
+    ],
+    "confidence": "medium",
+    "default_weight": 1.0
+  }
+]

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Interaction indicators - Elicitation Defense Lab</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <p><a class="back-link" href="index.html">&larr; Elicitation Defense Lab</a></p>
+  <h1>Interaction indicators</h1>
+  <p class="note">You already had this conversation. Go through the items below and mark whether the other person used each one on you. They are grouped by the human lever each technique leans on.</p>
+
+  <div class="privacy">
+    Everything here runs in your browser. Your answers are scored locally and
+    never leave the page. In-progress answers are kept only in this browser's
+    local storage.
+  </div>
+
+  <p id="load-error" hidden></p>
+
+  <div class="context-row">
+    <label for="context"><strong>Reporting context</strong>:</label><br>
+    <p class="note">Sets who the result names if this interaction is flagged: an FSO and counterintelligence office for cleared contractor or DoD, a security office for federal civilian, or a manager or security team plus the FBI's IC3 for private industry. It only matters if the result below is flagged; an unflagged result states plainly that no report is indicated.</p>
+    <select id="context">
+      <option value="general">General</option>
+      <option value="dod">DoD</option>
+      <option value="federal">Federal civilian</option>
+      <option value="cleared_contractor">Cleared contractor</option>
+      <option value="private_industry">Private industry</option>
+    </select>
+  </div>
+
+  <div class="context-row">
+    <label for="group-jump"><strong>Jump to group</strong>:</label><br>
+    <select id="group-jump">
+      <option value="">Choose a group&hellip;</option>
+    </select>
+  </div>
+
+  <div id="interaction-groups"></div>
+  <button id="interaction-run">Score interaction</button>
+
+  <section id="result" hidden>
+    <h2>Result</h2>
+    <div id="result-summary"></div>
+  </section>
+</main>
+<script type="module" src="interaction.js"></script>
+</body>
+</html>

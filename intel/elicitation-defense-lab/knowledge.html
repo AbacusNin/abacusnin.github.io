@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Knowledge check - Elicitation Defense Lab</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <p><a class="back-link" href="index.html">&larr; Elicitation Defense Lab</a></p>
+  <h1>Knowledge check</h1>
+  <p class="note">For each scenario, pick the recognition, countermeasure, and reporting response you would use. <span id="sample-note"></span></p>
+
+  <div class="privacy">
+    Everything here runs in your browser. The drawn items and your answers are
+    scored locally and never leave the page. In-progress answers are kept only
+    in this browser's local storage.
+  </div>
+
+  <p id="load-error" hidden></p>
+
+  <div class="context-row">
+    <label for="context"><strong>Reporting context</strong> (sets the correct reporting channel):</label><br>
+    <select id="context">
+      <option value="general">General</option>
+      <option value="dod">DoD</option>
+      <option value="federal">Federal civilian</option>
+      <option value="cleared_contractor">Cleared contractor</option>
+      <option value="private_industry">Private industry</option>
+    </select>
+  </div>
+
+  <div id="knowledge-items"></div>
+  <button id="knowledge-run">Score knowledge check</button>
+
+  <section id="result" hidden>
+    <h2>Result</h2>
+    <div id="result-summary"></div>
+  </section>
+</main>
+<script type="module" src="knowledge.js"></script>
+</body>
+</html>

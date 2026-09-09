@@ -1,0 +1,308 @@
+[
+  {
+    "id": "ind_a1_flattery",
+    "label": "Flattery",
+    "description": "Praise aimed at your competence, expertise, or standing, offered to loosen your discretion before a follow-up question.",
+    "example": "\"You clearly know this program better than anyone in the room. Give me the two-minute version?\"",
+    "technique_id": "A1",
+    "diagnosticity": 0.5,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "ind_a8_quid_pro_quo",
+    "label": "Quid pro quo",
+    "description": "An offer of a fact, favor, or personal disclosure made first, so you feel a social debt to reciprocate with information of your own.",
+    "example": "\"I'll tell you what I know about the merger if you tell me what your team's working on.\"",
+    "technique_id": "A8",
+    "diagnosticity": 0.6,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "ind_a2_provocation",
+    "label": "Provocation",
+    "description": "Deliberate skepticism toward a claim you made, meant to draw out elaboration to prove it or an answer given out of irritation.",
+    "example": "\"I don't buy it. There's no way your team actually pulled that off.\"",
+    "technique_id": "A2",
+    "diagnosticity": 0.5,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "ind_a12_assumed_knowledge",
+    "label": "Assumed knowledge",
+    "description": "Speech that presumes you already know the sensitive detail, so confirming or correcting it feels like the natural response.",
+    "example": "\"So when the contract renewal falls through in March, what's the backup plan?\"",
+    "technique_id": "A12",
+    "diagnosticity": 0.6,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "ind_a28_scharff",
+    "label": "The Scharff technique",
+    "description": "A friendly, non-confrontational conversation that carries the impression the other person already knows most of it, drawing confirmation or denial without ever asking directly.",
+    "example": "They talk about your program with total confidence, as if they already know it, and just wait for you to confirm it or let it stand.",
+    "technique_id": "A28",
+    "diagnosticity": 0.7,
+    "source": "granhag-scharff"
+  },
+  {
+    "id": "ind_a3_false_statement",
+    "label": "False statement",
+    "description": "An intentionally incorrect statement, offered so you supply the accurate version in the act of correcting it.",
+    "example": "\"I heard your project got canceled last spring.\"",
+    "technique_id": "A3",
+    "diagnosticity": 0.55,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "ind_a4_criticism",
+    "label": "Criticism",
+    "description": "Criticism of your work, employer, or a rival, offered to draw a defensive rebuttal that reveals detail.",
+    "example": "\"Honestly, your team's approach seems way behind where the competition is.\"",
+    "technique_id": "A4",
+    "diagnosticity": 0.5,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "ind_a5_one_upper",
+    "label": "One-upper",
+    "description": "A modest or exaggerated claim shared first, meant to create a competitive pull to top it with a larger, more specific one.",
+    "example": "\"We shipped 200 units last quarter. Bet you didn't hit that.\"",
+    "technique_id": "A5",
+    "diagnosticity": 0.45,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "ind_a6_feigned_ignorance",
+    "label": "Feigned ignorance",
+    "description": "A pose of ignorance about a subject you know well, meant to draw out an explanatory answer aimed at a supposed novice.",
+    "example": "\"I have no idea how any of this works. Can you walk me through it like I'm new?\"",
+    "technique_id": "A6",
+    "diagnosticity": 0.45,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "ind_a7_confidential_bait",
+    "label": "Confidential bait",
+    "description": "A disclosure framed as confidential, shared first so you feel invited to trade a confidence of your own.",
+    "example": "\"Just between us, my last project went way over budget too.\"",
+    "technique_id": "A7",
+    "diagnosticity": 0.55,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "ind_a9_good_listener",
+    "label": "Good listener",
+    "description": "Sustained, warm attention and active listening, used to keep you talking and steer the conversation toward a topic of interest.",
+    "example": "They ask thoughtful follow-up after follow-up, always steering back to your work and never their own.",
+    "technique_id": "A9",
+    "diagnosticity": 0.4,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "ind_a10_mutual_interest",
+    "label": "Mutual interest",
+    "description": "A manufactured sense of shared interest or background, built quickly so cooperation and disclosure feel like a natural next step.",
+    "example": "\"Wait, you went to State too, and you work in defense? We have so much in common, tell me about your work.\"",
+    "technique_id": "A10",
+    "diagnosticity": 0.4,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "ind_a11_mirroring",
+    "label": "Mirroring",
+    "description": "Matching your body language, tone, and phrasing to build unconscious rapport that keeps the conversation open.",
+    "example": "They mirror your posture and tone, then echo \"so the schedule slipped, huh\" every time timing comes up.",
+    "technique_id": "A11",
+    "diagnosticity": 0.35,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "ind_a13_bracketing",
+    "label": "Bracketing",
+    "description": "A deliberately wide or wrong numeric range, offered so you narrow it toward the true figure.",
+    "example": "\"I'd guess your budget is somewhere between two and five million. Closer to which end?\"",
+    "technique_id": "A13",
+    "diagnosticity": 0.6,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "ind_a14_leading_question",
+    "label": "Leading question",
+    "description": "A question built around a hidden presumption, so any direct answer accepts a fact you never actually confirmed.",
+    "example": "\"So you're still having trouble with the vendor, right?\"",
+    "technique_id": "A14",
+    "diagnosticity": 0.5,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "ind_a15_macro_to_micro",
+    "label": "Macro to micro",
+    "description": "A conversation that opens broad, narrows to a single sensitive detail, then widens out again so the narrowing goes unnoticed.",
+    "example": "Talk opens on the industry in general, narrows to your contract's exact timeline, then drifts back to small talk.",
+    "technique_id": "A15",
+    "diagnosticity": 0.45,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "ind_a16_oblique_reference",
+    "label": "Oblique reference",
+    "description": "Discussion of a related or comparable system, meant to draw you into using your own work as an unwitting reference point.",
+    "example": "\"The XYZ system handles that problem by doing X. Is that close to what you all do?\"",
+    "technique_id": "A16",
+    "diagnosticity": 0.4,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "ind_a17_quote_reported_facts",
+    "label": "Quote reported facts",
+    "description": "A citation of already-public data, used as a springboard toward the unpublished detail that would confirm or extend it.",
+    "example": "\"The press release said the launch slipped to Q3, so I'm guessing the testing phase ran long?\"",
+    "technique_id": "A17",
+    "diagnosticity": 0.35,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "ind_a18_word_repetition",
+    "label": "Word repetition",
+    "description": "Your own key word or phrase, echoed back as a prompt for further elaboration on it.",
+    "example": "You mention a \"supply chain issue,\" and they repeat \"supply chain issue...\" and wait.",
+    "technique_id": "A18",
+    "diagnosticity": 0.4,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "ind_a19_direct_question",
+    "label": "Direct question",
+    "description": "A blunt, direct question that relies on the social norm that a question posed deserves an answer.",
+    "example": "\"What's your project's current budget and timeline?\"",
+    "technique_id": "A19",
+    "diagnosticity": 0.5,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "ind_a20_questionnaire_survey",
+    "label": "Questionnaire or survey",
+    "description": "A survey or questionnaire that buries sensitive questions among benign ones under a plausible cover purpose.",
+    "example": "A short survey on \"industry trends\" that slips in a question about your program's staffing levels.",
+    "technique_id": "A20",
+    "diagnosticity": 0.55,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "ind_a21_ruse_interview",
+    "label": "Ruse interview",
+    "description": "A fabricated interview, often posing as a recruiter or headhunter, staged to justify probing questions about recent work.",
+    "example": "\"I'm recruiting for a similar role. Tell me more about what you built on your last project.\"",
+    "technique_id": "A21",
+    "diagnosticity": 0.65,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "ind_a22_target_associates",
+    "label": "Target associates",
+    "description": "An approach routed through a relative or colleague, or questions about a group you do not belong to, to reach information indirectly.",
+    "example": "\"Your spouse mentioned you've been traveling a lot for work lately. Big project?\"",
+    "technique_id": "A22",
+    "diagnosticity": 0.5,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "ind_a23_urge_to_complain",
+    "label": "Urge to complain",
+    "description": "An invitation to vent about work frustration, used to surface setbacks, staffing gaps, and delays you would not otherwise volunteer.",
+    "example": "\"Sounds rough. What's actually going wrong with the schedule?\"",
+    "technique_id": "A23",
+    "diagnosticity": 0.5,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "ind_a24_paper_review",
+    "label": "Paper review",
+    "description": "An unsolicited request to review a paper or proposal, framed to draw your sensitive expertise into the response.",
+    "example": "\"Would you mind reviewing this paper? It overlaps with what you're working on.\"",
+    "technique_id": "A24",
+    "diagnosticity": 0.6,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "ind_a25_offering_assistance",
+    "label": "Offering assistance",
+    "description": "Genuine, unsolicited help offered to you, used to surface your interests and needs and to build a sense of obligation.",
+    "example": "\"I know a guy who could fix that funding gap. What exactly are you short on?\"",
+    "technique_id": "A25",
+    "diagnosticity": 0.45,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "ind_a26_hypothetical_situation",
+    "label": "Hypothetical situation",
+    "description": "A hypothetical scenario built directly on something you just said, inviting you to reason through sensitive ground as if it were speculation.",
+    "example": "\"So hypothetically, if that system did fail, what would the fallback look like?\"",
+    "technique_id": "A26",
+    "diagnosticity": 0.45,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "ind_a27_setting_manipulation",
+    "label": "Setting manipulation",
+    "description": "A deliberate shift of the conversation to a relaxed, off-work setting, sometimes involving alcohol, to lower your guard.",
+    "example": "\"Let's grab drinks somewhere quieter and keep talking about your work.\"",
+    "technique_id": "A27",
+    "diagnosticity": 0.55,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "pattern_disproportionate_interest",
+    "label": "Disproportionate interest",
+    "description": "One topic gets far more attention than the rest of the conversation, out of proportion to a normal exchange.",
+    "example": "Every few minutes the conversation returns to your specific project, no matter what else came up in between.",
+    "pattern": true,
+    "diagnosticity": 0.6,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "pattern_topic_bridging",
+    "label": "Topic bridging",
+    "description": "The conversation is deliberately steered from a neutral opener toward the subject they actually want.",
+    "example": "Small talk about the weather turns, within two exchanges, into a question about your team's deadline.",
+    "pattern": true,
+    "diagnosticity": 0.5,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "pattern_question_density",
+    "label": "Question density",
+    "description": "An unusually high concentration of questions clustered on the same subject.",
+    "example": "In a five-minute stretch, six of their questions all touch your program's budget or timeline.",
+    "pattern": true,
+    "diagnosticity": 0.5,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "pattern_persistence_circling",
+    "label": "Persistence and circling back",
+    "description": "The same subject keeps returning to the conversation after you have moved past it.",
+    "example": "You change the subject twice, and both times they find a way back to the same question.",
+    "pattern": true,
+    "diagnosticity": 0.6,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "pattern_reformulation",
+    "label": "Reformulation",
+    "description": "A question you declined or deflected comes back reworded, testing whether a different phrasing gets an answer.",
+    "example": "You dodge \"what's your budget,\" and a few minutes later they ask \"so is funding tight this year?\"",
+    "pattern": true,
+    "diagnosticity": 0.5,
+    "source": "cdse-accidental-conversations-2025"
+  },
+  {
+    "id": "pattern_steering_mirroring",
+    "label": "Steering with mirroring",
+    "description": "The conversation is actively steered toward a topic while the other person mirrors your tone and body language.",
+    "example": "They match your energy and posture while gently walking every reply back toward your project.",
+    "pattern": true,
+    "diagnosticity": 0.5,
+    "source": "cdse-accidental-conversations-2025"
+  }
+]

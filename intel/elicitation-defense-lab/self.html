@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Self-assessment - Elicitation Defense Lab</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <p><a class="back-link" href="index.html">&larr; Elicitation Defense Lab</a></p>
+  <h1>Self-assessment</h1>
+  <p class="note">This is a self-reflection prompt, not a skills test. It asks how you would react in the moment, and a self-report like this is a weak stand-in for what you would actually do under pressure. Treat a high score here as a place to focus, not a verdict. The <a href="knowledge.html">knowledge check</a> is the module that actually tests whether you can recognize a technique and pick the right countermeasure and reporting response.</p>
+
+  <div class="privacy">
+    Everything here runs in your browser. The drawn items and your answers are
+    scored locally and never leave the page. In-progress answers are kept only
+    in this browser's local storage.
+  </div>
+
+  <p class="note">Rate each statement from 0 (strongly disagree) to 4 (strongly agree). <span id="sample-note"></span></p>
+
+  <p id="load-error" hidden></p>
+
+  <div id="self-items"></div>
+  <button id="self-run">Score self-assessment</button>
+
+  <section id="result" hidden>
+    <h2>Result</h2>
+    <div id="result-summary"></div>
+  </section>
+</main>
+<script type="module" src="self.js"></script>
+</body>
+</html>
