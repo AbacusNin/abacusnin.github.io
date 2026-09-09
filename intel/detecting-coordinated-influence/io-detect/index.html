@@ -20,19 +20,19 @@
       </div>
 
       <div class="prose">
-        <p>Individual posts in an influence operation look ordinary, so the operation cannot be found one account or one claim at a time. What can be counted is coordination: accounts resharing the same post seconds apart, posting identical text, or landing on one hashtag together. io-detect measures those behaviors, groups the accounts that keep doing them together, and scores the result against a corpus where the true answer is already labeled.</p>
-        <p>It was measured on the Indiana University Russia_2 campaign file, roughly a million posts, against that corpus's own organic control accounts. Precision was 0.54 and recall 0.67 at account granularity.</p>
+        <p>Individual posts in an influence operation look ordinary, so the operation cannot be found one account or one claim at a time. What can be counted is coordination: accounts resharing the same post seconds apart, posting identical text, or landing on one hashtag together. io-detect measures those behaviors, groups the accounts that keep doing them together, and scores the result against data where the true answer is already labeled.</p>
+        <p>It was measured on the Indiana University Russia_2 campaign file, roughly a million posts, against the organic control accounts that ship with it. Precision was 0.54 and recall 0.67 at account granularity.</p>
       </div>
 
       <section class="lens">
         <p class="label">Engineer</p>
-        <p>Python, with polars for the data work and networkx for the graph. Two source corpora ingest through one canonical schema, so the detection and scoring code never reads either source format directly. Built test-first with 30 tests, and a synthetic fixture drives a one-command demo of the whole pipeline, which means the tool runs without the gated corpus.</p>
+        <p>Python, with polars for the data work and networkx for the graph. Two sources ingest through one canonical schema, so the detection and scoring code never reads either source format directly. Built test-first with 30 tests, and a synthetic fixture drives a one-command demo of the whole pipeline, which means the tool runs without the gated dataset.</p>
         <p>The design rule that shaped the rest: behavior is detected first and named second. DISARM technique tags are output only, and nothing in the feature, detection, or scoring path reads a tag or a label to decide what to flag.</p>
       </section>
 
       <section class="lens">
         <p class="label">Analyst</p>
-        <p>Precision of 0.54 on a corpus enriched to 91% influence-operation rows is a lab ceiling, not a field forecast. Natural prevalence is far lower, and the same false-positive rate produces much worse precision against it. The honest reading is that the method finds most of a known operation and is right slightly more often than not when it raises a flag.</p>
+        <p>Precision of 0.54 on a file enriched to 91% influence-operation rows is a lab ceiling, not a field forecast. Natural prevalence is far lower, and the same false-positive rate produces much worse precision against it. The honest reading is that the method finds most of a known operation and is right slightly more often than not when it raises a flag.</p>
         <p>Coordination is also not authenticity. A tightly organized genuine community trips the same thresholds as a paid one, so a flag is a candidate for review rather than a finding. The pipeline does not attribute operations to any actor, and nothing here identifies individuals.</p>
       </section>
 
