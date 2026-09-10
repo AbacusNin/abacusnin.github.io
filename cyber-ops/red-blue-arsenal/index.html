@@ -37,10 +37,10 @@
           </figure>
 
           <h2>Making it trustworthy</h2>
-          <p>A tool list is worthless if the links are dead. I checked every repository on 2026-09-09. I fixed the links on projects that had moved or been renamed. Archived and superseded tools got marked as such, and I flagged anything commercial or hosted outside GitHub. A lot of well-known tools have quietly moved or gone unmaintained, so a list written from memory would have pointed people at 404s in the middle of a competition.</p>
+          <p>A tool list is worthless if the links are dead. I fixed the links on projects that had moved or been renamed. Archived and superseded tools got marked as such, and I flagged anything commercial or hosted outside GitHub. A lot of well-known tools have quietly moved or gone unmaintained and wanted to prevent chaff &amp; 404s in the middle of a competition.</p>
 
           <h2>Comparing against BlackArch</h2>
-          <p>BlackArch ships the largest security tool collection of any distro, so I compared the catalog against its full set of 2,858 packages to see what we were missing. Most of the difference was noise, old scripts and single-use proofs of concept. A real slice was worth folding in, and that pass added 147 tools and brought the catalog to 1,443.</p>
+          <p>BlackArch ships the largest security tool collection of any distro, so I compared the catalog against its full set of 2,858 packages to see what we were missing. Most of the difference was noise, old scripts and single-use proofs of concept. However, 147 tools were generally worth it and brought the catalog to 1,443.</p>
           <p>The comparison also gave me the most useful result of the whole project. I ran it against the 1,296 tools the catalog held at that point. Only 337 of them are in the BlackArch repository. The rest, about three quarters, are not, so a fresh BlackArch image still leaves most of the arsenal to install by hand.</p>
           <p>Two caveats sit on that number. The comparison matched on package names, so anywhere a package name and a repository name disagree, the gap is overstated. Arch's own base repositories also carry marquee tools that BlackArch's list leaves out. Nmap, metasploit, and hashcat are all in the catalog and none of them show up as gaps, so the real by-hand share sits somewhat below three quarters.</p>
           <p>The shape of the result matters more than the exact figure. Coverage is concentrated on the offensive side and close to nothing on the defensive side. That points the team straight at where to spend setup time. The red kit is mostly a package install away, and the blue kit is the part that takes real work.</p>
@@ -49,7 +49,7 @@
           <p>The last piece is a shared board the team fills in together. We pick the tools we plan to run and mark each one selected, installed, or practiced. Every pick gets a name attached. The board then shows our coverage across all 28 categories, so we can spot the gaps and the categories nobody owns while there is still time to fix them.</p>
 
           <h2>Why it stays private</h2>
-          <p>The full inventory and the interactive tools stay inside the team, so nothing on this page links to them. This is prep for a specific competition, and I don't want a tool list built for a scored environment sitting out in the open. So this page is the approach, plus the one thing I would pass to another team. Readiness is coverage plus ownership. The list was the easy half.</p>
+          <p>The full inventory and the interactive tools stay inside the team, so nothing on this page links to them. This is a competition prep tool and I don't want our tooling catalog sitting out in the open. So this page is the approach. FWIW; Readiness is coverage plus ownership.</p>
 
         </div>
       </div>
