@@ -239,6 +239,10 @@ body.plain { background-image: none; }
 .diagram svg { max-width: 360px; width: 100%; height: auto; display: block; }
 .diagram figcaption { font-size: 13px; color: var(--muted); margin-top: 10px; max-width: 60ch; }
 
+.shot { margin: 10px 0 22px; }
+.shot img { width: 100%; height: auto; display: block; border: 1px solid var(--border); border-radius: 6px; }
+.shot figcaption { font-size: 13px; color: var(--muted); margin-top: 10px; max-width: 60ch; }
+
 /* landing quote strip */
 .ticker {
   overflow: hidden;
