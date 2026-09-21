@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; frame-src https://www.youtube-nocookie.com; base-uri 'none'; form-action 'none'">
   <title>Abacus</title>
   <link rel="stylesheet" href="/assets/css/site.css">
 </head>
@@ -19,6 +20,11 @@
       <h1 class="hero">I study how systems behave, how they fail, and what those failures mean operationally.</h1>
       <p class="hero-sub">My work spans cybersecurity, intelligence, engineering, governance, and AI, where I turn ambiguous problems into observable, analyzable, and actionable resolutions.</p>
       <p class="hero-sub">Some of my work and tradecraft is public here. The rest stays <span class="redact">compartmented</span> by design.</p>
+
+      <details class="player">
+        <summary>Listen to my curated collection of organized atmospheric vibrations masquerading as emotional significance.</summary>
+        <div class="player-body" data-player><noscript>The list needs JavaScript.</noscript></div>
+      </details>
 
       <nav class="domains" aria-label="Sections">
         <a class="domain" href="/cyber-ops/">
@@ -54,5 +60,6 @@
     </footer>
   </div>
   <script src="/assets/js/ticker.js"></script>
+  <script src="/assets/js/player.js"></script>
 </body>
 </html>
