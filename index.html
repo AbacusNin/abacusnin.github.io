@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; frame-src https://www.youtube-nocookie.com; base-uri 'none'; form-action 'none'">
   <title>Abacus | Ninja</title>
-  <link rel="stylesheet" href="/assets/css/site.css?v=20260921">
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261007">
   <meta name="description" content="My work spans cybersecurity, intelligence, engineering, governance, and AI, where I turn ambiguous problems into observable, analyzable, and actionable resolutions.">
   <link rel="canonical" href="https://abacusnin.github.io/">
   <meta property="og:type" content="website">
@@ -22,6 +22,14 @@
   <div class="wrap">
     <header class="site-header">
       <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
     </header>
 
     <div class="ticker" data-ticker tabindex="0" aria-label="Quotes" hidden></div>
@@ -36,6 +44,16 @@
         <summary>Listen to my curated collection of organized atmospheric vibrations masquerading as emotional significance.</summary>
         <div class="player-body" data-player><noscript>The list needs JavaScript.</noscript></div>
       </details>
+
+      <section class="featured" aria-label="Featured">
+        <p class="featured-label">Featured</p>
+        <a class="featured-card" href="/cyber-ops/ctf-writeups/crypto/rotation-and-recovery/">
+          <span class="featured-tag">Crypto // Writeup</span>
+          <span class="featured-title">Rotation and Recovery</span>
+          <span class="featured-desc">Recovering a 128-bit key from a stateful protocol through an adversary-in-the-middle position, a verification oracle, and reducible ring structure, then mapping it back to detections and controls.</span>
+          <span class="featured-more">Read -&gt;</span>
+        </a>
+      </section>
 
       <nav class="domains" aria-label="Sections">
         <a class="domain" href="/cyber-ops/">

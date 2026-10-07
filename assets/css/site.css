@@ -348,3 +348,14 @@ body.plain { background-image: none; }
   .player-body { grid-template-columns: minmax(0, 1fr); }
   .player-slot { order: -1; width: 100%; height: auto; aspect-ratio: 16 / 9; }
 }
+
+/* homepage featured piece */
+.featured { margin: 40px 0 8px; }
+.featured-label { font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--magenta); margin: 0 0 12px; }
+.featured-card { display: block; border: 1px solid var(--border); border-left: 3px solid var(--cyan); background: var(--surface); border-radius: 6px; padding: 20px 22px 22px; color: inherit; }
+.featured-card:hover { border-color: var(--cyan); text-decoration: none; }
+.featured-tag { display: inline-block; font-family: var(--mono); font-size: 11px; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; }
+.featured-title { display: block; font-size: 20px; font-weight: 700; letter-spacing: -.01em; color: var(--text); margin: 0 0 8px; }
+.featured-card:hover .featured-title { color: var(--cyan); }
+.featured-desc { display: block; font-size: 14px; color: var(--muted); line-height: 1.55; max-width: 64ch; }
+.featured-more { display: inline-block; margin-top: 14px; font-family: var(--mono); font-size: 12px; color: var(--cyan); }
