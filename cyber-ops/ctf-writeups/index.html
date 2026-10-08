@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>CTF Writeups</title>
-  <link rel="stylesheet" href="/assets/css/site.css?v=20261007">
-  <meta name="description" content="Challenges I have solved, written up by technique. Each one connects the solution back to how the same behavior shows up in real detection and defense.">
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009">
+  <meta name="description" content="Challenges I've solved, written up by technique, each tied back to how the same behavior shows up in real detection and defense.">
   <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Abacus">
   <meta property="og:title" content="CTF Writeups">
-  <meta property="og:description" content="Challenges I have solved, written up by technique. Each one connects the solution back to how the same behavior shows up in real detection and defense.">
+  <meta property="og:description" content="Challenges I've solved, written up by technique, each tied back to how the same behavior shows up in real detection and defense.">
   <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/">
   <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
   <meta property="og:image:width" content="1200">
@@ -35,35 +35,32 @@
       <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / CTF Writeups</p>
       <div class="page-head">
         <h1 class="page-title">CTF Writeups</h1>
-        <p class="lead">Challenges I have solved, written up by technique. Each one connects the solution back to how the same behavior shows up in real detection and defense.</p>
+        <p class="lead">Challenges I've solved, written up by technique. Each one ties the solve back to how the same behavior shows up in real detection and defense.</p>
       </div>
 
-      <div class="project-list">
-        <div class="project-item">
-          <h3><a href="/cyber-ops/ctf-writeups/crypto/">Crypto</a><span class="tag">5 writeups</span></h3>
-          <p>Classical ciphers, weak randomness, and key-reuse bugs.</p>
-        </div>
-        <div class="project-item">
-          <h3>Forensics<span class="tag">Planned</span></h3>
-          <p>Disk, memory, and artifact analysis. BitLocker, the registry, removable media.</p>
-        </div>
-        <div class="project-item">
-          <h3>Network<span class="tag">Planned</span></h3>
-          <p>Packet and protocol work, from PCAP to malicious access points.</p>
-        </div>
-        <div class="project-item">
-          <h3>Cloud<span class="tag">Planned</span></h3>
-          <p>Log-driven investigation across cloud events and control planes.</p>
-        </div>
-        <div class="project-item">
-          <h3>Web<span class="tag">Planned</span></h3>
-          <p>Client-side analysis and request tampering, solved with the browser's own tools.</p>
-        </div>
-        <div class="project-item">
-          <h3><a href="/cyber-ops/red-blue-arsenal/">Red and blue arsenal</a><span class="tag">Team prep</span></h3>
-          <p>Not a challenge solve. The tool reference and readiness board I built so the team knows what it has before an event starts.</p>
+      <div class="archive-controls">
+        <input type="search" class="archive-search" data-search placeholder="Search title, technique, tag  ( / )" aria-label="Search writeups">
+        <div class="archive-chips" data-chips aria-label="Categories"></div>
+        <div class="archive-bar">
+          <span class="archive-count" data-count></span>
+          <label class="archive-sort">Sort
+            <select data-sort>
+              <option value="new">Newest</option>
+              <option value="old">Oldest</option>
+              <option value="az">A to Z</option>
+            </select>
+          </label>
         </div>
       </div>
+
+      <div class="archive-cards" data-cards></div>
+
+      <noscript>
+        <p class="archive-empty">The filter needs JavaScript. The writeups:</p>
+        <ul>
+          <li><a href="/cyber-ops/ctf-writeups/crypto/rotation-and-recovery/">Rotation and Recovery</a>, Crypto</li>
+        </ul>
+      </noscript>
 
       <a class="backlink" href="/cyber-ops/">&lt;- back to Cyber Ops</a>
     </main>
@@ -73,5 +70,6 @@
       <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
     </footer>
   </div>
+  <script src="/assets/js/archive.js?v=20261009"></script>
 </body>
 </html>
