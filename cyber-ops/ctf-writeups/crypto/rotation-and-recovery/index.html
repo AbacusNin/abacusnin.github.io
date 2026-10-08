@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Rotation and Recovery - CTF Writeups</title>
-  <link rel="stylesheet" href="/assets/css/site.css?v=20261007">
-  <meta name="description" content="Exploiting a stateful cryptographic protocol: recovering a 128-bit key through an adversary-in-the-middle position, a verification oracle, and reducible ring structure, while…">
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261008">
+  <meta name="description" content="I recovered a 128-bit key from a stateful protocol from a man-in-the-middle seat, by turning the verifier into a yes/no oracle and leaning on a weak, factorable key schedule.">
   <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/rotation-and-recovery/">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="Abacus">
   <meta property="og:title" content="Rotation and Recovery - CTF Writeups">
-  <meta property="og:description" content="Exploiting a stateful cryptographic protocol: recovering a 128-bit key through an adversary-in-the-middle position, a verification oracle, and reducible ring structure, while…">
+  <meta property="og:description" content="I recovered a 128-bit key from a stateful protocol from a man-in-the-middle seat, by turning the verifier into a yes/no oracle and leaning on a weak, factorable key schedule.">
   <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/rotation-and-recovery/">
   <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
   <meta property="og:image:width" content="1200">
@@ -35,12 +35,21 @@
       <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / <a href="/cyber-ops/ctf-writeups/crypto/">Crypto</a> / Rotation and Recovery</p>
       <div class="page-head">
         <h1 class="page-title">Rotation and Recovery</h1>
-        <p class="lead">Exploiting a stateful cryptographic protocol: recovering a 128-bit key through an adversary-in-the-middle position, a verification oracle, and reducible ring structure, while minimizing edit cost.</p>
+        <p class="lead">I recovered a 128-bit key from a stateful protocol while sitting in the middle of it, by turning the verifier into a yes/no oracle and leaning on a weak, factorable key schedule. Then I spent the rest of the event trying to do it for fewer edits.</p>
       </div>
 
       <div class="layout">
         <nav class="toc" data-toc aria-label="On this page"></nav>
         <div class="prose">
+<p class="tldr-label">Summary</p>
+<div class="tldr">
+<p><strong>The problem.</strong> I had a man-in-the-middle seat on a stateful protocol and had to recover a participant's secret 128-bit key, editing messages in flight and paying a cost for every edit I made.</p>
+<p><strong>What I did.</strong> I chained two weaknesses. Editable, under-authenticated key-rotation commands let me steer the key, and a MAC verifier that trusted an unauthenticated epoch field gave me a yes/no key-equality oracle. The key schedule's modulus factored, so I recovered the key in small independent pieces and recombined them with CRT.</p>
+<p><strong>The result.</strong> A WebAssembly client that recovered the key live from each run's own state and submitted it. Once it worked, a two-stage residue lift cut the edit cost by about 30% on the seeds I tested.</p>
+<p><strong>The honest limit.</strong> It worked, but I spent event time learning WebAssembly and the protocol on the clock, and I left further cost optimizations unfinished when time ran out.</p>
+</div>
+
+<figure class="diagram"><svg viewBox="0 0 360 434" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Kill chain from adversary-in-the-middle position to key submission"><defs><marker id="ah" markerWidth="9" markerHeight="9" refX="4.5" refY="8" orient="auto"><path d="M0,0 L9,0 L4.5,8 Z" fill="#35e0d0"/></marker></defs><rect x="6" y="6" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="27" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">T1557</text><text x="20" y="45" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">AiTM position</text><line x1="180" y1="58" x2="180" y2="78" stroke="#35e0d0" stroke-width="1.6" marker-end="url(#ah)"/><rect x="6" y="80" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="101" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">T1565.002</text><text x="20" y="119" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">Modify key-rotation traffic</text><line x1="180" y1="132" x2="180" y2="152" stroke="#35e0d0" stroke-width="1.6" marker-end="url(#ah)"/><rect x="6" y="154" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="175" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">CWE-203</text><text x="20" y="193" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">Verification oracle</text><line x1="180" y1="206" x2="180" y2="226" stroke="#35e0d0" stroke-width="1.6" marker-end="url(#ah)"/><rect x="6" y="228" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="249" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">Recover</text><text x="20" y="267" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">Factor modulus, recover residues</text><line x1="180" y1="280" x2="180" y2="300" stroke="#35e0d0" stroke-width="1.6" marker-end="url(#ah)"/><rect x="6" y="302" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="323" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">CRT</text><text x="20" y="341" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">Reconstruct the 128-bit key</text><line x1="180" y1="354" x2="180" y2="374" stroke="#35e0d0" stroke-width="1.6" marker-end="url(#ah)"/><rect x="6" y="376" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="397" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">Outcome</text><text x="20" y="415" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">Submit recovered key</text></svg><figcaption>Kill chain, from position to key submission. The mitigation and detection mapped to each stage are in the controls and detection tables below.</figcaption></figure>
 <div class="tablewrap"><table>
 <thead>
 <tr>
@@ -68,8 +77,8 @@
 </tbody>
 </table></div>
 <h2>1. Problem Statement and Threat Scenario</h2>
-<p>I controlled an adversarial position (MITM/AiTM) in a simulated message-exchange protocol with three other legitimate participants. I could see messages in flight, hold one at a time, edit it as long as I kept its length the same, release it back into the channel, and submit a recovered 16-byte key through a host-provided success function. Scoring was the combined cost of my nibble-level edits, billed as ink and whiteout.</p>
-<p>This scenario was predicated on a protocol whose endpoints assumed transport integrity while the channel underneath allowed mutation. The message surface included key-rotation messages, MAC-authenticated tokens carrying epoch context, verification requests, acknowledgements, and retries upon ACK loss. In the most basic form; the protocol exposed malleable and insufficiently authenticated messages, including state-changing key-rotation controls and an inadequately context-bound MAC.</p>
+<p>I was the man in the middle. Three other participants were talking over a simulated protocol, and I sat on the wire between them. I could watch messages go by, grab one at a time and hold it, edit it as long as I didn't change its length, and drop it back into the channel. When I thought I had the target's 16-byte key, I handed it to a success function the host gave me. The catch was cost: every edit was billed in ink and whiteout, priced per nibble, and my score was the total.</p>
+<p>The whole thing worked because the endpoints trusted the channel. They assumed nobody could touch a message in transit, and underneath them, I could. A few kinds of messages flowed past: key-rotation commands, MAC-signed tokens that carried an epoch number, verification requests, and the acknowledgements and retries that kept the conversation alive. Two of those were the problem. The rotation commands changed state but weren't properly authenticated, and the MAC didn't cover everything it should have.</p>
 <p>Threat Model:</p>
 <div class="tablewrap"><table>
 <thead>
@@ -105,7 +114,7 @@
 </tr>
 </tbody>
 </table></div>
-<p>Chaining two exploitable protocol primitives was pretty cool and represented substantial growth in skill. I combined chosen key transitions with a verification oracle, and the impact of that chain was amplified by a reducible quotient-ring structure in the key schedule. That let me turn a nominal 128-bit recovery into independent small-component searches whose oracle-query costs could be added rather than attempting a monolithic search. My deliverable was a WebAssembly client that talked only through allowed host imports and recovered the key at runtime from per-tick state.</p>
+<p>The part I'm proud of is that neither weakness was enough on its own. I had to chain them: use the editable rotation commands to push the key where I wanted, then use the verifier as a yes/no oracle to test where it landed. What made it tractable was the key schedule's algebra. The modulus factored, so instead of hunting one 128-bit key, I could recover a handful of small pieces independently and add up the cost rather than multiply it. What I shipped was a WebAssembly client that only spoke through the host's allowed calls and rebuilt the key live, from whatever state each run handed it.</p>
 <h2>2. Techniques, Tooling, and Actions Taken</h2>
 <h3>Initial Artifact Triage</h3>
 <ul>
@@ -114,9 +123,8 @@
 <li>The simulator was deterministic under a 32-byte seed, so local reproduction was stable but that hid a trap where live scoring used per-tick seeds, so any solver tied to a specific local seed wouldn't survive runtime.</li>
 </ul>
 <h3>Two-track Methodology</h3>
-<p>My first attempt at solving was a proof-of-concept Web Assembly WASM module that hardcoded the recovered key for a local seed and called the success function directly. 
-The big takeaway was confirmation of the ABI mechanics; host imports resolved, memory layout was correct, and the success call was accepted. This was a throwaway for live submission and per-tick scoring.</p>
-<p>My second attempt needed a seed-independent solver that recovers the key from the protocol's runtime state and meant I'd need to dig into the key rotation's algebra and clarify semantics of the verification response.</p>
+<p>My first attempt was a throwaway. I wrote a small WebAssembly module that hardcoded the key for one local seed and called the success function directly. It was never going to survive live scoring, but that wasn't the point. It proved the ABI worked: the host imports resolved, the memory layout was right, and the success call went through. I wanted the plumbing confirmed before I went anywhere near the math.</p>
+<p>The second attempt had to actually work: a solver that recovers the key from whatever state a live run hands it, no matter the seed. That meant digging into the algebra behind the key rotation and pinning down exactly what the verifier's response was telling me.</p>
 <h3>Seed-Independent Solver</h3>
 <p>My solver chained five primitives:</p>
 <ol>
@@ -127,7 +135,7 @@ The big takeaway was confirmation of the ABI mechanics; host imports resolved, m
 <li>CRT-recombined the residues into the full 128-bit key and called the success function.</li>
 </ol>
 <h3>Optimization Efforts</h3>
-<p>Once correctness was established, the problem shifted to cost minimization under King-of-the-Hill scoring. Optimization candidates were evaluated locally against published per-tick seeds:</p>
+<p>Once the solver was correct, the game changed. King-of-the-Hill scoring rewards the cheapest correct solve, so now I was minimizing edit cost. I tested each optimization idea locally against the published per-tick seeds:</p>
 <div class="tablewrap"><table>
 <thead>
 <tr>
@@ -155,7 +163,7 @@ The big takeaway was confirmation of the ABI mechanics; host imports resolved, m
 <tr>
 <td>Suppress-first-rotation</td>
 <td>Route the attacker's first key-rotation packet away from the target instead of identity-editing it</td>
-<td>Approximately 0.05% measured improvement on the tested seeds (the saved cost of one identity-rotation edit, LOL); it did not yield a competitive advantage</td>
+<td>About 0.05% on the tested seeds, the saved cost of a single identity-rotation edit; not a competitive advantage</td>
 </tr>
 <tr>
 <td>Retransmission-donor scheduler</td>
@@ -190,6 +198,8 @@ D. Similar to the runtime-computed tables, a real-time scheduler could probably 
 <li>Assuming the mathematically canonical payload was the cheapest one to produce. It was not as edit cost was weighted by nibble transition and algebraically equivalent payloads could still cost different amounts of ink and whiteout against the same donor. This realization came too late, during live-event development and real-time scoring.</li>
 </ul>
 <h2>3. Tooling and Scripts</h2>
+<details class="fold">
+<summary>Show the tooling and scripts</summary>
 <p>This section includes sanitized code patterns used or derived during the exercise.</p>
 <h3>Local WASM Execution</h3>
 <pre><code class="language-powershell"># Run a candidate WebAssembly solver against the local simulator.
@@ -339,6 +349,7 @@ for seed in &lt;SEED_1&gt; &lt;SEED_2&gt; &lt;SEED_3&gt;; do
     python ./run_wasm.py ./&lt;solver-file&gt;.wasm --seed-hex &quot;$seed&quot;
 done
 </code></pre>
+</details>
 <h2>4. Concept Review</h2>
 <h3>The protocol's invariant failures</h3>
 <p>Two exploitable protocol primitives, amplified by the algebraic key-schedule structure, made recovery achievable.</p>
@@ -377,7 +388,7 @@ In this ring XOR is addition and the key update is polynomial multiplication fol
 <p>The lift-candidate construction had a subtle, challenge-specific algebraic requirement. 
 A. In my implementation, when the solver maintained an accumulated affine state across rotations, the additive delta between the accumulated state and the test rotation reduced inside each targeted component to the generator <code>X</code>, not to the multiplicative identity; which meant an in-component value of <code>0x02</code>, not <code>X + 1</code> (<code>0x03</code>). 
 B. Using the wrong value shifted one recovered residue and caused final verification to fail. 
-C. This is the kind of bug that produced consistent good looking algebraics but still required me to commit component-level testing, during live scorin</p>
+C. This is the kind of bug that produced consistent good looking algebraics but still required me to commit component-level testing, during the live event.</p>
 <h3>Why Cost Optimization Matters</h3>
 <p>Edit cost was weighted asymmetrically: 
 1. Each old-to-new nibble transition carried an <code>(ink, whiteout)</code> cost. 
@@ -453,26 +464,12 @@ D. For repeated-factor components, explicitly avoiding coefficients divisible by
 3. A successful return code confirms that my reconstruction matches the target's protected initial key.</p>
 <h2>6. Lessons Learned</h2>
 <h3>Methodology Validation</h3>
-<p>This challenge was explicit instruction to treat interactive protocols as a state machine, not a bag of random isolated messages. 
-1. The exploit did not come from one malformed packet.
-2. It came from chaining key rotation, MAC generation, verification, and replay into a single recovery workflow where the primitives composed under the protocol's own state transitions.
-3. Keep my concerns about the challenge environment separate from solver correctness. 
-  a. My initial fixed-seed validator wasn't a viable live solver, but it earned its place because it proved memory layout, import resolution, and call mechanics before I even touched the algebra. 
-  b. The big takeaway was to validate the runtime, then build the exploit.</p>
+<p>The biggest thing this drilled into me is that an interactive protocol is a state machine. Each message moves it to a new state, and the exploit lived in how those moves composed, never in a single bad packet. The other habit that paid off was getting the boring part working first. My throwaway fixed-seed solver was never going to win the event, but it proved the memory layout, the imports, and the call mechanics before I touched any of the hard math. Validate the runtime, then build the exploit.</p>
 <h3>Gaps and/or Inefficiencies</h3>
-<p>My biggest experienced inefficiency was me assuming that a mathematically correct payload was also cost-efficient. 
-1. Once the solver worked, the live scoring made donor choice and edit cost equally important as cryptographic correctness. 
-2. Recognizing that the problem shifted into cost efficiency and performance improvement took valuable cycles waiting for new seed to post. 
-3. These efforts required real-time R&amp;D and then deploy time, all taking away from live scoring cycles.</p>
-<p>The second gap I had was understanding the scheduler's fragility under host timing. 
-4. Several optimizations looked clean in my IDE but failed and wasted cycles.
-5. This is because each host call advanced simulator time and I could only hold one message. I</p>
+<p>My biggest mistake was assuming that a mathematically clean payload was also a cheap one. Once the solver worked, live scoring made donor choice and edit cost matter as much as the cryptography. Realizing the problem had turned into a cost problem cost me cycles, a lot of them spent waiting for the next seed to post, and every optimization meant real-time R&amp;D plus deploy time that came straight out of my scoring window.</p>
+<p>The second gap was how fragile the scheduler got under the host's timing. Several optimizations looked clean in my editor and then failed in practice and burned cycles, because every host call advanced simulator time and I could only ever hold one message at once.</p>
 <p>In my post-mortem/AAR; big takeaway was on timing and queue state, that they are part of the attack surface for active protocol exploitation, not implementation considerations.</p>
-<p>The third, honestly, was tool selection. 
-6. My initial solver validated the ABI mechanics but left me grasping for a live solve. 
-7. Recognizing when an approach had hit its ceiling and pivoting decisively was an operational discipline the exercise underscored. 
-8. The adrenaline of live R&amp;D and implementation was exciting. 
-9. My unfamiliarity with the problem and with WebAssembly had me spending more R&amp;D time during live scoring, costing scoring cycles and creating frustration. </p>
+<p>The third, honestly, was tooling. My first solver proved the ABI but left me scrambling for a real solve, and I was slow to admit it had hit its ceiling. Knowing when to stop forcing an approach and pivot is its own discipline, and this exercise made me feel it. The live R&amp;D was a rush. It was also where my unfamiliarity with the problem and with WebAssembly cost me the most: time spent learning on the clock was time off the scoreboard, and it was frustrating. </p>
 <p>FWIW, I was able to pivot to the live-solve mechanism, but at the cost of team scoring and performance optimization.</p>
 <h3>Transferable Principles</h3>
 <div class="tablewrap"><table>
@@ -515,8 +512,7 @@ D. For repeated-factor components, explicitly avoiding coefficients divisible by
 </table></div>
 <h2>7. Extrapolation</h2>
 <h3>How I Developed</h3>
-<p>The exercise demanded skills I had and required tooling/protocol knowledge I didn't. 
-I was forced in real-time to chain these together to not only understand the challenge and ID the weakness, but then engineer an exploit and cost optimize it. </p>
+<p>This one leaned on skills I already had and skills I didn't, and I had to braid them together on the clock: read the protocol, find the weakness, build the exploit, and then make it cheap. </p>
 <ol>
 <li>Reading and instrumenting a custom protocol simulator from source.</li>
 <li>Understanding WebAssembly and producing a compliant client.</li>
@@ -527,10 +523,7 @@ I was forced in real-time to chain these together to not only understand the cha
 </ol>
 <p>Adjacent skills I identified as deficient were protocol reverse engineering, state-machine fuzzing, test harness design, and exploit engineering. 
 I've committed myself to whiteboarding and upskilling on these skill opportunities. </p>
-<p>This is not a typical writeup. I have a specific need abstract &amp; extrapolate my learning; in this instance it was appplication to relevant security domains and skills. 
-A. The challenge was 33% of the effort. 
-B. The research into Blue and Purple team additives; Detections, SIGMA, YAML, frameworks, etc. was 33% of the effort. 
-C. Last 33% was this writeup and distilling efforts and thoughts.</p>
+<p>This isn't a typical writeup, and that's on purpose. I need to take what I learn and push it into the security work I actually do. Roughly, solving the challenge was a third of the effort. Turning it into blue and purple-team material, the detections, Sigma, and framework mapping, was another third. Writing this up and distilling what I took from it was the last third.</p>
 <h3>SecOps, IR, and Threat Hunting</h3>
 <p>IRL, security practitioners would most reliably see this behavior through abnormal application-protocol state transitions: repeated validation failures, unusual key-rotation sequences, and retry storms. 
 1. Directly detecting in-flight message mutation would require specialized visibility, such as captures on both sides of an intermediary, instrumented relays, or endpoint pre-send and post-receive hashes. 
@@ -610,6 +603,8 @@ I. Treat retry behavior as a security signal when paired with validation anomali
 </tbody>
 </table></div>
 <h2>8. Reusable Tools, Scripts, and Artifacts</h2>
+<details class="fold">
+<summary>Show the reusable tools and artifacts</summary>
 <h3>Triage Decision Tree</h3>
 <pre><code class="language-text">Start
   Does the artifact define a custom runtime or ABI?
@@ -739,7 +734,10 @@ def choose_cheapest_payload(
 <li>Reject candidates that are cheaper but destabilize the scheduler.</li>
 <li>Include host-call, delay, and failure-risk costs in a higher-level objective when they materially affect the live score.</li>
 </ol>
+</details>
 <h2>9. Framework Mapping</h2>
+<details class="fold">
+<summary>Show the framework mapping</summary>
 <p>Even though this effectively was a simulation, this mapping allowed me to take the attack full circle.
 I used ATT&amp;CK as the baseline, and where I could and it was accurate, I included CAPEC, D3FEND, and CWE as complementary lenses. </p>
 <div class="tablewrap"><table>
@@ -862,7 +860,10 @@ I used ATT&amp;CK as the baseline, and where I could and it was accurate, I incl
 </tr>
 </tbody>
 </table></div>
+</details>
 <h2>10. Threat Intel and Standards Integration</h2>
+<details class="fold">
+<summary>Show the threat-intel and standards mapping</summary>
 <h3>STIX representation</h3>
 <p>The following STIX bundle is my attempt to link indicators, attack patterns, and a CoA through typed relationships to give threat teams a minimum useful structure. 
 1. It is intentionally illustrative rather than fully interoperable.
@@ -937,7 +938,10 @@ I used ATT&amp;CK as the baseline, and where I could and it was accurate, I incl
 <h3>STIG and CIS integration</h3>
 <p>STIG: N/A, as this exercise used a custom simulator rather than a deployed OS, APP, platform, etc. 
 CIS: Control concepts still map cleanly to CIS Controls and NIST SP 800-53 as the relevant defensive requirements are transport integrity, session authenticity, logging, monitoring, and cryptographic design review.</p>
+</details>
 <h2>11. Controls Mapping and Mitigation Realization</h2>
+<details class="fold">
+<summary>Show the controls mapping</summary>
 <h3>11a. Standards Mapping</h3>
 <div class="tablewrap"><table>
 <thead>
@@ -1167,7 +1171,10 @@ In production, I would need to consider the scheduled lookback and suppression b
 1. Verification events and rotation/ACK events do not necessarily share <code>TokenHash</code>. 
 2. The retry analytic correlates ACKs through a stable rotation identifier or message hash; schemas in prod should normalize sender and recipient direction before calculating the ratio. 
 3. A threshold below 0.2 tolerates some background loss while still surfacing sustained retry behavior.</p>
+</details>
 <h2>12. Indicators, Artifacts, and Detection Engineering</h2>
+<details class="fold">
+<summary>Show the detection engineering</summary>
 <h3>Illustrative behavioral indicators</h3>
 <p>These are behavioral indicators, not static IOCs. </p>
 <div class="tablewrap"><table>
@@ -1328,11 +1335,10 @@ correlation:
     gte: 10
 level: low
 </code></pre>
-<h2>13. Visual Artifact</h2>
-<p>A kill-chain flow is the best fit because the exercise follows a clear temporal sequence from positioning through oracle construction, residue recovery, reconstruction, and submission. 
-Defensive controls and detection artifacts are annotated as dashed-edge nodes off the relevant stage.</p>
-<figure class="diagram"><svg viewBox="0 0 360 434" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Kill chain from adversary-in-the-middle position to key submission"><defs><marker id="ah" markerWidth="9" markerHeight="9" refX="4.5" refY="8" orient="auto"><path d="M0,0 L9,0 L4.5,8 Z" fill="#35e0d0"/></marker></defs><rect x="6" y="6" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="27" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">T1557</text><text x="20" y="45" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">AiTM position</text><line x1="180" y1="58" x2="180" y2="78" stroke="#35e0d0" stroke-width="1.6" marker-end="url(#ah)"/><rect x="6" y="80" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="101" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">T1565.002</text><text x="20" y="119" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">Modify key-rotation traffic</text><line x1="180" y1="132" x2="180" y2="152" stroke="#35e0d0" stroke-width="1.6" marker-end="url(#ah)"/><rect x="6" y="154" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="175" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">CWE-203</text><text x="20" y="193" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">Verification oracle</text><line x1="180" y1="206" x2="180" y2="226" stroke="#35e0d0" stroke-width="1.6" marker-end="url(#ah)"/><rect x="6" y="228" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="249" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">Recover</text><text x="20" y="267" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">Factor modulus, recover residues</text><line x1="180" y1="280" x2="180" y2="300" stroke="#35e0d0" stroke-width="1.6" marker-end="url(#ah)"/><rect x="6" y="302" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="323" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">CRT</text><text x="20" y="341" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">Reconstruct the 128-bit key</text><line x1="180" y1="354" x2="180" y2="374" stroke="#35e0d0" stroke-width="1.6" marker-end="url(#ah)"/><rect x="6" y="376" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="397" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">Outcome</text><text x="20" y="415" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">Submit recovered key</text></svg><figcaption>Kill chain, from position to key submission. The mitigation and detection mapped to each stage are in the controls and detection tables above.</figcaption></figure>
-<h2>14. References</h2>
+</details>
+<h2>13. References</h2>
+<details class="fold">
+<summary>Show the references</summary>
 <ol>
 <li>MITRE ATT&amp;CK, T1557 Adversary-in-the-Middle: https://attack.mitre.org/techniques/T1557/</li>
 <li>MITRE ATT&amp;CK, T1565.002 Transmitted Data Manipulation: https://attack.mitre.org/techniques/T1565/002/</li>
@@ -1354,6 +1360,7 @@ Defensive controls and detection artifacts are annotated as dashed-edge nodes of
 <li>Sigma Correlation Rule Specification: https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-correlation-rules-specification.md</li>
 <li>Cohen, H., <em>A Course in Computational Algebraic Number Theory</em>, Springer GTM 138, 1993 </li>
 </ol>
+</details>
         </div>
       </div>
 

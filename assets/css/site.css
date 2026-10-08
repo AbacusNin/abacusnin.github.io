@@ -359,3 +359,19 @@ body.plain { background-image: none; }
 .featured-card:hover .featured-title { color: var(--cyan); }
 .featured-desc { display: block; font-size: 14px; color: var(--muted); line-height: 1.55; max-width: 64ch; }
 .featured-more { display: inline-block; margin-top: 14px; font-family: var(--mono); font-size: 12px; color: var(--cyan); }
+
+/* writeup summary block */
+.tldr { border: 1px solid var(--border); border-left: 3px solid var(--magenta); background: var(--surface); border-radius: 6px; padding: 18px 20px; margin: 4px 0 24px; }
+.tldr-label { font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--magenta); margin: 0 0 10px; }
+.tldr p { margin: 0 0 10px; color: var(--text); max-width: 64ch; }
+.tldr p:last-child { margin-bottom: 0; }
+.tldr strong { color: var(--text); }
+
+/* collapsible supplementary sections */
+details.fold { margin: 2px 0 20px; }
+details.fold > summary { font-family: var(--mono); font-size: 12px; letter-spacing: .04em; color: var(--muted); cursor: pointer; list-style: none; padding: 4px 0; }
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold > summary::before { content: "[+] "; color: var(--cyan); }
+details.fold[open] > summary::before { content: "[-] "; }
+details.fold > summary:hover { color: var(--text); }
+details.fold[open] > summary { margin-bottom: 12px; }
