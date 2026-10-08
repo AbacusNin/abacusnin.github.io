@@ -206,8 +206,10 @@ body.plain { background-image: none; }
 .toc a.active { color: var(--cyan); border-left-color: var(--cyan); }
 
 @media (max-width: 760px) {
-  .layout { flex-direction: column; gap: 18px; }
-  .toc { position: static; flex-basis: auto; }
+  .layout { display: block; }
+  .toc { position: static; flex-basis: auto; margin-bottom: 18px; }
+  .prose { min-width: 0; }
+  .prose pre, .tablewrap { max-width: 100%; }
 }
 
 /* long-form writeup content */
