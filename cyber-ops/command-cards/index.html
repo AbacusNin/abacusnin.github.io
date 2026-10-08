@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Command Cards</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261011">
+  <meta name="description" content="A running set of command-line one-liners for turning logs into answers, each one tested on sample data so the output is real, not drawn.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/command-cards/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="Command Cards">
+  <meta property="og:description" content="A running set of command-line one-liners for turning logs into answers, each one tested on sample data so the output is real, not drawn.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/command-cards/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / Command Cards</p>
+      <div class="page-head">
+        <h1 class="page-title">Command Cards</h1>
+        <p class="lead">One-liners I actually reach for, the kind that turn a pile of logs into an answer. Every card was run on sample data, so the output you see is real, not drawn. Grep, awk, sed, and friends.</p>
+      </div>
+
+      <!-- 01 -->
+      <section class="cmd-card">
+        <div class="cmd-head"><span class="cmd-chip">Log analysis</span><span class="cmd-idx"><b>01</b> / 07</span></div>
+        <h2 class="cmd-title">Top brute-force <span class="kw">IPs</span></h2>
+        <p class="cmd-sub">Rank every IP hammering your SSH.</p>
+        <div class="cmd-term">
+          <div class="cmd-term-bar"><span class="cmd-term-path">bash  /var/log/auth.log</span></div>
+          <div class="cmd-term-body">
+<div class="cmd-line"><span class="p">$</span> <span class="c">grep</span> "Failed password" /var/log/auth.log <span class="p">|</span> <span class="c">grep</span> <span class="f">-oE</span> "([0-9]{1,3}\.){3}[0-9]{1,3}" <span class="p">|</span> <span class="c">sort</span> <span class="p">|</span> <span class="c">uniq</span> <span class="f">-c</span> <span class="p">|</span> <span class="c">sort</span> <span class="f">-rn</span> <span class="p">|</span> <span class="c">head</span> <span class="f">-5</span></div>
+            <div class="cmd-bars">
+              <span class="n">47</span><span class="ip">203.0.113.45</span><span class="bar" style="width:100%;background:var(--magenta)"></span>
+              <span class="n">23</span><span class="ip">198.51.100.23</span><span class="bar" style="width:49%;background:var(--cyan)"></span>
+              <span class="n">11</span><span class="ip">203.0.113.178</span><span class="bar" style="width:23%;background:var(--cyan)"></span>
+              <span class="n">4</span><span class="ip">192.0.2.91</span><span class="bar" style="width:9%;background:var(--cyan)"></span>
+              <span class="n">1</span><span class="ip">10.0.0.12</span><span class="bar" style="width:3%;background:var(--cyan)"></span>
+            </div>
+          </div>
+        </div>
+        <div class="cmd-flags">
+          <span class="k">"Failed password"</span><span class="v">every failed SSH login</span>
+          <span class="k">grep -oE</span><span class="v">print only the matching IP, extended regex</span>
+          <span class="k">sort | uniq -c</span><span class="v">count each IP</span>
+          <span class="k">sort -rn</span><span class="v">biggest number first</span>
+          <span class="k">head -5</span><span class="v">show the top five</span>
+        </div>
+        <div class="cmd-note"><p class="lab">What you get</p><p>Find every failed SSH login, pull out the source IP, and count them. Now you know who is knocking and how hard. Block the top ones.</p></div>
+      </section>
+
+      <!-- 02 -->
+      <section class="cmd-card">
+        <div class="cmd-head"><span class="cmd-chip">Log analysis</span><span class="cmd-idx"><b>02</b> / 07</span></div>
+        <h2 class="cmd-title">Bytes out by <span class="kw">source</span></h2>
+        <p class="cmd-sub">Add up response sizes per client, and find the heavy hitter.</p>
+        <div class="cmd-term">
+          <div class="cmd-term-bar"><span class="cmd-term-path">bash  /var/log/nginx/access.log</span></div>
+          <div class="cmd-term-body">
+<div class="cmd-line"><span class="p">$</span> <span class="c">awk</span> '{bytes[$1] += $10} END {for (ip in bytes) <span class="c">print</span> bytes[ip], ip}' access.log <span class="p">|</span> <span class="c">sort</span> <span class="f">-rn</span></div>
+            <div class="cmd-out">176718 10.0.0.5
+ 94038 198.51.100.23
+ 29936 203.0.113.45
+  7152 192.0.2.91</div>
+          </div>
+        </div>
+        <div class="cmd-flags">
+          <span class="k">$1</span><span class="v">the client IP, field one</span>
+          <span class="k">$10</span><span class="v">the response size in bytes, field ten</span>
+          <span class="k">bytes[$1] += $10</span><span class="v">keep a running total per IP</span>
+          <span class="k">END { ... }</span><span class="v">print once, after the last line</span>
+          <span class="k">sort -rn</span><span class="v">largest total first</span>
+        </div>
+        <div class="cmd-note"><p class="lab">What you get</p><p>awk tallies bytes per client and prints the totals at the end. A cheap way to spot the host quietly exfiltrating, or the scraper eating your bandwidth.</p></div>
+      </section>
+
+      <!-- 03 -->
+      <section class="cmd-card">
+        <div class="cmd-head"><span class="cmd-chip">Log analysis</span><span class="cmd-idx"><b>03</b> / 07</span></div>
+        <h2 class="cmd-title">Most-hit <span class="kw">URLs</span></h2>
+        <p class="cmd-sub">What are they actually requesting?</p>
+        <div class="cmd-term">
+          <div class="cmd-term-bar"><span class="cmd-term-path">bash  /var/log/nginx/access.log</span></div>
+          <div class="cmd-term-body">
+<div class="cmd-line"><span class="p">$</span> <span class="c">awk</span> '{<span class="c">print</span> $7}' access.log <span class="p">|</span> <span class="c">sort</span> <span class="p">|</span> <span class="c">uniq</span> <span class="f">-c</span> <span class="p">|</span> <span class="c">sort</span> <span class="f">-rn</span> <span class="p">|</span> <span class="c">head</span> <span class="f">-5</span></div>
+            <div class="cmd-out">   4 /login
+   3 /api/data
+   3 /
+   1 /static/app.js
+   1 /admin</div>
+          </div>
+        </div>
+        <div class="cmd-flags">
+          <span class="k">awk '{print $7}'</span><span class="v">pull just the request path</span>
+          <span class="k">sort</span><span class="v">group identical paths together</span>
+          <span class="k">uniq -c</span><span class="v">collapse the runs and count them</span>
+          <span class="k">sort -rn</span><span class="v">most frequent first</span>
+        </div>
+        <div class="cmd-note"><p class="lab">What you get</p><p>sort then uniq -c is the count idiom for any column you can isolate. Sort puts identical lines next to each other, uniq -c tallies them. It answers "what is the most common X" every time.</p></div>
+      </section>
+
+      <!-- 04 -->
+      <section class="cmd-card">
+        <div class="cmd-head"><span class="cmd-chip">Sanitize</span><span class="cmd-idx"><b>04</b> / 07</span></div>
+        <h2 class="cmd-title">Redact before you <span class="kw">share</span></h2>
+        <p class="cmd-sub">Scrub IPs and emails out of a log in one pass.</p>
+        <div class="cmd-term">
+          <div class="cmd-term-bar"><span class="cmd-term-path">bash  incident.log</span></div>
+          <div class="cmd-term-body">
+<div class="cmd-line"><span class="p">$</span> <span class="c">sed</span> <span class="f">-E</span> "s/([0-9]{1,3}\.){3}[0-9]{1,3}/x.x.x.x/g; s/[[:alnum:]._%+-]+@[[:alnum:].-]+/[email]/g" incident.log</div>
+            <div class="cmd-out">Alert: beacon to x.x.x.x every 60s, see attachment.
+Dropped file hash e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+Second stage from x.x.x.x, sha256 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+Contact the analyst at [email] for the full report.</div>
+          </div>
+        </div>
+        <div class="cmd-flags">
+          <span class="k">sed -E</span><span class="v">extended regex, no backslash soup</span>
+          <span class="k">s/.../x.x.x.x/g</span><span class="v">replace every IPv4 with a placeholder</span>
+          <span class="k">;</span><span class="v">run a second substitution in the same pass</span>
+          <span class="k">/[email]/g</span><span class="v">mask every email address</span>
+          <span class="k">/g</span><span class="v">every match on the line, not just the first</span>
+        </div>
+        <div class="cmd-note"><p class="lab">What you get</p><p>One pass that swaps every IP and email for a placeholder, so you can drop a log into a ticket or a writeup without leaking addresses. The hashes stay, since those are the IOCs you want to keep.</p></div>
+      </section>
+
+      <!-- 05 -->
+      <section class="cmd-card">
+        <div class="cmd-head"><span class="cmd-chip">Text wrangling</span><span class="cmd-idx"><b>05</b> / 07</span></div>
+        <h2 class="cmd-title">Slice out the <span class="kw">fields</span></h2>
+        <p class="cmd-sub">Pull two columns from a delimited file.</p>
+        <div class="cmd-term">
+          <div class="cmd-term-bar"><span class="cmd-term-path">bash  /etc/passwd</span></div>
+          <div class="cmd-term-body">
+<div class="cmd-line"><span class="p">$</span> <span class="c">cut</span> <span class="f">-d:</span> <span class="f">-f1,7</span> /etc/passwd</div>
+            <div class="cmd-out">alice:/bin/bash
+deploy:/usr/sbin/nologin
+bob:/bin/zsh
+root:/bin/bash</div>
+          </div>
+        </div>
+        <div class="cmd-flags">
+          <span class="k">-d:</span><span class="v">split each line on a colon</span>
+          <span class="k">-f1,7</span><span class="v">keep fields one and seven, the user and its shell</span>
+        </div>
+        <div class="cmd-note"><p class="lab">What you get</p><p>cut is the fastest way to grab specific columns from delimited text. Here, every account and its login shell. Scan for the ones that should be nologin and are not.</p></div>
+      </section>
+
+      <!-- 06 -->
+      <section class="cmd-card">
+        <div class="cmd-head"><span class="cmd-chip">Threat intel</span><span class="cmd-idx"><b>06</b> / 07</span></div>
+        <h2 class="cmd-title">Pull <span class="kw">IOCs</span> from the noise</h2>
+        <p class="cmd-sub">Lift SHA-256 hashes out of a messy report.</p>
+        <div class="cmd-term">
+          <div class="cmd-term-bar"><span class="cmd-term-path">bash  report.txt</span></div>
+          <div class="cmd-term-body">
+<div class="cmd-line"><span class="p">$</span> <span class="c">grep</span> <span class="f">-oiE</span> "\b[a-f0-9]{64}\b" report.txt <span class="p">|</span> <span class="c">sort</span> <span class="f">-u</span></div>
+            <div class="cmd-out">9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</div>
+          </div>
+        </div>
+        <div class="cmd-flags">
+          <span class="k">-o</span><span class="v">print only the match, not the whole line</span>
+          <span class="k">-i</span><span class="v">case-insensitive hex</span>
+          <span class="k">-E</span><span class="v">extended regex</span>
+          <span class="k">\b[a-f0-9]{64}\b</span><span class="v">a 64-character hex string on word boundaries</span>
+          <span class="k">sort -u</span><span class="v">dedupe</span>
+        </div>
+        <div class="cmd-note"><p class="lab">What you get</p><p>Point it at any report or email and it lifts out just the hashes, ready to drop into a lookup or a block list. Swap the pattern for IPs, domains, or CVE IDs.</p></div>
+      </section>
+
+      <!-- 07 -->
+      <section class="cmd-card">
+        <div class="cmd-head"><span class="cmd-chip">Text wrangling</span><span class="cmd-idx"><b>07</b> / 07</span></div>
+        <h2 class="cmd-title">Top <span class="kw">words</span>, fast</h2>
+        <p class="cmd-sub">Word frequency without writing a script.</p>
+        <div class="cmd-term">
+          <div class="cmd-term-bar"><span class="cmd-term-path">bash  notes.txt</span></div>
+          <div class="cmd-term-body">
+<div class="cmd-line"><span class="p">$</span> <span class="c">tr</span> <span class="f">-cs</span> "A-Za-z" "\n" &lt; notes.txt <span class="p">|</span> <span class="c">tr</span> "A-Z" "a-z" <span class="p">|</span> <span class="c">sort</span> <span class="p">|</span> <span class="c">uniq</span> <span class="f">-c</span> <span class="p">|</span> <span class="c">sort</span> <span class="f">-rn</span> <span class="p">|</span> <span class="c">head</span> <span class="f">-5</span></div>
+            <div class="cmd-out">   5 a
+   4 detection
+   3 is
+   2 behavior
+   1 without</div>
+          </div>
+        </div>
+        <div class="cmd-flags">
+          <span class="k">tr -cs "A-Za-z" "\n"</span><span class="v">turn every run of non-letters into a newline, one word per line</span>
+          <span class="k">tr "A-Z" "a-z"</span><span class="v">fold to lowercase so Case and case match</span>
+          <span class="k">sort | uniq -c</span><span class="v">count each word</span>
+          <span class="k">sort -rn | head -5</span><span class="v">the top five</span>
+        </div>
+        <div class="cmd-note"><p class="lab">What you get</p><p>Two tr passes split text into lowercase words, then the count idiom ranks them. Good for skimming what a long log or a dump is really about. Stopwords like "a" rise to the top, which is why real pipelines add a filter.</p></div>
+      </section>
+
+      <a class="backlink" href="/cyber-ops/">&lt;- back to Cyber Ops</a>
+    </main>
+
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+</body>
+</html>
