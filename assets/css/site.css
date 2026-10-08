@@ -431,3 +431,11 @@ details.fold[open] > summary { margin-bottom: 12px; }
   .cmd-flags { grid-template-columns: 1fr; gap: 3px 0; }
   .cmd-flags .k { justify-self: start; margin-top: 8px; }
 }
+
+/* credentials page */
+.cred-h { font-family: var(--mono); font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--cyan); border-top: 1px solid var(--border); padding-top: 22px; margin: 30px 0 14px; }
+.cred-list { list-style: none; margin: 0; padding: 0; }
+.cred-list li { display: flex; flex-wrap: wrap; gap: 2px 14px; align-items: baseline; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.cred-name { font-family: var(--mono); font-size: 15px; font-weight: 700; color: var(--text); }
+.cred-by { color: var(--muted); font-size: 14px; }
+.cred > p { color: var(--muted); max-width: 64ch; margin: 0; }
