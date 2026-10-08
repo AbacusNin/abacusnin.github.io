@@ -40,7 +40,7 @@
 
       <!-- 01 -->
       <section class="cmd-card">
-        <div class="cmd-head"><span class="cmd-chip">Log analysis</span><span class="cmd-idx"><b>01</b> / 07</span></div>
+        <div class="cmd-head"><span class="cmd-chip">Log analysis</span><span class="cmd-idx"><b>01</b> / 09</span></div>
         <h2 class="cmd-title">Top brute-force <span class="kw">IPs</span></h2>
         <p class="cmd-sub">Rank every IP hammering your SSH.</p>
         <div class="cmd-term">
@@ -68,7 +68,7 @@
 
       <!-- 02 -->
       <section class="cmd-card">
-        <div class="cmd-head"><span class="cmd-chip">Log analysis</span><span class="cmd-idx"><b>02</b> / 07</span></div>
+        <div class="cmd-head"><span class="cmd-chip">Log analysis</span><span class="cmd-idx"><b>02</b> / 09</span></div>
         <h2 class="cmd-title">Bytes out by <span class="kw">source</span></h2>
         <p class="cmd-sub">Add up response sizes per client, and find the heavy hitter.</p>
         <div class="cmd-term">
@@ -93,7 +93,7 @@
 
       <!-- 03 -->
       <section class="cmd-card">
-        <div class="cmd-head"><span class="cmd-chip">Log analysis</span><span class="cmd-idx"><b>03</b> / 07</span></div>
+        <div class="cmd-head"><span class="cmd-chip">Log analysis</span><span class="cmd-idx"><b>03</b> / 09</span></div>
         <h2 class="cmd-title">Most-hit <span class="kw">URLs</span></h2>
         <p class="cmd-sub">What are they actually requesting?</p>
         <div class="cmd-term">
@@ -118,7 +118,7 @@
 
       <!-- 04 -->
       <section class="cmd-card">
-        <div class="cmd-head"><span class="cmd-chip">Sanitize</span><span class="cmd-idx"><b>04</b> / 07</span></div>
+        <div class="cmd-head"><span class="cmd-chip">Sanitize</span><span class="cmd-idx"><b>04</b> / 09</span></div>
         <h2 class="cmd-title">Redact before you <span class="kw">share</span></h2>
         <p class="cmd-sub">Scrub IPs and emails out of a log in one pass.</p>
         <div class="cmd-term">
@@ -143,7 +143,7 @@ Contact the analyst at [email] for the full report.</div>
 
       <!-- 05 -->
       <section class="cmd-card">
-        <div class="cmd-head"><span class="cmd-chip">Text wrangling</span><span class="cmd-idx"><b>05</b> / 07</span></div>
+        <div class="cmd-head"><span class="cmd-chip">Text wrangling</span><span class="cmd-idx"><b>05</b> / 09</span></div>
         <h2 class="cmd-title">Slice out the <span class="kw">fields</span></h2>
         <p class="cmd-sub">Pull two columns from a delimited file.</p>
         <div class="cmd-term">
@@ -165,7 +165,7 @@ root:/bin/bash</div>
 
       <!-- 06 -->
       <section class="cmd-card">
-        <div class="cmd-head"><span class="cmd-chip">Threat intel</span><span class="cmd-idx"><b>06</b> / 07</span></div>
+        <div class="cmd-head"><span class="cmd-chip">Threat intel</span><span class="cmd-idx"><b>06</b> / 09</span></div>
         <h2 class="cmd-title">Pull <span class="kw">IOCs</span> from the noise</h2>
         <p class="cmd-sub">Lift SHA-256 hashes out of a messy report.</p>
         <div class="cmd-term">
@@ -188,7 +188,7 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</div>
 
       <!-- 07 -->
       <section class="cmd-card">
-        <div class="cmd-head"><span class="cmd-chip">Text wrangling</span><span class="cmd-idx"><b>07</b> / 07</span></div>
+        <div class="cmd-head"><span class="cmd-chip">Text wrangling</span><span class="cmd-idx"><b>07</b> / 09</span></div>
         <h2 class="cmd-title">Top <span class="kw">words</span>, fast</h2>
         <p class="cmd-sub">Word frequency without writing a script.</p>
         <div class="cmd-term">
@@ -209,6 +209,52 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</div>
           <span class="k">sort -rn | head -5</span><span class="v">the top five</span>
         </div>
         <div class="cmd-note"><p class="lab">What you get</p><p>Two tr passes split text into lowercase words, then the count idiom ranks them. Good for skimming what a long log or a dump is really about. Stopwords like "a" rise to the top, which is why real pipelines add a filter.</p></div>
+      </section>
+
+      <!-- 08 -->
+      <section class="cmd-card">
+        <div class="cmd-head"><span class="cmd-chip">JSON logs</span><span class="cmd-idx"><b>08</b> / 09</span></div>
+        <h2 class="cmd-title">Filter <span class="kw">JSON</span> logs</h2>
+        <p class="cmd-sub">Reach into structured events, pull one field, and count it.</p>
+        <div class="cmd-term">
+          <div class="cmd-term-bar"><span class="cmd-term-path">bash  events.jsonl</span></div>
+          <div class="cmd-term-body">
+<div class="cmd-line"><span class="p">$</span> <span class="c">jq</span> <span class="f">-r</span> 'select(.action=="login" and .result=="fail") | .user' events.jsonl <span class="p">|</span> <span class="c">sort</span> <span class="p">|</span> <span class="c">uniq</span> <span class="f">-c</span> <span class="p">|</span> <span class="c">sort</span> <span class="f">-rn</span></div>
+            <div class="cmd-out">   3 admin
+   2 root</div>
+          </div>
+        </div>
+        <div class="cmd-flags">
+          <span class="k">jq -r</span><span class="v">raw output, without the surrounding quotes</span>
+          <span class="k">select( ... )</span><span class="v">keep only the failed login events</span>
+          <span class="k">.user</span><span class="v">pull out the username field</span>
+          <span class="k">sort | uniq -c | sort -rn</span><span class="v">count and rank</span>
+        </div>
+        <div class="cmd-note"><p class="lab">What you get</p><p>jq reaches into structured logs the way grep reaches into text. Here it keeps only the failed logins and pulls the username, then the count idiom ranks who is being targeted. The same shape works on CloudTrail, Falco, or any JSON-per-line log.</p></div>
+      </section>
+
+      <!-- 09 -->
+      <section class="cmd-card">
+        <div class="cmd-head"><span class="cmd-chip">Network</span><span class="cmd-idx"><b>09</b> / 09</span></div>
+        <h2 class="cmd-title">Top <span class="kw">DNS</span> queries</h2>
+        <p class="cmd-sub">Count what a capture was trying to resolve.</p>
+        <div class="cmd-term">
+          <div class="cmd-term-bar"><span class="cmd-term-path">bash  capture.pcap</span></div>
+          <div class="cmd-term-body">
+<div class="cmd-line"><span class="p">$</span> <span class="c">tshark</span> <span class="f">-r</span> capture.pcap <span class="f">-Y</span> "dns.flags.response == 0" <span class="f">-T</span> fields <span class="f">-e</span> dns.qry.name <span class="p">|</span> <span class="c">sort</span> <span class="p">|</span> <span class="c">uniq</span> <span class="f">-c</span> <span class="p">|</span> <span class="c">sort</span> <span class="f">-rn</span></div>
+            <div class="cmd-out">   3 example.com
+   2 cdn.example.net
+   1 telemetry.bad.tld
+   1 api.github.com</div>
+          </div>
+        </div>
+        <div class="cmd-flags">
+          <span class="k">-r capture.pcap</span><span class="v">read a capture file, no live sniffing</span>
+          <span class="k">-Y "dns.flags.response == 0"</span><span class="v">display filter, only DNS queries</span>
+          <span class="k">-T fields -e dns.qry.name</span><span class="v">print just the queried name</span>
+          <span class="k">sort | uniq -c | sort -rn</span><span class="v">count and rank</span>
+        </div>
+        <div class="cmd-note"><p class="lab">What you get</p><p>tshark reads a capture offline and lets you pull any protocol field by name. Every DNS query, counted. A fast way to spot beaconing or a domain nobody should be resolving, without opening the GUI.</p></div>
       </section>
 
       <a class="backlink" href="/cyber-ops/">&lt;- back to Cyber Ops</a>
