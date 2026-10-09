@@ -39,7 +39,7 @@
       b.classList.toggle("on", b.dataset.cat === cat));
   }
 
-  const norm = (s) => (s || "").toLowerCase();
+  const norm = (s) => (s || "").toLowerCase().replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
 
   function render() {
     let list = items.slice();
@@ -47,7 +47,8 @@
     if (q) {
       const s = norm(q);
       list = list.filter((it) =>
-        norm([it.title, it.category, it.difficulty, (it.tags || []).join(" "), it.summary].join(" ")).includes(s));
+        norm([it.title, it.category, it.difficulty, (it.tags || []).join(" "),
+          (it.aliases || []).join(" "), it.summary].join(" ")).includes(s));
     }
     list.sort((a, b) => {
       if (sort === "az") return a.title.localeCompare(b.title);
@@ -83,6 +84,12 @@
       p.className = "wu-desc";
       p.textContent = it.summary;
       a.append(p);
+    }
+    if (it.tags && it.tags.length) {
+      const tags = document.createElement("span");
+      tags.className = "wu-tags";
+      tags.textContent = "Tags: " + it.tags.join(", ");
+      a.append(tags);
     }
     if (it.date) {
       const d = document.createElement("span");
