@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Fifteen Videos, One Hidden PDF - CTF Writeups</title>
   <link rel="stylesheet" href="/assets/css/site.css?v=20261009">
-  <meta name="description" content="Fifteen playable MP4 files each carried a small piece of one PDF in a trailing uuid box. I let the PDF structure and zlib checksum put the pieces back in order.">
+  <meta name="description" content="Fifteen playable MP4 files each carried a short PDF fragment in a trailing uuid box. I used PDF structure and zlib validation to restore the document despite misleading filenames.">
   <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/mp4-uuid-pdf-reconstruction/">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="Abacus">
   <meta property="og:title" content="Fifteen Videos, One Hidden PDF">
-  <meta property="og:description" content="Fifteen playable MP4 files each carried a small piece of one PDF in a trailing uuid box. I let the PDF structure and zlib checksum put the pieces back in order.">
+  <meta property="og:description" content="Fifteen playable MP4 files each carried a short PDF fragment in a trailing uuid box. I used PDF structure and zlib validation to restore the document despite misleading filenames.">
   <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/mp4-uuid-pdf-reconstruction/">
   <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
   <meta property="og:image:width" content="1200">
@@ -34,19 +34,19 @@
       <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Forensics / Fifteen Videos, One Hidden PDF</p>
       <div class="page-head">
         <h1 class="page-title">Fifteen Videos, One Hidden PDF</h1>
-        <p class="lead">The videos played normally. The document was riding in extension boxes after the media data, one small slice per file.</p>
+        <p class="lead">The videos played normally. The document rode in extension boxes after the media data, one small slice per file.</p>
       </div>
       <div class="layout">
         <nav class="toc" data-toc aria-label="On this page"></nav>
         <div class="prose">
           <p class="tldr-label">Summary</p>
           <div class="tldr">
-<p><strong>The challenge.</strong> Fifteen short video files concealed a one-page PDF whose final line held the flag.</p>
-<p><strong>What I did.</strong> I walked the MP4 boxes, extracted the trailing uuid payloads, followed the readable PDF syntax, and tested the opaque compressed pieces by decompression.</p>
-<p><strong>The result.</strong> My solve record describes one reconstructed PDF with a readable memo and the recovered flag.</p>
-<p><strong>The limit.</strong> The ZIP contains the writeup but not the fifteen MP4 carriers or reassembler, so I cannot rerun the reconstruction from this archive.</p>
+<p><strong>The challenge.</strong> Fifteen short videos concealed a one-page PDF whose final line held the flag.</p>
+<p><strong>What I did.</strong> I walked the MP4 boxes, extracted the trailing uuid payloads, ordered readable PDF syntax, and tested the opaque compressed pieces by decompression.</p>
+<p><strong>The result.</strong> One fragment order produced a valid PDF with consistent object offsets and a readable memo containing the flag.</p>
+<p><strong>The limit.</strong> The puzzle supplied files rather than a live exfiltration path. The content-inspection ideas below are proposed and have no production false-positive baseline.</p>
           </div>
-<figure class="diagram"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Triage 15 MP4s; Extract payloads; Reject filename order; Rebuild the document; Read the memo">
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Triage 15 MP4s; Extract payloads; Reject filename order; Rebuild the document; Read the memo">
 <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
 <rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Triage 15 MP4s</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Playable streams; trailing uuid boxes</text>
 <line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
@@ -58,58 +58,243 @@
 <line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
 <rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Read the memo</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Reconstructed page carries the flag</text>
 </svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
-<h2>The videos looked ordinary</h2>
-<p>I was given fifteen short MP4 files and a hint that something had moved through shared video. Each one played. <code>ffprobe</code> saw ordinary H.264 video and AAC audio. I recorded file hashes before taking anything apart, then looked at the container around the streams. Every file ended with a <code>uuid</code> box after its media data.</p>
-<p>An MP4 is made of length-prefixed boxes. A <code>uuid</code> box gives a producer room for user-defined data, so a player can skip it and still play the video. These boxes held only about 68 to 69 bytes apiece. Extracted together, the pieces showed fragments of a PDF: a <code>%PDF</code> header in one, object and page syntax in others, and the cross-reference and trailer near the end. The videos were carriers. The document was the thing to rebuild.</p>
-<h2>The file names sent me the wrong way</h2>
-<p>The video names looked like social-media short codes. I tried their apparent order first. Concatenating the extracted bytes that way did not give me a PDF or a decompressible content stream. I had let the carriers tell me how to order the payload. The payload itself gave better clues.</p>
-<p>Readable PDF pieces joined at broken tokens. A fragment ending in <code>/F</code>, for example, could be followed by the one beginning <code>ilter /FlateDecode</code>. I used those joins and the PDF object structure to place the header, objects, cross-reference table, and trailer. The page content stream was harder: its compressed bytes looked opaque, so I could not line those slices up by eye.</p>
-<p>The compressed stream gave me a test. I tried the remaining short permutations and kept the order that <code>zlib</code> could decompress. A zlib stream includes an Adler-32 checksum, so a wrong byte order usually fails decisively. The recorded solve found one order that inflated. I then checked the rebuilt PDF's object offsets against its cross-reference table and read the one-page memo. Its final line held the flag, which I am leaving out of this page.</p>
+<h2>Case details</h2>
 <table>
 <thead>
 <tr>
-<th>Evidence</th>
-<th>What I used it for</th>
+<th>Field</th>
+<th>This case</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Fifteen trailing <code>uuid</code> payloads</td>
-<td>Account for every carrier and every recovered slice.</td>
+<td>Area</td>
+<td>Media-container forensics and file reconstruction</td>
 </tr>
 <tr>
-<td>PDF header, object syntax, <code>xref</code>, and trailer</td>
-<td>Place the readable structural pieces.</td>
+<td>Difficulty</td>
+<td>Medium, by my assessment</td>
 </tr>
 <tr>
-<td>A <code>FlateDecode</code> stream</td>
-<td>Test possible orders of the opaque pieces.</td>
+<td>Status</td>
+<td>Solved; a one-page PDF carried the recovered flag</td>
 </tr>
 <tr>
-<td>Cross-reference offsets</td>
-<td>Check the assembled PDF against its own object locations.</td>
+<td>Starting point</td>
+<td>Fifteen playable MP4 files</td>
+</tr>
+<tr>
+<td>Hiding place</td>
+<td>One trailing ISO-BMFF <code>uuid</code> box per file</td>
+</tr>
+<tr>
+<td>Ordering evidence</td>
+<td>PDF syntax, zlib stream validation, and PDF cross-reference offsets</td>
+</tr>
+<tr>
+<td>Operational bridge</td>
+<td>A proposed content-inspection test for extension-box payloads</td>
 </tr>
 </tbody>
 </table>
-<p>The source files are absent from this ZIP, so I cannot repeat the extraction here. There is also a limit to the brute-force step: it worked because only a small number of pieces belonged to the opaque stream. I would need a different ordering strategy for a much larger set.</p>
-<h2>The defender angle I would test</h2>
-<p>This was a file puzzle, with no observed network exfiltration or defender logs. A real content-inspection service could still learn from it. I would parse the full MP4 box tree, record unexpected extension payloads, and group related uploads for deeper inspection. Scanning only the playable video and audio streams would miss these bytes.</p>
-<p>I would not ship a whole-file <code>%PDF-</code> signature as a detector for all fifteen carriers. The PDF header can appear only in the fragment that contains it. A useful test fixture would include all fifteen carriers plus legitimate MP4s with ordinary <code>uuid</code> metadata. The blue team could measure which files the parser surfaces; the purple team could change fragment order and payload encoding to find its limits. That validation has not been done on production media.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I was given fifteen short video files and a hint about information moving through shared reels. Every video played normally. The task was to find the concealed data, rebuild its original artifact, and recover the five-word flag inside it. I had the files only, with no live target or network capture.</p>
+<p>The prompt sounded like exfiltration, but the artifacts did not show an attacker, defender, or actual transfer. I treat that story as the puzzle's framing. Later sections use media-based data hiding as an operational analogy and propose a content-inspection exercise.</p>
+<h2>2. Techniques, Tooling, and Actions Taken</h2>
+<p>I hashed the fifteen carriers before analysis and preserved their bytes. <code>ffprobe</code> showed ordinary H.264 video and AAC audio. The useful difference was outside the playable streams: a walk of each top-level MP4 box tree ended in a <code>uuid</code> user-extension box after <code>mdat</code>. I extracted its payload and got fifteen slices of roughly 68 to 69 bytes each.</p>
+<p>Several slices were readable PDF structure. I could see the header, numbered objects, a page and font description, a <code>FlateDecode</code> stream, the cross-reference table, and the trailer. I first followed the apparent order of the social-media short codes in the filenames. That concatenation did not start as a PDF and its compressed section would not inflate. I kept the failed order as a useful check: the carrier names were a clue to test, not an ordering rule.</p>
+<p>The printable fragments joined at broken PDF tokens and object boundaries. I placed the header and trailer from the document grammar, then tried the tractable permutations of the opaque stream fragments. One order gave a zlib stream that decompressed. I checked the rebuilt PDF's cross-reference entries against the actual byte positions of its objects. The resulting one-page memo carried the flag on its final line.</p>
+<h2>3. Tooling and Scripts</h2>
+<p>Python's standard library did the box walk, extraction, ordering, decompression, and offset checks. <code>ffprobe</code> was a quick sanity check on the media streams. The core box parser read the declared size and type, honored a 64-bit extended size when present, and rejected a box that ran beyond the file:</p>
+<pre><code class="language-python">import struct
+
+size, kind = struct.unpack_from(&quot;&gt;I4s&quot;, data, offset)
+header = 8
+if size == 1:
+    size = struct.unpack_from(&quot;&gt;Q&quot;, data, offset + 8)[0]
+    header = 16
+elif size == 0:
+    size = len(data) - offset
+if size &lt; header or offset + size &gt; len(data):
+    raise ValueError(&quot;invalid box size&quot;)
+if kind == b&quot;uuid&quot;:
+    if size &lt; header + 16:
+        raise ValueError(&quot;missing user UUID&quot;)
+    fragment = data[offset + header + 16:offset + size]
+</code></pre>
+<p>The extra 16 bytes belong to the user UUID. For an ordinary box with an eight-byte size/type header, the hidden data begins 24 bytes into the box. An extended-size box has a longer header, so a fixed 24-byte skip would be wrong there. I kept each extracted fragment tied to its carrier during reconstruction, even though filenames did not decide the order.</p>
+<p>For the compressed section I tried candidate orders with <code>itertools.permutations</code>, extracted the bytes bounded by <code>stream</code> and <code>endstream</code>, and called <code>zlib.decompress</code>. The parser also checked PDF object offsets after assembly. Those independent format checks mattered more than whether the output merely looked readable.</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Input</th>
+<th>Output</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MP4 box walk</td>
+<td>Fifteen intact videos</td>
+<td>Trailing <code>uuid</code> payload from each</td>
+<td>Box sizes stayed within each file.</td>
+</tr>
+<tr>
+<td>PDF structure join</td>
+<td>Readable fragments</td>
+<td>Header, objects, <code>xref</code>, and trailer order</td>
+<td>Tokens and object references connected.</td>
+</tr>
+<tr>
+<td>zlib permutation check</td>
+<td>Opaque stream fragments</td>
+<td>One decompressible order</td>
+<td>zlib wrapper and checksum accepted it.</td>
+</tr>
+<tr>
+<td>PDF offset check</td>
+<td>Reassembled bytes</td>
+<td>One-page document</td>
+<td>Cross-reference entries pointed at their objects.</td>
+</tr>
+</tbody>
+</table>
+<h2>4. Concept Explanation</h2>
+<p>An MP4 uses length-prefixed boxes. The familiar types carry file identity, movie metadata, and media data. A <code>uuid</code> box adds a 16-byte user identifier and extension data. A player can ignore an unfamiliar extension and still play the video. That gave each carrier room for one piece of the document without affecting playback. <a href="https://www.iso.org/standard/83102.html">ISO/IEC 14496-12</a> defines the container family.</p>
+<p>A PDF has its own ordering clues. A header identifies the format, numbered objects refer to one another, and the <code>xref</code> table records object byte offsets. The trailer points to that table. Those byte offsets can check a reconstructed file, even when filenames are misleading.</p>
+<p>The page-content stream used <code>FlateDecode</code>, a zlib-wrapped DEFLATE stream. A zlib wrapper includes an Adler-32 checksum, described in <a href="https://www.rfc-editor.org/rfc/rfc1950">RFC 1950</a>; <a href="https://www.rfc-editor.org/rfc/rfc1951">RFC 1951</a> describes DEFLATE. The PDF stream's <code>/Length</code> describes the encoded bytes stored in the PDF. A separate length check would compare that number with the stored bytes before inflation. The decompressed text can have a different length.</p>
+<h2>5. Exploit / Analysis Mechanics</h2>
+<p>The hiding worked because each <code>uuid</code> box was a legal container extension after the media data. No single 68- or 69-byte fragment was the whole PDF. A viewer showed a normal video, and the readable pieces alone did not give me the correct order of the compressed stream.</p>
+<p>The filename short codes suggested a chronological send order. That order failed the PDF header and zlib checks. I switched to constraints from the payload: <code>%PDF</code> at the start, object grammar through the body, and <code>xref</code> plus trailer at the end. A fragment ending in <code>/F</code> followed by one beginning <code>ilter /FlateDecode</code>, for example, completed a real PDF token. The compressed bytes had no such visible join, so I tried their small permutation space and kept the order that inflated.</p>
+<p>The reconstructed file passed three checks I could apply without trusting its appearance: the zlib stream decompressed, PDF cross-reference offsets landed on their object definitions, and the page content read as one memo. The final line supplied the flag. This brute-force step was practical because only a few fragments lay inside the opaque stream. A much larger split would need additional ordering constraints.</p>
+<h2>6. Lessons Learned</h2>
+<p>The container tree gave me the hiding place before I spent time decoding the video or audio. I will check extension boxes early when media plays cleanly but still seems to carry data. The first filename order was attractive because it came with a story. The PDF header, object grammar, and checksum were better witnesses.</p>
+<p>I also learned to build validation into the reassembler. The stream inflated and the cross-reference offsets landed on the expected objects. For a fuller PDF check, I would also compare <code>/Length</code> with the stored, encoded stream bytes. The same habit transfers to other checksummed or self-describing formats.</p>
 <details class="fold">
-<summary>Framework and format notes</summary>
-<p>MITRE ATT&amp;CK <a href="https://attack.mitre.org/techniques/T1027/003/">T1027.003, Steganography</a> and <a href="https://capec.mitre.org/data/definitions/636.html">CAPEC-636, Hiding Malicious Data or Code within Files</a> are useful analogies for concealed data in a media container. The challenge did not show an intrusion or prove that these files crossed a real inspection boundary.</p>
-<p>The <a href="https://www.iso.org/standard/83102.html">ISO base media file format</a> identifies the box-based container family. <a href="https://datatracker.ietf.org/doc/html/rfc1950">RFC 1950</a> describes the zlib wrapper and checksum that helped test the compressed piece order. If I validate a PDF stream's <code>/Length</code> value, I compare it with the encoded stream bytes in the file. It is not the size of the text after decompression, as <a href="https://opensource.adobe.com/dc-acrobat-sdk-docs/acrobatsdk/apireference/COS_Layer/CosStream.html">Adobe's PDF stream documentation</a> makes clear.</p>
+<summary>7. Operational Extrapolation</summary>
+<h3>Individual Practitioner Development</h3>
+<p>This solve exercised ISO-BMFF parsing, file carving, PDF structure, and reconstruction from scattered fragments. I would repeat it on another extension mechanism, such as XMP metadata, to see which parts of the workflow generalize beyond MP4 <code>uuid</code> boxes.</p>
+<h3>Security Operations</h3>
+<p>I would test a content-inspection pipeline with a benign set of MP4s containing ordinary <code>uuid</code> metadata and a separate set with split document fragments. The blue team would parse whole containers and retain extension-box payloads. The purple team would vary fragment order and encoding. I would measure which files the pipeline surfaces and which reconstructed objects analysts can verify. I have not run this test against production media or a DLP gateway.</p>
+<h3>Intelligence Operations</h3>
+<p>These files gave me no actor, infrastructure, collection source, or attribution lead. Their concealment method is transferable to artifact analysis; this puzzle itself does not support an intelligence conclusion.</p>
 </details>
 <details class="fold">
-<summary>Reassembly method to reuse</summary>
-<ol>
-<li>Hash the original carriers and walk their top-level boxes without changing the files.</li>
-<li>Extract extension-box payloads using the declared box sizes. Keep their source-file association.</li>
-<li>Let the embedded format supply the first ordering constraints. Treat file names as clues to test.</li>
-<li>For compressed pieces, try the tractable candidate orders against the format's own decoder and checksum.</li>
-<li>Validate the completed document structurally before trusting the message inside it.</li>
-</ol>
-<p>That procedure is drawn from this solve. It is not a tested detector for arbitrary MP4 uploads.</p>
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The reusable method is an MP4 <code>uuid</code>-box carver followed by a PDF reassembler. Its inputs are a set of MP4 carriers and an output path. It produces each extracted fragment, their recovered order, and the assembled PDF. Python's standard library is enough for the parser, permutations, and zlib checks. In the challenge run, the tool reproduced the target PDF byte for byte even after the carrier files were given generic names. Decompression and cross-reference offsets provided the structural checks.</p>
+<p>The method assumes the carriers together hold one PDF with a small, reorderable compressed stream. It would need more constraints for a larger permutation space or multiple hidden documents. A parser used on untrusted uploads also needs strict box-size and file-size limits before allocating or trying combinations.</p>
+</details>
+<details class="fold">
+<summary>9. Framework Applicability and Mapping</summary>
+<p>This was a non-adversarial reconstruction puzzle, so the mappings describe an analogous hiding method. They do not record an observed intrusion.</p>
+<table>
+<thead>
+<tr>
+<th>Exercise behavior</th>
+<th>Framework</th>
+<th>ID</th>
+<th>Fit and status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PDF fragments concealed in video-container extensions</td>
+<td><a href="https://attack.mitre.org/techniques/T1027/003/">MITRE ATT&amp;CK Steganography</a></td>
+<td>T1027.003</td>
+<td>Analogical. ATT&amp;CK covers data hidden in digital media.</td>
+</tr>
+<tr>
+<td>Data stored in a file-format extension area</td>
+<td><a href="https://capec.mitre.org/data/definitions/636.html">MITRE CAPEC, Hiding Malicious Data or Code within Files</a></td>
+<td>CAPEC-636</td>
+<td>Pattern analogy. The PDF here was a puzzle payload, not observed malicious code.</td>
+</tr>
+</tbody>
+</table>
+<p>I do not assign a direct D3FEND, STRIDE, or OWASP mapping from these files. The inspection exercise in Section 7 is proposed; it did not assess a control or a web application.</p>
+</details>
+<details class="fold">
+<summary>10. Threat Intelligence and Standards Integration</summary>
+<p>I have no host or network observable, adversary infrastructure, or campaign to share. The short codes, user UUID, and recovered flag belong to the challenge and do not become operational indicators. I would not create STIX objects or a TAXII exchange from this puzzle. The ISO, PDF, and zlib specifications are format references used to reconstruct the bytes, not threat-intelligence products.</p>
+</details>
+<details class="fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<p>The challenge provided files, not a defended system with a stated content-inspection policy. I cannot claim a tested NIST, CIS, or STIG control result. The useful defensive work is a proposed parser and test set for media uploads or repositories. Section 12 describes what such a check would need before an organization could rely on it.</p>
+</details>
+<details class="fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>The file content suggests a detection question: which media objects carry substantial user-extension data, and can the pipeline find documents split across several related files? A whole-file <code>%PDF-</code> signature could identify only the fragment containing the PDF header. It could not match every carrier in this set. A rule requiring both <code>uuid</code> and <code>%PDF-</code> therefore cannot support a 15-of-15 detection claim.</p>
+<table>
+<thead>
+<tr>
+<th>Detection field</th>
+<th>Proposed design</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sensor</td>
+<td>Whole-file inspection at upload, repository, or DLP intake.</td>
+</tr>
+<tr>
+<td>Parsing</td>
+<td>Walk top-level boxes with size bounds; extract and record <code>uuid</code> payloads.</td>
+</tr>
+<tr>
+<td>Correlation</td>
+<td>Group related media and look for document fragments or a reconstructable embedded format.</td>
+</tr>
+<tr>
+<td>First test set</td>
+<td>All fifteen challenge carriers plus benign MP4s with legitimate <code>uuid</code> metadata.</td>
+</tr>
+<tr>
+<td>False positives</td>
+<td>XMP, vendor tags, and other normal extension data.</td>
+</tr>
+<tr>
+<td>Limits</td>
+<td>Compression, encryption, file grouping, and large fragment counts can defeat simple signatures or brute force.</td>
+</tr>
+<tr>
+<td>Validation status</td>
+<td><strong>Proposed.</strong> I validated the reconstruction method on the puzzle; I have no production false-positive measurement or deployed rule.</td>
+</tr>
+</tbody>
+</table>
+<p>I would keep a parser finding separate from an exfiltration alert. A <code>uuid</code> payload is a reason to inspect a file. A claim that data left an organization would require transfer evidence the puzzle never supplied.</p>
+</details>
+<h2>13. Visual Artifact</h2>
+<p>The <a href="#analysis-flow">diagram near the summary</a> shows the reconstruction path from fifteen playable carriers to the <code>uuid</code> fragments, PDF structure, zlib check, and final memo. It places the failed filename order beside the actual format-driven route.</p>
+<details class="fold">
+<summary>14. References</summary>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Supported claim</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://www.iso.org/standard/83102.html">ISO/IEC 14496-12, ISO base media file format</a></td>
+<td>MP4 box and user-extension context.</td>
+</tr>
+<tr>
+<td><a href="https://www.iso.org/standard/51502.html">ISO 32000-1, PDF 1.7</a></td>
+<td>PDF objects, cross-reference table, and stream structure.</td>
+</tr>
+<tr>
+<td><a href="https://www.rfc-editor.org/rfc/rfc1950">RFC 1950, ZLIB</a> and <a href="https://www.rfc-editor.org/rfc/rfc1951">RFC 1951, DEFLATE</a></td>
+<td>Compressed stream and checksum validation.</td>
+</tr>
+<tr>
+<td><a href="https://attack.mitre.org/techniques/T1027/003/">MITRE ATT&amp;CK T1027.003</a> and <a href="https://capec.mitre.org/data/definitions/636.html">CAPEC-636</a></td>
+<td>Analogical framework discussion in Section 9.</td>
+</tr>
+</tbody>
+</table>
 </details>
         </div>
       </div>

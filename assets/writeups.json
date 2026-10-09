@@ -79,7 +79,7 @@
   {
     "title": "Fifteen Videos, One Hidden PDF",
     "category": "Forensics",
-    "difficulty": "Medium",
+    "difficulty": "Medium (self-rated)",
     "date": "2026-10",
     "tags": [
       "MP4",
@@ -88,7 +88,7 @@
       "file carving",
       "DEFLATE"
     ],
-    "summary": "Fifteen playable MP4 files each carried a small piece of one PDF in a trailing uuid box. I let the PDF structure and zlib checksum put the pieces back in order.",
+    "summary": "Fifteen playable MP4 files each carried a short PDF fragment in a trailing uuid box. I used PDF structure and zlib validation to restore the document despite misleading filenames.",
     "url": "/cyber-ops/ctf-writeups/forensics/mp4-uuid-pdf-reconstruction/"
   },
   {
