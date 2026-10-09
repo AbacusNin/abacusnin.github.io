@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>When the Answer File Stopped Carrying Information - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="I read a Haskell compile-time transform, inverted its answer forms, and found the point where its state became zero and the transcript stopped revealing the key.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/reversing/type-level-dialect/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="When the Answer File Stopped Carrying Information">
+  <meta property="og:description" content="I read a Haskell compile-time transform, inverted its answer forms, and found the point where its state became zero and the transcript stopped revealing the key.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/reversing/type-level-dialect/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a></p>
+      <div class="page-head">
+        <h1 class="page-title">When the Answer File Stopped Carrying Information</h1>
+        <p class="lead">The first part of the answer file narrowed the hidden string. After the state reached zero, every later answer was the same regardless of the characters that followed.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Recover a hidden string from a Haskell type-level transform and aligned question and answer files.</p>
+<p><strong>What I did.</strong> I parsed answer forms into modular constraints, carried the state through candidate characters, and checked the result by forward simulation.</p>
+<p><strong>The result.</strong> The candidate reproduced the recorded answers byte for byte, and the submitted full value was accepted by the scoring platform.</p>
+<p><strong>The limit.</strong> The answer transcript did not determine the key&#x27;s tail after the absorbing-zero state; the format and theme supplied that part of the candidate.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Read the GHC transform; Parse the answer forms; Carry candidate state; State reaches zero; Check the full candidate">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Read the GHC transform</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Find the two modular calculations</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Parse the answer forms</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Turn each chosen word into a residue</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Carry candidate state</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Keep choices consistent across lines</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">State reaches zero</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Later answers reveal no characters</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Check the full candidate</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Transcript parity and accepted entry</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Reverse engineering, type-level Haskell and modular constraint inversion</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>High</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved; recorded forward parity and accepted submission</td>
+</tr>
+<tr>
+<td>Given</td>
+<td>The transform source, a question file, an answer file, and a Title-Case flag format</td>
+</tr>
+<tr>
+<td>Goal</td>
+<td>Recover the secret string imported by the program but absent from the supplied source</td>
+</tr>
+<tr>
+<td>Main limit</td>
+<td>Once the state reached zero, the remaining transcript no longer depended on the remaining characters</td>
+</tr>
+</tbody>
+</table>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I had a small Haskell program and two aligned text files. One held questions, and the other held the answers the program had produced. The program imported a secret string from a module I did not have. It used that string to choose a different surface form for each answer. I needed to work backward from the source and the transcript to recover the secret.</p>
+<p>The flag format helped: a fixed wrapper around a short run of concatenated Title-Case words, which I will write as <code>&lt;prefix&gt;{TitleCaseWords}</code>. That constraint mattered later because the answer forms did not identify every character by themselves. I had the transform, the questions, and the resulting answers. I did not have the module that defined the secret.</p>
+<p>This was a static puzzle. There was no live service to exploit, no defender telemetry, and no adversary in the challenge evidence. The useful question was narrower: how much information about a hidden input does this particular transform leave in its outputs?</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>The hint initially looked geographic to me. Its wordplay pointed instead to GHC, the compiler used by the source. Once I recognized that, I stopped treating the answer file as a word game and read the type-level definitions as a program.</p>
+<p>I mapped the surface vocabulary first. Each field had several interchangeable forms, and a small numeric index selected one. A question named only some fields for a given character position. I parsed each answer line back into the forms it used, matching the longest form first because some contained spaces. That gave me observed indices for a subset of fields at each position.</p>
+<p>My first shortcut failed. I treated positions independently and chose a plausible letter from the right residue class. The next lines stopped matching. Each character also changed the state used for every later one. I went back to the recurrence, carried that state forward with each candidate, and searched within the Title-Case format instead of fixing one character at a time.</p>
+<p>That search narrowed the leading part of the key. At a later position, the carried value became zero. Every following answer then used the default form, no matter which characters followed. I used the format and challenge theme for that unconstrained tail. Finally, I regenerated the entire answer transcript from the candidate and compared it byte for byte. The recorded submission of the full value was accepted by the scoring platform.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>I used the GHC source to extract the transform and Python 3 to model it. The local analyzer took the question lines, answer lines, form tables, field-to-series mapping, two moduli, and a candidate alphabet. It parsed forms into indices, tracked candidate characters and state, reported how many characters remained possible at each position, and forward-generated answers from a candidate key. It used only the standard library.</p>
+<p>This is the small core of the forward model. <code>n</code> is a field's starting series value. <code>M1</code> selects a surface form; <code>M2</code> carries the state to the next character.</p>
+<pre><code class="language-python">def run_series(n, key, M1, M2):
+    state, forms = n, []
+    for char in key:
+        value = ord(char)
+        forms.append((state * value) % M1)
+        state = (state * value) % M2
+    return forms
+</code></pre>
+<p>The reverse side needs the actual form table. I matched answer text to a field's longest valid form, read its index, and kept candidate characters whose computed index matched. A character also had to leave a state consistent with later lines. The constraint profile made the important boundary visible: a few choices remained at early positions; after zero, the whole allowed alphabet remained possible.</p>
+<p>The recorded validation had two layers. A synthetic fixture checked the general analyzer's parity. For the challenge candidate, the independently generated answer file matched the supplied answers byte for byte, with matching SHA-256 digests in the solve record. That is a consistency check on the model and candidate. It cannot prove that the transcript uniquely determines characters after the zero state.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>GHC can compute over type-level strings and numbers while it checks a program. This challenge made that compile-time work produce answer text. The imported secret supplied characters; the type-level machinery walked them and chose a form for each queried field. GHC was part of the mechanism, which is why the hint mattered.</p>
+<p>The math behind the form choice is small. Each field has a starting series number <code>n</code>. A character code multiplies that series' current state. The product modulo <code>M1</code> chooses an output form. The same product modulo <code>M2</code> becomes the next state. Seeing one form gives me a remainder, not a character. Several letters can have the same remainder, so I also need the format and later lines to narrow a choice.</p>
+<p>Zero changes the problem completely. If the running product becomes zero modulo <code>M2</code>, multiplying it by any later character leaves it zero. All later form indices become zero as well. From that point, the answers are identical for many possible tails. The Title-Case words were a useful language clue, but they were outside information, separate from what the transcript proved.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>I wrote the state in terms of one running product. Let <code>P(i)</code> be the product of character codes before position <code>i</code>, reduced modulo <code>M2</code>. For a series that begins at <code>n</code>, its state is <code>state_n(i) = n * P(i) mod M2</code>. At position <code>i</code>, the selected form has index <code>state_n(i) * ord(c_i) mod M1</code>. The next product is <code>P(i+1) = P(i) * ord(c_i) mod M2</code>.</p>
+<p>That relationship let me avoid solving every field as a separate machine. All the series saw the same character at each step. I only needed to carry one product while checking the form indices for the fields actually asked on that line.</p>
+<table>
+<thead>
+<tr>
+<th>What I observed</th>
+<th>What it constrained</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A surface form in an answer</td>
+<td>One index modulo <code>M1</code> for its field</td>
+</tr>
+<tr>
+<td>Several queried fields on one line</td>
+<td>A set of residue conditions on the current character and state</td>
+</tr>
+<tr>
+<td>A Title-Case candidate letter</td>
+<td>A plausible character that still needed later-line checking</td>
+</tr>
+<tr>
+<td>A zero state modulo <code>M2</code></td>
+<td>Every later selected index, regardless of later characters</td>
+</tr>
+</tbody>
+</table>
+<p>The independent-position guess failed because it satisfied a local remainder while sending the carried product down the wrong path. Propagating the state fixed that mistake. Under the stated format, the recorded search narrowed the informative prefix. The constraint profile then showed a hard stop: after the accumulator reached zero, every allowed character fit every remaining answer line.</p>
+<p>I checked the complete candidate by running it forward through my model and comparing the generated answers with the supplied file byte for byte. Matching SHA-256 digests were a convenient way to record that parity. The full candidate also received a reported accepted result from the scoring platform. Those checks answer different questions. Transcript parity tests consistency with the observed answers. The accepted submission resolves the entire candidate, including a tail the transcript could not distinguish.</p>
+<p>More field queries against the same post-zero state would still return the default forms. Recovering that tail deterministically would require other information, such as a fresh state or a different transform that had not already collapsed.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned</summary>
+<p>I should have measured each position's candidate count earlier. Once I could see which positions had a handful of letters and which had the whole alphabet, I knew where to spend the search effort. Guessing a single letter from one line hid that distinction.</p>
+<p>The other lesson was to carry state through the entire transcript. The parallel field computations looked separate in the source, but they shared the same per-character multiplier. One running product described their joint behavior. That made the inversion manageable and exposed the absorbing-zero point.</p>
+<p>I also kept two kinds of correctness apart. Regenerating an output proves a candidate is compatible with the transform. It does not always prove that candidate is the only possible input. Here the answer file stopped distinguishing tails. The format and accepted submission completed the solve.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Operational Extrapolation</summary>
+<h3>Individual Practitioner Development</h3>
+<p>This pushed me to read code that runs at compile time as carefully as code that runs after launch. The useful skills were extracting a recurrence from type-level definitions, turning selected words into modular constraints, and admitting when the inverse stops being unique. A good follow-up exercise would use a modified transform that asks every field and never reaches zero, then measure whether the extra observations actually produce unique characters.</p>
+<h3>Security Operations</h3>
+<p>This puzzle did not supply a host, a deployed verifier, runtime behavior, or logs. I have no SOC alert, incident-response step, hunt, or playbook to claim from it. A separate design review could ask whether a real service leaks partial secret information through repeated answers, but that would need an actual system and test data.</p>
+<h3>Intelligence Operations</h3>
+<p>There was no collection source, infrastructure, actor, or attribution surface here. I would not turn a puzzle transcript into an intelligence finding. The reusable habit is to state what an observation can and cannot determine before assigning meaning to it.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The useful reusable piece is the recurrence model paired with a constraint profile. A generic version needs question and answer files, form tables, a field-to-series map, <code>M1</code>, <code>M2</code>, and an allowed alphabet. It can return answer parity, hashes of the generated and observed outputs, per-position candidate counts, and positions that are completely unconstrained.</p>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>Purpose</th>
+<th>Limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Longest-form parser</td>
+<td>Recover a field's selected index from answer text</td>
+<td>Needs accurate form tables; overlapping forms require deliberate matching order</td>
+</tr>
+<tr>
+<td>State model</td>
+<td>Reproduce indices and carry <code>P(i)</code> forward</td>
+<td>Assumes the same multiplier and modular recurrence as the target</td>
+</tr>
+<tr>
+<td>Constraint profile</td>
+<td>Count surviving characters at each position</td>
+<td>Counts depend on the chosen alphabet and format prior</td>
+</tr>
+<tr>
+<td>Forward parity check</td>
+<td>Compare a full candidate with every answer line</td>
+<td>A match shows consistency, not uniqueness after collapse</td>
+</tr>
+</tbody>
+</table>
+<p>I validated the generic method on a synthetic example during the solve and used the challenge's answer file for full-candidate parity. I would reuse the method by re-reading a new target's actual definitions, replacing the form tables and moduli, then checking how many inputs produce each output. The snippet in Section 3 is the recurrence, not a complete parser for an arbitrary transcript.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Applicability and Mapping</summary>
+<p>I considered ATT&amp;CK and found no adversary behavior to map. This is a static reverse-engineering puzzle. It has no observed tactic, technique, victim, or compromise. D3FEND, CAPEC, STRIDE, and OWASP would add labels without helping explain the solve.</p>
+<p>An information-leak analogy can help teach the many-to-one transform: a visible answer gives partial information about a hidden input. That is illustrative. I did not test a real verifier or identify a real weakness.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intelligence and Standards Integration</summary>
+<p>I have no indicators, infrastructure, malware sample, or exchangeable observables from this exercise. There is nothing factual to put in STIX or send over TAXII. I also have no system configuration or assessment scope for a STIG or CIS finding.</p>
+<p>The relevant external documentation is the GHC language guide in Section 14. It explains the type-level features used by this style of program. It does not validate the challenge-specific recurrence or the recovered key; those came from analyzing the puzzle and checking the recorded answers.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<p>There was no operational asset or control failure to mitigate. I cannot honestly map a NIST SP 800-53, CIS, STIG, CMMC, PCI DSS, or HIPAA control from this record. If a real application used a similar answer-producing transform to protect a secret, I would first define the application, its threat model, and the outputs an observer could collect. Only then would a control or design change have a measurable target.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>The work was static and compile-time. It produced no production logs or network events, and it supplied no IOC. I have no YARA or Sigma rule, SIEM query, or hunt hypothesis to present as tested detection.</p>
+<p>The useful artifact is the constraint profile, because it tells me where the transcript stops carrying information. That is an analysis result for this puzzle, not a detector for an environment.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow beside the summary</a> traces the solve: read the GHC transform, turn answer words into residues, carry candidate state, find zero, and verify the full candidate. The two calculations at each character deserve to be read together. One product selects a visible form modulo <code>M1</code>; the same product becomes the next state modulo <code>M2</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Branch from the product</th>
+<th>What happens</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>product mod M1</code></td>
+<td>Selects a form that appears in the answer transcript when its field is queried</td>
+</tr>
+<tr>
+<td><code>product mod M2</code></td>
+<td>Carries the state into the next character</td>
+</tr>
+<tr>
+<td>Carried state becomes zero</td>
+<td>Every later form index becomes zero, so the transcript loses the tail</td>
+</tr>
+</tbody>
+</table>
+<p>That last branch is why the diagram ends with two checks. Forward parity confirmed that my candidate explained the answer file. The accepted entry confirmed the full string, including characters for which the answer file itself had gone silent.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>What it supports</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://downloads.haskell.org/ghc/latest/docs/users_guide/exts/type_literals.html">GHC User's Guide, Type-Level Literals</a></td>
+<td>GHC's type-level literal and numeric facilities behind the compile-time reading of the source</td>
+</tr>
+<tr>
+<td><a href="https://downloads.haskell.org/ghc/latest/docs/users_guide/exts/type_families.html">GHC User's Guide, Type Families</a></td>
+<td>Type-level definitions and dispatch used by this style of transform</td>
+</tr>
+</tbody>
+</table>
+<p>The source code and answer transcript established the challenge-specific equations and outputs. These compiler references explain the language features; they are not evidence that a particular key was recovered.</p>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>

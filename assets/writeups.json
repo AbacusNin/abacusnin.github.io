@@ -107,5 +107,20 @@
     ],
     "summary": "A trojanized calculator detached from its terminal and overwrote its own command line with a familiar service name. I traced that rename in a stripped ELF without running its backdoor.",
     "url": "/cyber-ops/ctf-writeups/malware/trojanized-calculator-process-masquerade/"
+  },
+  {
+    "title": "When the Answer File Stopped Carrying Information",
+    "category": "Reversing",
+    "difficulty": "High",
+    "date": "2026-10",
+    "tags": [
+      "Haskell",
+      "GHC",
+      "type-level programming",
+      "modular arithmetic",
+      "constraint solving"
+    ],
+    "summary": "I read a Haskell compile-time transform, inverted its answer forms, and found the point where its state became zero and the transcript stopped revealing the key.",
+    "url": "/cyber-ops/ctf-writeups/reversing/type-level-dialect/"
   }
 ]
