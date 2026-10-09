@@ -5,7 +5,14 @@
     "category": "Crypto",
     "difficulty": "Advanced",
     "date": "2026-05",
-    "tags": ["MITM", "verification oracle", "CRT", "WebAssembly", "GF(2)", "key recovery"],
+    "tags": [
+      "MITM",
+      "verification oracle",
+      "CRT",
+      "WebAssembly",
+      "GF(2)",
+      "key recovery"
+    ],
     "summary": "Recovered a 128-bit key from a stateful protocol using an adversary-in-the-middle seat, a verification oracle, and a factorable key schedule, then cut the edit cost with a two-stage residue lift."
   },
   {
@@ -14,7 +21,14 @@
     "category": "Forensics",
     "difficulty": "Medium",
     "date": "2026-10",
-    "tags": ["Wi-Fi", "probe requests", "MAC randomization", "PNL leakage", "device tracking", "SQLite forensics"],
+    "tags": [
+      "Wi-Fi",
+      "probe requests",
+      "MAC randomization",
+      "PNL leakage",
+      "device tracking",
+      "SQLite forensics"
+    ],
     "summary": "Found the one device in a 39,000-device Wi-Fi probe capture that never randomized its MAC, then read its leaked saved-network list back as a travel itinerary. The whole solve turned on a single bit."
   },
   {
@@ -23,7 +37,58 @@
     "category": "AI Security",
     "difficulty": "Medium",
     "date": "2026-10",
-    "tags": ["LLM gatekeeper", "prompt injection", "stateful authorization", "purple team", "access control"],
+    "tags": [
+      "LLM gatekeeper",
+      "prompt injection",
+      "stateful authorization",
+      "purple team",
+      "access control"
+    ],
     "summary": "Two requests failed against a courtly LLM. I learned its rules, earned four merits, and corrected a final petition to recover the flag, then carried the lesson into access control and purple team testing."
+  },
+  {
+    "title": "Three Code Objects in One Python Function",
+    "category": "Reversing",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "Python bytecode",
+      "marshal",
+      "RC4",
+      "code objects",
+      "reverse engineering"
+    ],
+    "summary": "A Python flag checker kept replacing one function's code object. I matched its bytecode to the right interpreter, read the RC4 check, and reversed it to recover the accepted input.",
+    "url": "/cyber-ops/ctf-writeups/reversing/python-bytecode-rc4/"
+  },
+  {
+    "title": "The Calculator That Waited for an ICMP Echo",
+    "category": "Malware Analysis",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "ELF",
+      "process masquerading",
+      "ICMP",
+      "raw sockets",
+      "reverse shell"
+    ],
+    "summary": "I read a trojanized calculator without running it, found the process name it adopted, and traced the ICMP Echo Request that woke its reverse shell.",
+    "url": "/cyber-ops/ctf-writeups/malware/trojanized-calculator-icmp/"
+  },
+  {
+    "title": "Fifteen Videos, One Hidden PDF",
+    "category": "Forensics",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "MP4",
+      "uuid boxes",
+      "PDF",
+      "file carving",
+      "DEFLATE"
+    ],
+    "summary": "Fifteen playable MP4 files each carried a small piece of one PDF in a trailing uuid box. I let the PDF structure and zlib checksum put the pieces back in order.",
+    "url": "/cyber-ops/ctf-writeups/forensics/mp4-uuid-pdf-reconstruction/"
   }
 ]

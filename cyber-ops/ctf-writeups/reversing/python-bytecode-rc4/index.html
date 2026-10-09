@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Three Code Objects in One Python Function - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009">
+  <meta name="description" content="A Python flag checker kept replacing one function&#x27;s code object. I matched its bytecode to the right interpreter, read the RC4 check, and reversed it to recover the accepted input.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/reversing/python-bytecode-rc4/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="Three Code Objects in One Python Function">
+  <meta property="og:description" content="A Python flag checker kept replacing one function&#x27;s code object. I matched its bytecode to the right interpreter, read the RC4 check, and reversed it to recover the accepted input.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/reversing/python-bytecode-rc4/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Reversing / Three Code Objects in One Python Function</p>
+      <div class="page-head">
+        <h1 class="page-title">Three Code Objects in One Python Function</h1>
+        <p class="lead">The source showed one checking function, but it behaved like three. The trick was in the code objects it loaded at runtime.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> A self-contained Python script accepted or rejected a flag. Its visible source hid the check behind serialized bytecode.</p>
+<p><strong>What I did.</strong> I split the embedded blob into three code objects, found the Python version that disassembled them cleanly, and inverted the final RC4 comparison.</p>
+<p><strong>The result.</strong> My solve record says the recovered input passed the format gate, reproduced the stored ciphertext, and was accepted by the original checker.</p>
+<p><strong>The limit.</strong> The ZIP contains this writeup but not the challenge script or recovery artifacts, so the exact bytes cannot be replayed from this public page.</p>
+          </div>
+<figure class="diagram"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Read the script; Split the blob; Fix the disassembly; Invert the check; Verify">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Read the script</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">One function, three serialized bodies</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Split the blob</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Input, format gate, RC4 validator</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Fix the disassembly</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Use the matching CPython version</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Invert the check</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">RC4(key, stored bytes) gives input</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Verify</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Gate, round trip, original checker</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>The script I was handed</h2>
+<p>The challenge gave me a Python script that asked for a flag and answered yes or no. Its hint talked about doing more with fewer functions. I initially read that as flavor text. Then I found the part of the source that mattered: a byte blob split into three serialized code objects, each assigned in turn to the same function's <code>__code__</code> attribute. The function's name stayed put while its body changed.</p>
+<p>That changed how I approached the checker. Reading the visible function definition would tell me little about the code that actually ran. I needed the three hidden bodies and, especially, the last one that decided whether my input was right.</p>
+<h2>Getting the hidden bodies into view</h2>
+<p>I separated the blob at its delimiter and inspected the code objects with Python's <code>marshal</code> module. Their constants and local names gave me a rough map: the first stage read input, the second checked its prefix and exact length, and the last performed the comparison. Names such as <code>S</code>, <code>key_length</code>, and <code>keystream_byte</code> pointed toward RC4, but names alone were not enough to tell me which embedded bytes were the key and which were the target ciphertext.</p>
+<p>My first disassembly was a mess. I had used the Python interpreter on my machine, and its opcode meanings did not match the serialized code. I tried other minor versions until the instructions made sense alongside the surrounding source. <a href="https://docs.python.org/3/library/dis.html">Python's <code>dis</code> documentation</a> is blunt about this: CPython bytecode can change between releases. Successful deserialization was not proof that I was reading the instructions correctly.</p>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>What I could establish</th>
+<th>Why it mattered</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Input</td>
+<td>The script took a candidate string.</td>
+<td>I could trace the value that reached the checker.</td>
+</tr>
+<tr>
+<td>Gate</td>
+<td>It required a fixed prefix and exact length.</td>
+<td>A plausible decryption result still had to satisfy the program's format check.</td>
+</tr>
+<tr>
+<td>Validator</td>
+<td>It ran RC4 with an embedded key and compared the output with stored bytes.</td>
+<td>The comparison could be reversed without searching candidate flags.</td>
+</tr>
+</tbody>
+</table>
+<h2>The guess that cost me time</h2>
+<p>I tried to rebuild RC4 before I had the operand roles straight. I swapped the key and ciphertext in my first attempt and counted a repeated byte only once while copying an embedded list. The result looked nothing like a flag. That failure was useful: it sent me back to the instruction stream to follow the assignments and the ordered byte construction instead of trusting the constant pool as a recipe.</p>
+<p>Once the native disassembly showed the data flow, the check was simple. It computed <code>RC4(key, candidate)</code> and compared those bytes with the embedded ciphertext. RC4 generates a keystream from the key and XORs it with the input. Applying the same operation to the ciphertext yields the candidate that produces it: <code>RC4(key, ciphertext)</code>. I used the 128-byte key and 40-byte comparison value recorded in the checker. I am leaving both constants out of this public page.</p>
+<p>My notes record three checks on the recovered string. It had the required prefix and length. Running it back through RC4 reproduced the comparison bytes. The original, unmodified program accepted it under the matching interpreter. Those checks were stronger than a flag-shaped output alone. The ZIP did not include the original script or the companion RC4 utility, so I cannot rerun them from this archive.</p>
+<h2>Taking it into defensive work</h2>
+<p>This was a local reversing puzzle. It did not give me an incident, an attacker, or host telemetry. I still see a useful exercise for a blue and purple team: give the blue team a benign Python sample that deserializes embedded code and swaps <code>__code__</code> at runtime. Have the purple team vary the packaging while keeping the behavior the same. The blue team can test whether its collection actually shows the loaded code and whether its analysts can recover the behavior under the right interpreter.</p>
+<p>I would start with process and script evidence, then decide whether a hunt is practical. A rule that fires on <code>marshal</code> alone would catch legitimate tooling and miss other loaders. The CTF provides no false-positive rate or production log sample, so this is a proposed exercise rather than a detection I tested. I would also handle unknown serialized code in an isolated environment: <a href="https://docs.python.org/3/library/marshal.html">Python warns that <code>marshal</code> is not secure against maliciously constructed data</a>.</p>
+<details class="fold">
+<summary>Framework fit and references</summary>
+<p>MITRE ATT&amp;CK <a href="https://attack.mitre.org/techniques/T1027/">T1027, Obfuscated Files or Information</a>, gives me a vocabulary for the hidden code. <a href="https://attack.mitre.org/techniques/T1140/">T1140, Deobfuscate/Decode Files or Information</a>, describes a possible step in real malicious code execution. I use both as analogies. The challenge itself showed a checker I reversed; it did not show an adversary using either technique in an environment.</p>
+<p>I do not have an operational asset or a measured control failure to map to NIST or CIS controls here. The practical control lesson is narrower: collect enough evidence to see dynamic code loading, analyze it with the matching runtime, and test any proposed alert against legitimate use. <a href="https://www.rfc-editor.org/info/rfc7465/">RFC 7465</a> prohibits RC4 cipher suites in TLS; that standards point is background on RC4, not a claim that this puzzle used TLS.</p>
+</details>
+<details class="fold">
+<summary>Reusable reversing checklist</summary>
+<ol>
+<li>Find the data that becomes executable code. Save the serialized bytes and their order before running the sample.</li>
+<li>Inspect code-object constants and names, then match the CPython minor version before trusting <code>dis</code> output.</li>
+<li>Follow assignments in the instructions. A constant pool does not tell you which byte sequence is a key or a comparison target.</li>
+<li>If a stream cipher checks transformed input against stored bytes, test whether the same transform recovers the input.</li>
+<li>Confirm the recovered bytes against every gate and, where the original artifact is available, the unmodified checker.</li>
+</ol>
+<p>This list comes from the recorded solve. It is a method to try on similar puzzles, not a claim that every serialized Python checker uses RC4.</p>
+</details>
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009"></script>
+</body>
+</html>
