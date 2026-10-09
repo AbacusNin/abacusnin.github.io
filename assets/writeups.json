@@ -90,5 +90,20 @@
     ],
     "summary": "Fifteen playable MP4 files each carried a small piece of one PDF in a trailing uuid box. I let the PDF structure and zlib checksum put the pieces back in order.",
     "url": "/cyber-ops/ctf-writeups/forensics/mp4-uuid-pdf-reconstruction/"
+  },
+  {
+    "title": "The Calculator That Renamed Itself",
+    "category": "Malware Analysis",
+    "difficulty": "Not provided",
+    "date": "2026-10",
+    "tags": [
+      "ELF",
+      "process masquerading",
+      "argv overwrite",
+      "raw sockets",
+      "static analysis"
+    ],
+    "summary": "A trojanized calculator detached from its terminal and overwrote its own command line with a familiar service name. I traced that rename in a stripped ELF without running its backdoor.",
+    "url": "/cyber-ops/ctf-writeups/malware/trojanized-calculator-process-masquerade/"
   }
 ]
