@@ -16,5 +16,14 @@
     "date": "2026-10",
     "tags": ["Wi-Fi", "probe requests", "MAC randomization", "PNL leakage", "device tracking", "SQLite forensics"],
     "summary": "Found the one device in a 39,000-device Wi-Fi probe capture that never randomized its MAC, then read its leaked saved-network list back as a travel itinerary. The whole solve turned on a single bit."
+  },
+  {
+    "title": "Four Merits and a Final Petition",
+    "url": "/cyber-ops/ctf-writeups/ai/llm-court-gatekeeper/",
+    "category": "AI Security",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": ["LLM gatekeeper", "prompt injection", "stateful authorization", "purple team", "access control"],
+    "summary": "Two requests failed against a courtly LLM. I learned its rules, earned four merits, and corrected a final petition to recover the flag, then carried the lesson into access control and purple team testing."
   }
 ]
