@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Rotation and Recovery - CTF Writeups</title>
-  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-1">
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
   <meta name="description" content="I recovered a 128-bit key from a stateful protocol from a man-in-the-middle seat, by turning the verifier into a yes/no oracle and leaning on a weak, factorable key schedule.">
   <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/rotation-and-recovery/">
   <meta property="og:type" content="article">
@@ -115,7 +115,8 @@
 </tbody>
 </table></div>
 <p>The part I'm proud of is that neither weakness was enough on its own. I had to chain them: use the editable rotation commands to push the key where I wanted, then use the verifier as a yes/no oracle to test where it landed. What made it tractable was the key schedule's algebra. The modulus factored, so instead of hunting one 128-bit key, I could recover a handful of small pieces independently and add up the cost rather than multiply it. What I shipped was a WebAssembly client that only spoke through the host's allowed calls and rebuilt the key live, from whatever state each run handed it.</p>
-<h2>2. Techniques, Tooling, and Actions Taken</h2>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
 <h3>Initial Artifact Triage</h3>
 <ul>
 <li>The challenge archive gave me the execution model, the WebAssembly ABI, and a Python simulator. Pretty good starting stack. </li>
@@ -197,7 +198,10 @@ D. Similar to the runtime-computed tables, a real-time scheduler could probably 
 <li>Submitting through a manually constructed API route when the live interface expected a WASM upload. Figuring out how the challenge worked consumed critical early cycles in HTTP debugging before I recognized the internal-runner mechanism.</li>
 <li>Assuming the mathematically canonical payload was the cheapest one to produce. It was not as edit cost was weighted by nibble transition and algebraically equivalent payloads could still cost different amounts of ink and whiteout against the same donor. This realization came too late, during live-event development and real-time scoring.</li>
 </ul>
-<h2>3. Tooling and Scripts</h2>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
 <details class="fold">
 <summary>Show the tooling and scripts</summary>
 <p>This section includes sanitized code patterns used or derived during the exercise.</p>
@@ -350,7 +354,10 @@ for seed in &lt;SEED_1&gt; &lt;SEED_2&gt; &lt;SEED_3&gt;; do
 done
 </code></pre>
 </details>
-<h2>4. Concept Review</h2>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Review</summary>
 <h3>The protocol's invariant failures</h3>
 <p>Two exploitable protocol primitives, amplified by the algebraic key-schedule structure, made recovery achievable.</p>
 <ol>
@@ -401,7 +408,10 @@ C. How I ordered testing</p>
 1. Finding the vulnerability is one skill; 
 2. Engineering the exploit against an objective is a second one. </p>
 <p>In KoTH events or engagements with a constrained action budget, the second skill decides how you finish.</p>
-<h2>5. Exploit/Analysis Mechanics</h2>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit/Analysis Mechanics</summary>
 <h3>Step 1: Establish Primitives Over the Message Flow</h3>
 <p>The solver waits for interceptable messages and treats any sufficiently long in-flight message as a candidate donor. </p>
 <p>Operational constraints:
@@ -462,7 +472,10 @@ D. For repeated-factor components, explicitly avoiding coefficients divisible by
 1. I have the solver write the reconstructed key into WASM memory at a known offset.
 2. Then, call the host success function with a pointer to that memory. 
 3. A successful return code confirms that my reconstruction matches the target's protected initial key.</p>
-<h2>6. Lessons Learned</h2>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned</summary>
 <h3>Methodology Validation</h3>
 <p>The biggest thing this drilled into me is that an interactive protocol is a state machine. Each message moves it to a new state, and the exploit lived in how those moves composed, never in a single bad packet. The other habit that paid off was getting the boring part working first. My throwaway fixed-seed solver was never going to win the event, but it proved the memory layout, the imports, and the call mechanics before I touched any of the hard math. Validate the runtime, then build the exploit.</p>
 <h3>Gaps and/or Inefficiencies</h3>
@@ -510,7 +523,10 @@ D. For repeated-factor components, explicitly avoiding coefficients divisible by
 </tr>
 </tbody>
 </table></div>
-<h2>7. Extrapolation</h2>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
 <h3>How I Developed</h3>
 <p>This one leaned on skills I already had and skills I didn't, and I had to braid them together on the clock: read the protocol, find the weakness, build the exploit, and then make it cheap. </p>
 <ol>
@@ -602,7 +618,10 @@ I. Treat retry behavior as a security signal when paired with validation anomali
 </tr>
 </tbody>
 </table></div>
-<h2>8. Reusable Tools, Scripts, and Artifacts</h2>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
 <details class="fold">
 <summary>Show the reusable tools and artifacts</summary>
 <h3>Triage Decision Tree</h3>
@@ -735,7 +754,10 @@ def choose_cheapest_payload(
 <li>Include host-call, delay, and failure-risk costs in a higher-level objective when they materially affect the live score.</li>
 </ol>
 </details>
-<h2>9. Framework Mapping</h2>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
 <details class="fold">
 <summary>Show the framework mapping</summary>
 <p>Even though this effectively was a simulation, this mapping allowed me to take the attack full circle.
@@ -861,7 +883,10 @@ I used ATT&amp;CK as the baseline, and where I could and it was accurate, I incl
 </tbody>
 </table></div>
 </details>
-<h2>10. Threat Intel and Standards Integration</h2>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
 <details class="fold">
 <summary>Show the threat-intel and standards mapping</summary>
 <h3>STIX representation</h3>
@@ -939,7 +964,10 @@ I used ATT&amp;CK as the baseline, and where I could and it was accurate, I incl
 <p>STIG: N/A, as this exercise used a custom simulator rather than a deployed OS, APP, platform, etc. 
 CIS: Control concepts still map cleanly to CIS Controls and NIST SP 800-53 as the relevant defensive requirements are transport integrity, session authenticity, logging, monitoring, and cryptographic design review.</p>
 </details>
-<h2>11. Controls Mapping and Mitigation Realization</h2>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
 <details class="fold">
 <summary>Show the controls mapping</summary>
 <h3>11a. Standards Mapping</h3>
@@ -1172,7 +1200,10 @@ In production, I would need to consider the scheduled lookback and suppression b
 2. The retry analytic correlates ACKs through a stable rotation identifier or message hash; schemas in prod should normalize sender and recipient direction before calculating the ratio. 
 3. A threshold below 0.2 tolerates some background loss while still surfacing sustained retry behavior.</p>
 </details>
-<h2>12. Indicators, Artifacts, and Detection Engineering</h2>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
 <details class="fold">
 <summary>Show the detection engineering</summary>
 <h3>Illustrative behavioral indicators</h3>
@@ -1336,7 +1367,10 @@ correlation:
 level: low
 </code></pre>
 </details>
-<h2>13. References</h2>
+
+</details>
+<details class="fold section-fold">
+<summary>13. References</summary>
 <details class="fold">
 <summary>Show the references</summary>
 <ol>
@@ -1361,6 +1395,8 @@ level: low
 <li>Cohen, H., <em>A Course in Computational Algebraic Number Theory</em>, Springer GTM 138, 1993 </li>
 </ol>
 </details>
+
+</details>
         </div>
       </div>
 
@@ -1373,6 +1409,6 @@ level: low
       <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
     </footer>
   </div>
-  <script src="/assets/js/toc.js?v=20261009-1"></script>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
 </body>
 </html>

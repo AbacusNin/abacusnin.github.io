@@ -377,6 +377,8 @@ details.fold > summary::before { content: "[+] "; color: var(--cyan); }
 details.fold[open] > summary::before { content: "[-] "; }
 details.fold > summary:hover { color: var(--text); }
 details.fold[open] > summary { margin-bottom: 12px; }
+details.section-fold { border-top: 1px solid var(--border); padding-top: 12px; }
+details.section-fold > summary { font-size: 13px; letter-spacing: .08em; color: var(--cyan); text-transform: uppercase; }
 
 /* writeup archive */
 .archive-controls { margin: 24px 0 18px; }
