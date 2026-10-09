@@ -137,5 +137,19 @@
     ],
     "summary": "A stereo cat recording hid a brief one-channel burst. I read its sample amplitudes as Morse-like timing after the spectrogram and bit-plane checks came up empty.",
     "url": "/cyber-ops/ctf-writeups/forensics/sample-domain-morse/"
+  },
+  {
+    "title": "The Flag That Read Backward",
+    "category": "Crypto",
+    "difficulty": "Easy",
+    "date": "2026-10",
+    "tags": [
+      "Atbash",
+      "classical cryptography",
+      "substitution cipher",
+      "representation triage"
+    ],
+    "summary": "A series hint pointed toward XOR, but this first token kept the shape of a flag. I tried Atbash, checked the reversible mapping, and submitted the recovered answer.",
+    "url": "/cyber-ops/ctf-writeups/crypto/atbash-flag/"
   }
 ]

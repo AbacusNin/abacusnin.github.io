@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Flag That Read Backward - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="A series hint pointed toward XOR, but this first token kept the shape of a flag. I tried Atbash, checked the reversible mapping, and submitted the recovered answer.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/atbash-flag/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Flag That Read Backward">
+  <meta property="og:description" content="A series hint pointed toward XOR, but this first token kept the shape of a flag. I tried Atbash, checked the reversible mapping, and submitted the recovered answer.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/atbash-flag/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a></p>
+      <div class="page-head">
+        <h1 class="page-title">The Flag That Read Backward</h1>
+        <p class="lead">The series talked about XOR. This first key gave me a much smaller problem: a flag-shaped string whose letters had been reflected across the alphabet.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Recover the flag hidden in one short encoded token, the first key in a larger series.</p>
+<p><strong>What I did.</strong> I inspected its characters and delimiters, tried Atbash, and checked the candidate before submitting it.</p>
+<p><strong>The result.</strong> The decoded answer was accepted by the challenge platform. The worked example below uses a separate, generic string.</p>
+<p><strong>The limit.</strong> The actual token and flag are withheld, so the worked example demonstrates the method rather than reproducing the accepted submission.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Inspect the token; Test the series hint; Reflect the alphabet; Check the candidate; Submit the answer">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Inspect the token</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Letters, braces, and underscores</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Test the series hint</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Keep XOR for the later key stage</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Reflect the alphabet</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Apply Atbash to each letter</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Check the candidate</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Readability, format, round trip</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Submit the answer</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Platform accepted the flag</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Classical cryptography; monoalphabetic substitution</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Easy</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved; submitted answer accepted</td>
+</tr>
+<tr>
+<td>Given</td>
+<td>One short encoded token and a series hint about later XOR combination</td>
+</tr>
+<tr>
+<td>Method</td>
+<td>Atbash reflection of Latin letters; other characters unchanged</td>
+</tr>
+<tr>
+<td>Validation</td>
+<td>Readable decode, expected flag structure, reversible transform, accepted submission</td>
+</tr>
+<tr>
+<td>Public example</td>
+<td><code>uozt{zgyzhs_rh_zm_rmelofgrlm}</code> becomes <code>flag{atbash_is_an_involution}</code></td>
+</tr>
+<tr>
+<td>Scope</td>
+<td>A self-contained puzzle; no live system or defender telemetry</td>
+</tr>
+</tbody>
+</table>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I had a short token and a taunting message. This was the first key in a series whose later framing mentioned combining keys with XOR. My immediate job was narrower: recover the flag represented by this one token. I had no program to reverse, no service to query, and no traffic capture. The token itself was the entire artifact.</p>
+<p>The answer was expected to fit a <code>&lt;ctf-prefix&gt;{...}</code> wrapper. I do not show the challenge's actual token or recovered flag here. The example throughout this page is a generic pair made to show the same transform. The challenge was a cipher puzzle, with no observed intrusion, victim, or operational threat model.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I started by looking at the token before reaching for the series hint. Its braces, digits, and underscores were already in place. The body used printable characters and kept the shape of a flag. That made a letter-by-letter substitution a good first test. The shape alone could not eliminate XOR; an XOR result can also be printable. I had no key or byte representation pointing me to that route for this first token, though.</p>
+<p>Atbash was the cheapest test. I reflected each letter across the alphabet, leaving the braces, underscores, and other nonletters alone. The result read as ordinary English and named the technique. I then ran the transform again to make sure my decoder returned the starting text. Finally, I checked the flag wrapper and submitted the actual recovered value. The platform accepted it.</p>
+<p>I did not need to run Caesar shifts or search for an XOR key after that result. Those were alternatives I considered, not failed executions. The series' XOR instruction still mattered for the later combination step; it did not describe the encoding of this first key.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>I used a small Python 3 codec. It has no third-party dependencies. It changes ASCII letters in either case and passes every other character through. The <a href="atbash_codec.py">codec</a> and <a href="sample_atbash.txt">sample fixture</a> are available alongside this page; both use only the generic example.</p>
+<pre><code class="language-python">import sys
+
+SAMPLE_CT = &quot;uozt{zgyzhs_rh_zm_rmelofgrlm}&quot;
+
+
+def atbash(text: str) -&gt; str:
+    out = []
+    for char in text:
+        if &quot;a&quot; &lt;= char &lt;= &quot;z&quot;:
+            out.append(chr(ord(&quot;z&quot;) - (ord(char) - ord(&quot;a&quot;))))
+        elif &quot;A&quot; &lt;= char &lt;= &quot;Z&quot;:
+            out.append(chr(ord(&quot;Z&quot;) - (ord(char) - ord(&quot;A&quot;))))
+        else:
+            out.append(char)
+    return &quot;&quot;.join(out)
+
+
+text = sys.argv[1] if len(sys.argv) &gt; 1 else SAMPLE_CT
+result = atbash(text)
+print(result)
+assert atbash(result) == text
+</code></pre>
+<p>Run it with <code>python3 atbash_codec.py "uozt{zgyzhs_rh_zm_rmelofgrlm}"</code>. The sample prints:</p>
+<pre><code class="language-text">flag{atbash_is_an_involution}
+</code></pre>
+<p>The assertion checks the implementation's round trip. It cannot, on its own, prove that a candidate is the intended flag: Atbash will round-trip any input. Readable content and the accepted submission supplied the stronger checks in this case.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>A monoalphabetic substitution uses one fixed replacement for each letter, wherever that letter appears. Atbash uses the alphabet in reverse order: <code>a</code> maps to <code>z</code>, <code>b</code> to <code>y</code>, and <code>m</code> to <code>n</code>. The same mapping works backward. In symbols, <code>atbash(atbash(x)) == x</code> for text handled by the codec above.</p>
+<p>The unchanged braces and underscores helped me recognize the flag's structure before I knew its letters. Atbash preserved those characters because the codec only changes the Latin alphabet. That is a useful clue, though other transformations can preserve punctuation too. The <a href="https://cacr.uwaterloo.ca/hac/about/chap7.pdf">Handbook of Applied Cryptography, Section 7.3.2</a>, places simple substitution among the classical ciphers and explains why it is unsuitable as modern protection.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>For a lowercase letter at position <code>i</code> from <code>a = 0</code>, Atbash returns the letter at <code>25 - i</code>. The same rule applies separately to uppercase. Digits, braces, underscores, and punctuation keep their positions and values. There is no secret Atbash key to recover; the work is recognizing the mapping and checking the decoded text.</p>
+<p>On the public example, <code>uozt</code> becomes <code>flag</code>, and <code>zgyzhs</code> becomes <code>atbash</code>. A second pass restores <code>uozt{zgyzhs_rh_zm_rmelofgrlm}</code> exactly. This shows that the implementation performs the intended reflection. The example's English phrase was chosen for demonstration and was never the challenge submission.</p>
+<p>For the actual challenge, I used three checks in order: the decode read sensibly, it fit the expected flag structure, and the platform accepted the submitted value. The last check establishes the challenge outcome. I cannot use the round trip to claim that Atbash is uniquely identified from character shape alone. This method also assumes Latin letters. A keyed substitution or a different alphabet would need a different analysis.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned</summary>
+<p>The series hint almost decided my first move for me. Looking at the token was faster. Its printable, delimiter-preserving form suggested a substitution worth testing, and Atbash resolved it without a search. I would make that quick representation check again before applying the larger story of a multi-part challenge to a single artifact.</p>
+<p>The round trip was still worth doing. It caught the kind of coding mistake that can hide behind a plausible output, especially around uppercase letters and punctuation. I kept its meaning narrow: it checks the codec, while the readable answer and platform response check the solve. I had no reason to keep transforming this token after acceptance.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Operational Extrapolation</summary>
+<h3>Individual Practitioner Development</h3>
+<p>This gave me a compact exercise in separating representation from cipher choice. I could recognize a structure-preserving transform, test the simplest candidate, and verify the code without confusing that verification with proof of the answer. A sensible next exercise would add a keyed substitution or a polyalphabetic cipher, then use known plaintext to test a proposed key. Recognition alone would not recover that text.</p>
+<h3>Security Operations</h3>
+<p>I have no production detection result from this challenge. It supplied a static string, and my decoder ran locally. In a real investigation, a similarly obfuscated string would need context: where it was found, what process used it, and what behavior followed its decoding. That context could justify an analytic. This token alone does not.</p>
+<h3>Intelligence Operations</h3>
+<p>Recognizing a classical cipher is useful practice for reading encoded material. This case supplied no collection source, actor, campaign, or attribution evidence. I would preserve the decoded text and its transform in an intelligence work record, but I would not turn the puzzle into a claim about an adversary.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The <a href="atbash_codec.py">Atbash codec</a> accepts one string and prints its reflected form. It needs Python 3 and the standard library only. Its built-in sample makes a quick smoke check possible; the <a href="sample_atbash.txt">sample fixture</a> records both sides of that example. Neither file contains the challenge value. The codec works on ASCII Latin letters and leaves all other characters unchanged.</p>
+<p>I also keep a short triage sequence for similar puzzles:</p>
+<ol>
+<li>Record the raw character set, length, and delimiters.</li>
+<li>Ask which transforms could leave that structure intact. Keep other possibilities open.</li>
+<li>Try inexpensive candidates such as Atbash or ROT-N before a keyed search when the token supports it.</li>
+<li>Check implementation behavior separately from answer correctness.</li>
+<li>Let the artifact and the final verifier settle the result, even if a series theme suggests another route.</li>
+</ol>
+<p>The codec makes substitution checks repeatable. It only applies Atbash, and its round-trip assertion cannot identify an unknown cipher.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Applicability and Mapping</summary>
+<p>I did not map this solve to ATT&amp;CK. <a href="https://attack.mitre.org/techniques/T1140/">T1140</a> describes an adversary decoding or deobfuscating information during activity on a system. Here I, as the puzzle solver, decoded a token handed to me. The exercise contains no evidence of an adversary doing that on a host.</p>
+<p>I also found no evidence-based anchor for D3FEND, CAPEC, STRIDE, OWASP, or a NIST SP 800-series security practice. Naming those frameworks would suggest an operational case that the challenge never supplied. Section 7 discusses the skill I practiced without assigning a framework technique.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intelligence and Standards Integration</summary>
+<p>This token did not give me an indicator of compromise, an attack pattern, or a course of action to exchange. I have no STIX object or TAXII feed to produce. A STIG or CIS Safeguard would likewise require a system and a control question absent here. If a future investigation found Atbash text in malware or traffic, the surrounding evidence would determine whether any of those standards helped describe it.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<p>No control was tested or implemented in this exercise. I had no target configuration, software weakness, or defender environment to map to NIST SP 800-53, CIS Controls v8, STIG, CMMC, PCI DSS, or HIPAA. There is no mitigation realization to report. For this puzzle, the concrete result was the accepted decode.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>The supplied token is a challenge artifact, not a production indicator. The local decode created no host or network telemetry relevant to detection engineering. I therefore have no YARA or Sigma rule, SIEM query, hunt result, or SOC analytic to claim. If the same encoding appeared in a real artifact, I would first establish the file or process context and then test whether a detector could distinguish it from ordinary text.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow diagram above</a> shows the decision I made before decoding: inspect the token, set aside the later XOR combination hint, then try an alphabet reflection. It also keeps the round-trip code check separate from the platform's acceptance of the answer.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<p><strong>REF.001.</strong> Reference text from CRC Press and the University of Waterloo's Centre for Applied Cryptographic Research. A. J. Menezes, P. C. van Oorschot, and S. A. Vanstone, <a href="https://cacr.uwaterloo.ca/hac/about/chap7.pdf">Handbook of Applied Cryptography, Chapter 7, Section 7.3.2</a>, 1996. First edition, fifth printing (2001), ISBN 0-8493-8523-7. Supports the simple substitution explanation in Sections 4 and 5. Source record accessed October 5, 2026.</p>
+<p><strong>REF.002.</strong> Framework documentation from MITRE, <a href="https://attack.mitre.org/techniques/T1140/">ATT&amp;CK for Enterprise T1140: Deobfuscate/Decode Files or Information</a>. Living framework; consult the linked page for its current version. Supports the non-applicability assessment in Section 9. Source record accessed October 5, 2026.</p>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
