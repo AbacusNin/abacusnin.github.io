@@ -184,7 +184,7 @@ body.plain { background-image: none; }
 /* on-page table of contents */
 .layout { display: flex; gap: 40px; align-items: flex-start; }
 .layout > .prose { flex: 1 1 auto; min-width: 0; }
-.toc { flex: 0 0 168px; position: sticky; top: 24px; }
+.toc { flex: 0 0 168px; position: sticky; top: 24px; max-height: calc(100vh - 48px); overflow-y: auto; }
 .toc-label {
   font-family: var(--mono);
   font-size: 11px;
@@ -207,7 +207,7 @@ body.plain { background-image: none; }
 
 @media (max-width: 760px) {
   .layout { display: block; }
-  .toc { position: static; flex-basis: auto; margin-bottom: 18px; }
+  .toc { position: static; flex-basis: auto; max-height: none; overflow: visible; margin-bottom: 18px; }
   .prose { min-width: 0; }
   .prose pre, .tablewrap { max-width: 100%; }
 }
