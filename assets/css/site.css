@@ -398,6 +398,7 @@ details.section-fold > summary { font-size: 13px; letter-spacing: .08em; color: 
 .wu-title { display: block; font-family: var(--mono); font-size: 17px; font-weight: 700; color: var(--text); }
 .wu-card:hover .wu-title { color: var(--cyan); }
 .wu-desc { display: block; margin: 7px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; max-width: 70ch; }
+.wu-tags { display: block; margin: 9px 0 0; color: var(--muted); font-family: var(--mono); font-size: 11px; line-height: 1.6; max-width: 90ch; }
 .wu-date { display: block; margin: 9px 0 0; font-family: var(--mono); font-size: 11px; color: var(--muted); }
 .archive-empty { color: var(--muted); padding: 18px 0; }
 

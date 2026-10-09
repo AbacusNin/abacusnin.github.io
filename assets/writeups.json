@@ -7,13 +7,22 @@
     "date": "2026-05",
     "tags": [
       "MITM",
+      "message tampering",
       "verification oracle",
+      "finite-field arithmetic",
       "CRT",
+      "Hensel lift",
+      "WASM ABI",
+      "cost-objective optimization",
+      "detection engineering"
+    ],
+    "summary": "Recovered a 128-bit key from a stateful protocol using an adversary-in-the-middle seat, a verification oracle, and a factorable key schedule, then cut the edit cost with a two-stage residue lift.",
+    "aliases": [
       "WebAssembly",
       "GF(2)",
       "key recovery"
     ],
-    "summary": "Recovered a 128-bit key from a stateful protocol using an adversary-in-the-middle seat, a verification oracle, and a factorable key schedule, then cut the edit cost with a two-stage residue lift."
+    "status": "Solved; seed-independent solver shipped; incremental cost optimizations applied"
   },
   {
     "title": "Deanonymizing a Wi-Fi Device from a Probe-Request Capture",
@@ -22,14 +31,20 @@
     "difficulty": "Medium",
     "date": "2026-10",
     "tags": [
-      "Wi-Fi",
-      "probe requests",
+      "Wi-Fi probe requests",
       "MAC randomization",
+      "locally-administered bit",
       "PNL leakage",
       "device tracking",
-      "SQLite forensics"
+      "SQLite forensics",
+      "OSINT itinerary"
     ],
-    "summary": "Found the one device in a 39,000-device Wi-Fi probe capture that never randomized its MAC, then read its leaked saved-network list back as a travel itinerary. The whole solve turned on a single bit."
+    "summary": "Found the one device in a 39,000-device Wi-Fi probe capture that never randomized its MAC, then read its leaked saved-network list back as a travel itinerary. The whole solve turned on a single bit.",
+    "aliases": [
+      "Wi-Fi",
+      "probe requests"
+    ],
+    "status": "Solved"
   },
   {
     "title": "Four Merits and a Final Petition",
@@ -38,15 +53,21 @@
     "difficulty": "Medium",
     "date": "2026-10",
     "tags": [
-      "LLM security",
-      "prompt injection",
+      "llm-security",
+      "prompt-injection",
+      "jailbreak-resistance",
+      "sensitive-information-disclosure",
+      "system-prompt-leakage",
+      "stateful-authorization",
+      "in-character-roleplay"
+    ],
+    "summary": "A courtly LLM refused my direct and acrostic requests. I earned four merits, corrected a final petition, and submitted the disclosed flag successfully. The case becomes a proposed gateway and purple team test.",
+    "aliases": [
       "jailbreak testing",
-      "stateful authorization",
-      "sensitive information disclosure",
       "purple team",
       "access control"
     ],
-    "summary": "A courtly LLM refused my direct and acrostic requests. I earned four merits, corrected a final petition, and submitted the disclosed flag successfully. The case becomes a proposed gateway and purple team test."
+    "status": "Solved"
   },
   {
     "title": "Three Code Objects in One Python Function",
@@ -54,14 +75,20 @@
     "difficulty": "Medium",
     "date": "2026-10",
     "tags": [
-      "Python bytecode",
+      "python-bytecode",
       "marshal",
-      "RC4",
-      "code objects",
-      "reverse engineering"
+      "code-object-swapping",
+      "cross-version-bytecode",
+      "rc4",
+      "flag-checker",
+      "reverse-engineering"
     ],
     "summary": "A Python flag checker kept replacing one function's code object. I matched its bytecode to the right interpreter, read the RC4 check, and reversed it to recover the accepted input.",
-    "url": "/cyber-ops/ctf-writeups/reversing/python-bytecode-rc4/"
+    "url": "/cyber-ops/ctf-writeups/reversing/python-bytecode-rc4/",
+    "aliases": [
+      "code objects"
+    ],
+    "status": "Solved"
   },
   {
     "title": "The Calculator That Waited for an ICMP Echo",
@@ -70,13 +97,17 @@
     "date": "2026-10",
     "tags": [
       "ELF",
-      "ICMP",
+      "stripped binary",
       "raw sockets",
+      "ICMP",
       "traffic signaling",
-      "reverse shell"
+      "reverse shell",
+      "static analysis",
+      "trojanized binary"
     ],
     "summary": "A stripped calculator contained a passive raw-ICMP receive loop. I read its packet checks and identified the crafted Echo Request that activated a reverse-shell callback.",
-    "url": "/cyber-ops/ctf-writeups/malware/trojanized-calculator-icmp/"
+    "url": "/cyber-ops/ctf-writeups/malware/trojanized-calculator-icmp/",
+    "status": "Solved"
   },
   {
     "title": "Fifteen Videos, One Hidden PDF",
@@ -85,13 +116,21 @@
     "date": "2026-10",
     "tags": [
       "MP4",
-      "uuid boxes",
-      "PDF",
+      "ISO-BMFF",
+      "uuid` box",
+      "data hiding",
       "file carving",
-      "DEFLATE"
+      "PDF reconstruction",
+      "DEFLATE/zlib"
     ],
     "summary": "Fifteen playable MP4 files each carried a short PDF fragment in a trailing uuid box. I used PDF structure and zlib validation to restore the document despite misleading filenames.",
-    "url": "/cyber-ops/ctf-writeups/forensics/mp4-uuid-pdf-reconstruction/"
+    "url": "/cyber-ops/ctf-writeups/forensics/mp4-uuid-pdf-reconstruction/",
+    "aliases": [
+      "uuid boxes",
+      "PDF",
+      "DEFLATE"
+    ],
+    "status": "Solved"
   },
   {
     "title": "The Calculator That Renamed Itself",
@@ -99,14 +138,25 @@
     "difficulty": "Medium",
     "date": "2026-10",
     "tags": [
-      "ELF",
-      "process masquerading",
-      "argv overwrite",
-      "raw sockets",
-      "static analysis"
+      "trojanized-software",
+      "supply-chain",
+      "process-masquerade",
+      "argv0-overwrite",
+      "raw-socket",
+      "ICMP-backdoor",
+      "traffic-signaling",
+      "reverse-shell",
+      "static-analysis",
+      "ELF"
     ],
     "summary": "A trojanized calculator detached from its terminal and overwrote its own command line with a familiar service name. I traced that rename in a stripped ELF without running its backdoor.",
-    "url": "/cyber-ops/ctf-writeups/malware/trojanized-calculator-process-masquerade/"
+    "url": "/cyber-ops/ctf-writeups/malware/trojanized-calculator-process-masquerade/",
+    "aliases": [
+      "process masquerading",
+      "argv overwrite",
+      "raw sockets"
+    ],
+    "status": "Solved"
   },
   {
     "title": "When the Answer File Stopped Carrying Information",
@@ -116,12 +166,18 @@
     "tags": [
       "Haskell",
       "GHC",
+      "type families",
       "type-level programming",
       "modular arithmetic",
-      "constraint solving"
+      "constraint inversion",
+      "flag-format analysis"
     ],
     "summary": "I read a Haskell compile-time transform, inverted its answer forms, and found the point where its state became zero and the transcript stopped revealing the key.",
-    "url": "/cyber-ops/ctf-writeups/reversing/type-level-dialect/"
+    "url": "/cyber-ops/ctf-writeups/reversing/type-level-dialect/",
+    "aliases": [
+      "constraint solving"
+    ],
+    "status": "Solved"
   },
   {
     "title": "The Click Between Two Meows",
@@ -130,13 +186,20 @@
     "date": "2026-10",
     "tags": [
       "audio steganography",
+      "Morse code",
       "waveform analysis",
+      "stereo channel isolation",
+      "spectrogram decoy",
+      "CTF forensics"
+    ],
+    "summary": "A stereo cat recording hid a brief one-channel burst. I read its sample amplitudes as Morse-like timing after the spectrogram and bit-plane checks came up empty.",
+    "url": "/cyber-ops/ctf-writeups/forensics/sample-domain-morse/",
+    "aliases": [
       "stereo channels",
       "Morse-like encoding",
       "sample-domain analysis"
     ],
-    "summary": "A stereo cat recording hid a brief one-channel burst. I read its sample amplitudes as Morse-like timing after the spectrogram and bit-plane checks came up empty.",
-    "url": "/cyber-ops/ctf-writeups/forensics/sample-domain-morse/"
+    "status": "Solved"
   },
   {
     "title": "The Flag That Read Backward",
@@ -144,12 +207,18 @@
     "difficulty": "Easy",
     "date": "2026-10",
     "tags": [
-      "Atbash",
-      "classical cryptography",
-      "substitution cipher",
-      "representation triage"
+      "atbash",
+      "monoalphabetic-substitution",
+      "reciprocal-cipher",
+      "involution",
+      "representation-triage"
     ],
     "summary": "A series hint pointed toward XOR, but this first token kept the shape of a flag. I tried Atbash, checked the reversible mapping, and submitted the recovered answer.",
-    "url": "/cyber-ops/ctf-writeups/crypto/atbash-flag/"
+    "url": "/cyber-ops/ctf-writeups/crypto/atbash-flag/",
+    "aliases": [
+      "classical cryptography",
+      "substitution cipher"
+    ],
+    "status": "Solved"
   }
 ]
