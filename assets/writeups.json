@@ -122,5 +122,20 @@
     ],
     "summary": "I read a Haskell compile-time transform, inverted its answer forms, and found the point where its state became zero and the transcript stopped revealing the key.",
     "url": "/cyber-ops/ctf-writeups/reversing/type-level-dialect/"
+  },
+  {
+    "title": "The Click Between Two Meows",
+    "category": "Forensics",
+    "difficulty": "Medium-hard (self-rated)",
+    "date": "2026-10",
+    "tags": [
+      "audio steganography",
+      "waveform analysis",
+      "stereo channels",
+      "Morse-like encoding",
+      "sample-domain analysis"
+    ],
+    "summary": "A stereo cat recording hid a brief one-channel burst. I read its sample amplitudes as Morse-like timing after the spectrogram and bit-plane checks came up empty.",
+    "url": "/cyber-ops/ctf-writeups/forensics/sample-domain-morse/"
   }
 ]

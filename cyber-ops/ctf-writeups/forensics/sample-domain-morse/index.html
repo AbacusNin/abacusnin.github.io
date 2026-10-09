@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Click Between Two Meows - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="A stereo cat recording hid a brief one-channel burst. I read its sample amplitudes as Morse-like timing after the spectrogram and bit-plane checks came up empty.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/sample-domain-morse/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Click Between Two Meows">
+  <meta property="og:description" content="A stereo cat recording hid a brief one-channel burst. I read its sample amplitudes as Morse-like timing after the spectrogram and bit-plane checks came up empty.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/sample-domain-morse/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a></p>
+      <div class="page-head">
+        <h1 class="page-title">The Click Between Two Meows</h1>
+        <p class="lead">The hint sent me toward the spectrogram. The answer sat in a few milliseconds of left-channel samples between the meows.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Recover a hidden sentence from a 16-bit stereo WAV of cat vocalizations.</p>
+<p><strong>What I did.</strong> I compared the channels by region, isolated a short left-only burst, and decoded its amplitude run lengths.</p>
+<p><strong>The result.</strong> The run lengths produced a readable sentence, and the submitted flag was accepted by the scoring platform.</p>
+<p><strong>The limit.</strong> This method depends on a clean amplitude gap and an isolated channel; no production detection was validated.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Inspect the stereo WAV; Compare both channels; Threshold sample values; Decode run lengths; Check the result">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Inspect the stereo WAV</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Check spectrogram and bit planes</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Compare both channels</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Find a short left-only burst</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Threshold sample values</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Read loud marks and quiet gaps</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Decode run lengths</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Map the Morse-like timing to text</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Check the result</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Readable message and accepted flag</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Audio forensics and sample-domain steganography</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium-hard (self-rated)</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved; manual submission accepted</td>
+</tr>
+<tr>
+<td>Carrier</td>
+<td>Roughly four seconds of 16-bit, 48 kHz stereo PCM with two cat vocalizations</td>
+</tr>
+<tr>
+<td>Payload location</td>
+<td>A short left-channel burst between the two meows, around 1.4 seconds</td>
+</tr>
+<tr>
+<td>Encoding</td>
+<td>Loud marks of one or three samples; quiet gaps of one, three, or five samples</td>
+</tr>
+<tr>
+<td>Output</td>
+<td>A short English sentence, withheld here as the flag value</td>
+</tr>
+</tbody>
+</table>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I was given one stereo WAV and asked to find a message hidden in it. The recording was a few seconds of cat sounds. The prompt made an emphatic pun on a familiar audio editor, so the spectrogram was the obvious place to look first. The expected answer was a short English sentence inside the event's flag wrapper. I keep the sentence itself out of this public account.</p>
+<p>I had the audio file and worked offline. There was no service to query, no credentials, and no network target. The task was to find where the data lived in the WAV and turn it back into text. The challenge did not present an adversary or an operational environment, so the defender ideas later in this article are separate proposals.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I checked the carrier before guessing at a cipher. The file was valid 16-bit stereo PCM at 48 kHz, about four seconds long. I hashed the original and compared its channels. They were different, which made the stereo split worth examining instead of immediately mixing to mono.</p>
+<p>The hint pulled me toward a spectrogram. I tried several window sizes on both channels, then used frequency-bin whitening and column normalization to bring out faint structure. I saw the harmonic combs and pitch glides of two ordinary meows, but no drawn letters. I kept going through the other common hiding places. The LSB stream, whether read by channel or interleaved and in either bit order, yielded no file signature. RIFF inspection showed only the expected <code>fmt</code> and <code>data</code> chunks, a consistent size, and no appended payload. A stereo difference pointed to one brief transient rather than a continuous hidden track. I also checked for DTMF and sped-up speech; the tones followed the cat sounds, and the overlapping DTMF frequencies did not form clean dual tones.</p>
+<p>The useful pivot was much simpler: I measured amplitude by time region and by channel. Between the two meows, near 1.4 seconds, the left channel had a short high-amplitude burst. The right channel was effectively silent there. I isolated that burst and thresholded its samples into loud marks and quiet gaps. Run-length encoding gave me marks of one or three samples and gaps of one, three, or five. That was enough structure to try a Morse-like decode. It produced a readable sentence with no unmapped tokens, and my manual flag submission was accepted.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>I used Python's <code>wave</code> module with NumPy for the sample work; SciPy and Matplotlib helped with the frequency and visual checks. The first pass kept the channels separate and measured the file before any decoding:</p>
+<pre><code class="language-python">import wave
+import numpy as np
+
+with wave.open(&quot;carrier.wav&quot;, &quot;rb&quot;) as wav:
+    rate = wav.getframerate()
+    channels = wav.getnchannels()
+    raw = wav.readframes(wav.getnframes())
+
+samples = np.frombuffer(raw, dtype=np.int16).reshape(-1, channels)
+left = samples[:, 0].astype(np.int64)
+right = samples[:, 1].astype(np.int64)
+print(rate, channels, samples.shape)  # 48000, 2, (frame_count, 2)
+print(np.array_equal(left, right))     # False
+</code></pre>
+<p>I marked the two cover sounds at roughly 0.28-0.97 and 2.47-3.12 seconds, then looked for left-channel samples above an absolute amplitude of 4,000 outside those windows. The reference channel had no samples above that threshold at the matching positions. The windows and threshold belong to this carrier; they are inputs to check on a different file.</p>
+<pre><code class="language-python">from itertools import groupby
+
+times = np.arange(len(left)) / rate
+cover = ((times &gt;= 0.28) &amp; (times &lt;= 0.97)) | ((times &gt;= 2.47) &amp; (times &lt;= 3.12))
+loud = np.flatnonzero((np.abs(left) &gt; 4000) &amp; ~cover)
+lo, hi = int(loud.min()), int(loud.max())
+bits = (np.abs(left[lo:hi + 1]) &gt; 4000).astype(int)
+runs = [(value, sum(1 for _ in group)) for value, group in groupby(bits)]
+</code></pre>
+<p>The decoder then reads one-sample loud runs as dots and three-sample loud runs as dashes. A one-sample quiet run separates marks within a letter, three samples end a letter, and five end a word. It maps each finished dot/dash token through the Morse alphabet and flushes the final token after the loop. I would reject any unexpected run length or unmapped token rather than silently turn it into text.</p>
+<p>My working decoder also used a neutral synthetic WAV carrying <code>SAMPLE MORSE</code> to check the generic extraction path. The challenge decode was checked separately by its readable output and the accepted submission. A synthetic round trip verifies the implementation pattern; it does not prove that a detector will find this method in arbitrary noisy audio.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>Morse turns letters into short and long marks. International Morse sets a dash at three dot units, a one-unit gap between marks in a letter, three between letters, and seven between words. Here the unit was one audio sample. At 48 kHz that is about 20.8 microseconds. The entire hidden sentence occupied only a few milliseconds.</p>
+<p>This carrier followed the dot/dash and character-gap ratios, but the observed word gap was <strong>five samples</strong>, not the standard seven. I call it Morse-like sample timing for that reason. The word boundary came from the actual run lengths and the successful decode, not from forcing the data to fit the standard.</p>
+<p>The payload was in the amplitude of sample values, not in their least-significant bits. A spectrogram averaged its short burst into a click-like vertical feature. The high bits carried the loud/quiet pattern, while the usual LSB test had nothing useful to read. The right channel gave me a quiet reference during the burst, which made the left-channel anomaly much easier to isolate.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>The precondition was unusually favorable. The injected marks were much louder than the quiet samples, and the corresponding right-channel region was silent. I could pick a threshold between those groups without trying to recover a weak signal under the meows.</p>
+<p>I split the channels, excluded the two cover-sound intervals, and found the left-channel event near 1.4 seconds. I took the sample span from its first to last loud mark, turned absolute amplitudes above 4,000 into <code>1</code>, and treated the rest as <code>0</code>. Run-length encoding reduced that bit stream to a short list of mark and gap lengths.</p>
+<table>
+<thead>
+<tr>
+<th>Observed run</th>
+<th>Interpretation in this carrier</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Loud, 1 sample</td>
+<td>Dot</td>
+</tr>
+<tr>
+<td>Loud, 3 samples</td>
+<td>Dash</td>
+</tr>
+<tr>
+<td>Quiet, 1 sample</td>
+<td>Next mark in the same letter</td>
+</tr>
+<tr>
+<td>Quiet, 3 samples</td>
+<td>Next letter</td>
+</tr>
+<tr>
+<td>Quiet, 5 samples</td>
+<td>Next word</td>
+</tr>
+</tbody>
+</table>
+<p>The one/three loud runs and one/three/five quiet runs were tightly separated. With those lengths, the token stream mapped to a grammatical sentence without unknown symbols. I then checked the result against the expected answer structure and submitted it. The platform accepted the flag. That confirms the challenge answer; it does not prove the same threshold and timing rules would work on a different recording.</p>
+<p>This decoder assumes a clean amplitude split, a stable sample clock, and one channel whose payload can be compared against a quieter reference. Noise, resampling, lossy compression, a weaker mark amplitude, or a signal spread over both channels would require different isolation and timing rules. Treating every short click as Morse would produce false leads.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned</summary>
+<p>The audio-editor hint was worth testing, and the spectrogram result was worth recording. It did not contain the message. I spent longer there than I needed to because the pun made that layer feel likely. The cheap per-channel amplitude survey should have come earlier.</p>
+<p>For the next audio puzzle, I would inspect frequency, bit planes, container structure, and channel-by-channel time series near the start of triage. I would also mark silence and compare it with the other channel. A loud event in one channel during reference-channel silence is a much sharper lead than a faint pattern I hope to see in a spectrogram.</p>
+<p>The run lengths settled the encoding. One and three samples for marks, followed by three distinct gap lengths, gave me a testable model. I still needed to verify every token and the final answer; a plausible phrase alone would have been too easy to overread.</p>
+<table>
+<thead>
+<tr>
+<th>Challenge observation</th>
+<th>Practical audio-forensics habit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Spectrogram showed real meows but no text</td>
+<td>Test the hinted representation and move on when its evidence is exhausted</td>
+</tr>
+<tr>
+<td>One channel carried a burst during quiet audio</td>
+<td>Compare channels by time region before downmixing</td>
+</tr>
+<tr>
+<td>High-amplitude samples carried the pattern</td>
+<td>Inspect raw sample values as well as LSBs</td>
+</tr>
+<tr>
+<td>Run lengths formed clear groups</td>
+<td>Let measured timing define the decoder, including its deviations from a standard</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Operational Extrapolation</summary>
+<p><strong>Individual Practitioner Development.</strong> This solve added sample-domain and stereo-region checks to my audio triage. I would practice the method with synthetic carriers that vary channel assignment, amplitude, noise, and sample rate. That would show when the simple threshold stops working.</p>
+<p><strong>Security Operations.</strong> A crafted CTF WAV is not production telemetry, so I have no SOC detection result to claim. A proposed media-analysis exercise could give an analyst a set of benign recordings and one synthetic one-channel burst, then measure whether channel comparison and run-length inspection find it without flooding the queue with ordinary clicks. Endpoint process behavior and file provenance would be separate evidence if a real incident supplied them.</p>
+<p><strong>Intelligence Operations.</strong> A covert message inside benign media is an illustrative collection concern. This challenge did not provide an actor, distribution path, infrastructure, or attribution evidence. I would need those before turning the carrier into a threat-intelligence report.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The reusable method is a channel-aware burst decoder. Its inputs are a PCM WAV, payload and reference channel numbers, a region or burst-localization rule, an amplitude threshold, and a table of accepted mark and gap lengths. Its output is the decoded text plus the run list that supports it. The examples in Section 3 show the channel split, localization, and run-length core.</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Purpose</th>
+<th>Validation and limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Channel comparison</td>
+<td>Find a short event present in one channel during reference silence</td>
+<td>Worked for this clean stereo carrier; a dual-channel payload would evade this condition</td>
+</tr>
+<tr>
+<td>Amplitude and run-length decoder</td>
+<td>Turn the burst into dot/dash tokens and text</td>
+<td>Recorded challenge decode had no unmapped tokens; exact lengths are carrier-specific</td>
+</tr>
+<tr>
+<td>Neutral <code>SAMPLE MORSE</code> test</td>
+<td>Check that a synthetic burst decodes as expected</td>
+<td>Validates the generic path, not real-world detection performance</td>
+</tr>
+</tbody>
+</table>
+<p>I would keep the run list alongside any decoded phrase. It is the shortest reproducible explanation of why those letters were chosen. I would also expose the threshold and channel choices as inputs, because hard-coding the values from this one WAV would make the method brittle.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Applicability and Mapping</summary>
+<p>MITRE ATT&amp;CK <a href="https://attack.mitre.org/techniques/T1027/003/">T1027.003, Steganography</a> describes adversaries hiding information in media, including audio. The mechanical resemblance is clear, but this puzzle had no adversary or observed intrusion. I use the technique as an <strong>illustrative analogy</strong>, not as a mapped TTP from a real case.</p>
+<p>I found no exercise evidence that would make D3FEND, CAPEC, STRIDE, OWASP, CACAO, or OpenC2 useful here. The proposed media-analysis exercise in Section 7 is a test idea, not a mapped defensive control.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intelligence and Standards Integration</summary>
+<p>The recording supplied no real indicator, distribution channel, command-and-control endpoint, actor, or vulnerability. I have no STIX object to create, TAXII exchange to make, or intelligence claim to attribute. The Morse standard in Section 14 is a reference for timing and alphabet; its seven-unit word spacing also makes the challenge's five-sample deviation visible.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<p>I assessed no operational system or control. A NIST SP 800-53, CIS, STIG, CMMC, PCI DSS, or HIPAA mapping would need an asset and scope that this WAV does not provide. If an organization wanted to screen incoming media, I would first establish the workflow, data volume, allowed formats, and false-positive tolerance. The CTF result alone does not validate a preventive control.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>I have no production IOC or validated YARA, Sigma, or SIEM rule from this file. The measurable artifact is a short high-amplitude mark/gap burst in one channel while the other is quiet. That supports a <strong>proposed forensic triage check</strong>, with required data being lossless stereo samples and per-channel amplitude by time window.</p>
+<p>I would test that check on benign clicks, edits, and recording defects before treating it as suspicious. I would also vary the threshold, channel, sample rate, and noise level. An alert on any one-channel transient would be noisy; the specific run-length groups provide a second filter, but I have not measured its sensitivity or false-positive rate. ATT&amp;CK's steganography entry supplies context for the technique, not validation of this proposed check.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow beside the summary</a> shows the actual solve path from stereo carrier to readable message. The decisive branch was the channel split: the left channel had a brief burst outside the meows, while the right channel stayed quiet at that moment. Thresholding and run-length encoding then exposed the timing.</p>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>What changed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Stereo WAV</td>
+<td>Left and right samples became separate time series</td>
+</tr>
+<tr>
+<td>Left-only burst</td>
+<td>Cover sounds were excluded; the short event became the region of interest</td>
+</tr>
+<tr>
+<td>Binary marks and gaps</td>
+<td>Amplitude above the chosen threshold became <code>1</code>, quiet became <code>0</code></td>
+</tr>
+<tr>
+<td>Run list</td>
+<td>Consecutive values became one/three marks and one/three/five gaps</td>
+</tr>
+<tr>
+<td>Decoded text</td>
+<td>Dot/dash tokens became the hidden sentence, then the accepted flag</td>
+</tr>
+</tbody>
+</table>
+<p>This is a transformation path through one file, not an attack timeline.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Use in this article</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://www.itu.int/rec/R-REC-M.1677-1-200910-I/en">ITU-R M.1677-1, International Morse code</a></td>
+<td>Standard Morse alphabet and relative mark/gap timing, including the seven-unit word gap</td>
+</tr>
+<tr>
+<td><a href="https://attack.mitre.org/techniques/T1027/003/">MITRE ATT&amp;CK T1027.003, Steganography</a></td>
+<td>Illustrative framework comparison for hiding data in an audio carrier; no adversary behavior is asserted for this puzzle</td>
+</tr>
+</tbody>
+</table>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
