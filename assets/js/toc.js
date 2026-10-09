@@ -2,16 +2,19 @@
   const box = document.querySelector("[data-toc]");
   if (!box) return;
 
-  const heads = Array.from(document.querySelectorAll("main h2"));
-  if (heads.length < 2) { box.remove(); return; }
+  const sections = Array.from(document.querySelectorAll("main h2, main details.fold > summary"));
+  if (sections.length < 2) { box.remove(); return; }
 
   const slug = (t) => t.toLowerCase().replace(/[^\w]+/g, "-").replace(/^-|-$/g, "");
 
-  const links = heads.map((h) => {
-    if (!h.id) h.id = slug(h.textContent);
+  const links = sections.map((section) => {
+    if (!section.id) section.id = slug(section.textContent);
     const a = document.createElement("a");
-    a.href = "#" + h.id;
-    a.textContent = h.textContent;
+    a.href = "#" + section.id;
+    a.textContent = section.textContent;
+    if (section.tagName === "SUMMARY") {
+      a.addEventListener("click", () => { section.parentElement.open = true; });
+    }
     return a;
   });
 
@@ -19,6 +22,13 @@
   label.className = "toc-label";
   label.textContent = "On this page";
   box.append(label, ...links);
+
+  const openLinkedFold = () => {
+    const section = sections.find((item) => "#" + item.id === window.location.hash);
+    if (section?.tagName === "SUMMARY") section.parentElement.open = true;
+  };
+  openLinkedFold();
+  window.addEventListener("hashchange", openLinkedFold);
 
   const spy = new IntersectionObserver(
     (entries) => {
@@ -29,5 +39,5 @@
     },
     { rootMargin: "0px 0px -70% 0px" }
   );
-  heads.forEach((h) => spy.observe(h));
+  sections.forEach((section) => spy.observe(section));
 })();
