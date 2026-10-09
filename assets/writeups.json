@@ -49,7 +49,7 @@
   {
     "title": "Three Code Objects in One Python Function",
     "category": "Reversing",
-    "difficulty": "Medium",
+    "difficulty": "Moderate (self-rated)",
     "date": "2026-10",
     "tags": [
       "Python bytecode",

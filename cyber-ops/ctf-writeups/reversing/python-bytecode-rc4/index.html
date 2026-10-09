@@ -43,8 +43,8 @@
           <div class="tldr">
 <p><strong>The challenge.</strong> A self-contained Python script accepted or rejected a candidate flag. Its visible source hid the check inside serialized code objects.</p>
 <p><strong>What I did.</strong> I split the embedded blob, inspected each code object, found a compatible CPython version, and read the RC4 data flow from the disassembly.</p>
-<p><strong>The result.</strong> The recorded candidate passed the format gate, reproduced the stored ciphertext, and was accepted by the original checker.</p>
-<p><strong>The limit.</strong> The ZIP holds the writeup but not the challenge script, key, ciphertext, or companion tools. I can report the recorded checks but cannot rerun them from this archive.</p>
+<p><strong>The result.</strong> The recovered input passed the format gate, reproduced the stored ciphertext, and was accepted by the checker.</p>
+<p><strong>The limit.</strong> This local puzzle produced no production telemetry. The blue/purple exercise and detection ideas below are proposed.</p>
           </div>
 <figure class="diagram"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Embedded byte blob; One function; Match CPython; RC4 comparison; Check the answer">
 <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
@@ -58,32 +58,69 @@
 <line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
 <rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Check the answer</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Gate, round trip, original program</text>
 </svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>This case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Area</td>
+<td>Reverse engineering and applied cryptography</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Moderate, by my assessment</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved; the checker accepted the recovered input</td>
+</tr>
+<tr>
+<td>Starting point</td>
+<td>One interactive Python flag checker</td>
+</tr>
+<tr>
+<td>Objective</td>
+<td>Recover the exact input that passes its gate and validator</td>
+</tr>
+<tr>
+<td>Core techniques</td>
+<td>Code-object swapping, <code>marshal</code> inspection, CPython version matching, RC4 inversion</td>
+</tr>
+<tr>
+<td>Verification</td>
+<td>Prefix and length, RC4 round trip, acceptance by the unmodified checker</td>
+</tr>
+<tr>
+<td>Operational bridge</td>
+<td>A proposed blue/purple test of dynamic-code visibility and analysis</td>
+</tr>
+</tbody>
+</table>
 <h2>The script and the first clue</h2>
 <p>I was given one Python script. It asked for a flag and told me whether I had the right one. The challenge hint talked about getting more behavior from fewer named functions. I took a closer look at the call path and found the trick: the script split an embedded byte blob into three serialized code objects, assigned each one to the same function's <code>__code__</code> attribute, and called that function after each swap.</p>
 <p>The function's name stayed the same. Its instructions did not. That made the visible definition a poor guide to what the checker actually did. I needed to recover the three bodies, then follow the last one through to the comparison. The intended answer had a fixed flag prefix and length; I withhold the challenge-specific bytes and the flag itself here.</p>
-<p>The supplied record describes a local reversing exercise. It contains no incident, protected production system, or attacker telemetry. I use the technique later as a proposed blue/purple exercise, with that boundary in place.</p>
+<p>This was a local reversing puzzle. I did not have an incident, production system, or attacker telemetry to analyze. The blue/purple exercise later in this article is my proposed way to test the technique in an operational setting.</p>
 <h2>I pulled apart the hidden bodies</h2>
-<p>I isolated the blob without running the script's interactive entry point and split it at the delimiter used in the source. The three pieces began with a code-object marshal marker in the recorded environment. I deserialized them with <code>marshal</code> and looked first at their constants, names, and local variables. That quick pass gave me a map of the checker: one body read input, one enforced the prefix and exact length, and one validated the bytes. Locals such as <code>S</code>, <code>key_length</code>, and <code>keystream_byte</code> made RC4 likely. They did not prove the roles of the embedded constants.</p>
-<p>Here is the shape of my extraction step, with the challenge path, delimiter, and byte values replaced. The original writeup records this as executed; the script itself was not included in the ZIP, so this excerpt is a reconstruction of that method and is not runnable as printed.</p>
+<p>I isolated the blob without running the interactive entry point and split it at the delimiter used in the source. The three pieces began with a code-object marshal marker. I deserialized them with <code>marshal</code> and looked first at their constants, names, and local variables. That quick pass gave me a map of the checker: one body read input, one enforced the prefix and exact length, and one validated the bytes. Locals such as <code>S</code>, <code>key_length</code>, and <code>keystream_byte</code> made RC4 likely. They did not prove the roles of the embedded constants.</p>
+<p>The inspection itself was short. The variable <code>functions</code> held the embedded blob; the delimiter separated its three bodies.</p>
 <pre><code class="language-python">import marshal
 
-src = open(&quot;challenge.py&quot;, &quot;rb&quot;).read()
-src = src.replace(b&quot;if __name__=='__main__':main()&quot;, b&quot;pass&quot;)
-ns = {}
-exec(compile(src, &quot;challenge.py&quot;, &quot;exec&quot;), ns)
-
-segments = ns[&quot;functions&quot;].split(b&quot;&lt;DELIM&gt;&quot;)
-for i, segment in enumerate(segments):
-    open(f&quot;seg{i}.bin&quot;, &quot;wb&quot;).write(segment)
-    code = marshal.loads(segment)
-    print(i, code.co_varnames, code.co_names, code.co_consts)
+segments = functions.split(delimiter)
+codes = [marshal.loads(segment) for segment in segments]
+for code in codes:
+    print(code.co_varnames, code.co_names, code.co_consts)
 </code></pre>
-<p>That exact entry-point replacement depended on the source text matching the expected bytes. It also compiled and executed the modified script, which matters when examining an untrusted sample. In a real malware case I would extract the literal with a parser or work inside an isolated analysis environment. I am preserving the actual solve path here, along with its limit, rather than presenting the snippet as a safe general-purpose extractor. <a href="https://docs.python.org/3/library/marshal.html">Python's <code>marshal</code> documentation</a> warns against deserializing untrusted data.</p>
+<p>I neutralized the interactive entry point before loading the script to obtain that blob. That edit depended on an exact text match and still executed the rest of the script. I would isolate an untrusted sample and extract its literal without executing it. <a href="https://docs.python.org/3/library/marshal.html">Python's <code>marshal</code> documentation</a> warns against deserializing untrusted data.</p>
 <table>
 <thead>
 <tr>
 <th>Hidden body</th>
-<th>What the record established</th>
+<th>What I found</th>
 <th>Why I needed it</th>
 </tr>
 </thead>
@@ -105,28 +142,11 @@ for i, segment in enumerate(segments):
 </tr>
 </tbody>
 </table>
-<p>I also inspected each segment on its own. That kept the visible source, the serialized objects, and the behavior of the running function from blurring together. The source's <code>functions</code> variable was a container for the three bodies; it was not three ordinary Python definitions I could read in place.</p>
-<pre><code class="language-python">import marshal
-
-for i in range(3):
-    with open(f&quot;seg{i}.bin&quot;, &quot;rb&quot;) as f:
-        code = marshal.loads(f.read())
-    print(i, code.co_varnames)
-    print(i, code.co_consts)
-</code></pre>
+<p>I inspected each segment on its own. That kept the visible source, the serialized objects, and the behavior of the running function from blurring together. The <code>functions</code> variable was a container for three bodies. It did not give me three ordinary definitions to read in place.</p>
 <p>The output let me identify the RC4-shaped stage before I could trust its instructions. It did not give me a valid solution by itself. A constant pool can contain the right key and ciphertext while leaving their use, byte order, and repeated values unclear.</p>
 <h2>The bytecode looked wrong until I changed interpreters</h2>
 <p>The first disassembly was incoherent. <code>marshal.loads</code> had produced objects I could inspect, but my host interpreter did not assign the same meanings to their opcode bytes. I tried two CPython minor versions that were wrong before finding the version that gave a coherent listing. The successful listing agreed with the surrounding script and the local-name clues.</p>
-<p>That distinction cost me time. A code object's outer structure can be readable while its <code>co_code</code> bytes are being interpreted under the wrong opcode table. CPython changes bytecode between releases; the <a href="https://docs.python.org/3/library/dis.html">Python <code>dis</code> documentation</a> says so directly. I now check the interpreter version before trusting a disassembly. The source writeup also suggests comparing an opening <code>RESUME</code> opcode with the running interpreter, where that opcode applies. I would use that as a clue, then require a coherent listing rather than declaring a version from one byte.</p>
-<p>The recorded command used an interpreter manager to fetch a candidate version and then disassembled the validator from its serialized segment:</p>
-<pre><code class="language-bash">uv python install 3.x
-python3.x - &lt;&lt;'PY'
-import dis, marshal
-with open(&quot;seg2.bin&quot;, &quot;rb&quot;) as f:
-    dis.dis(marshal.loads(f.read()))
-PY
-</code></pre>
-<p>The <code>3.x</code> placeholder stands for the matching minor version. The ZIP does not include <code>seg2.bin</code>, so I cannot rerun this listing here. The point of the command is where the version check entered the solve: before I relied on any instruction names or operand flow.</p>
+<p>That distinction cost me time. A code object's outer structure can be readable while its <code>co_code</code> bytes are being interpreted under the wrong opcode table. CPython changes bytecode between releases; the <a href="https://docs.python.org/3/library/dis.html">Python <code>dis</code> documentation</a> says so directly. I installed candidate minor versions and used <code>dis.dis</code> on the validator under each one. Only one gave a listing whose control flow agreed with the script. An opening <code>RESUME</code> opcode can help identify a mismatch in versions that use it, but I required a coherent listing before relying on any operand flow.</p>
 <p>The mechanical reason is specific to CPython. A function's <code>__code__</code> points to a code object containing bytecode, constants, names, and local-variable metadata. Reassigning that attribute can give a compatible function a new body at runtime. <code>marshal</code> can serialize code objects, but it is tied to Python's internal formats. Reading the wrapper and reading the opcodes are separate checks. The challenge worked because the script kept its three real bodies inside serialized data and swapped them into one callable when needed.</p>
 <h2>My first RC4 attempt was backwards</h2>
 <p>The constant pool contained the material I needed, but it did not tell me how the validator used it. I initially reversed the key and ciphertext roles. I also under-counted an embedded byte list after treating repeated values as duplicates. The output was garbage. That was a useful failure because it exposed exactly what I had assumed: a pool of constants is a collection of values, not an ordered account of how the code constructs its inputs.</p>
@@ -135,11 +155,10 @@ PY
 <pre><code class="language-python">candidate = rc4(key, ciphertext)
 assert rc4(key, candidate) == ciphertext
 </code></pre>
-<p>I did not need a brute-force search. The equality check gave me an inverse operation. The key and comparison bytes are deliberately absent from this public page, so the snippet explains the decisive operation rather than revealing the original answer. For background on why RC4 is unsuitable for modern TLS, <a href="https://www.rfc-editor.org/rfc/rfc7465">RFC 7465</a> prohibits its cipher suites there. That standard is context for the primitive; this challenge did not use TLS.</p>
+<p>I did not need a brute-force search. The equality check gave me an inverse operation. For background on why RC4 is unsuitable for modern TLS, <a href="https://www.rfc-editor.org/rfc/rfc7465">RFC 7465</a> prohibits its cipher suites there. This checker did not use TLS.</p>
 <p>I checked the RC4 identification against the instruction sequence, not only the variable names. The code built a 256-entry permutation <code>S</code>, mixed it with the key, advanced two indices while producing a keystream byte, and XORed each input byte with that stream. Those are the key-scheduling and output phases of standard RC4. The stored 40-byte value was the comparison target. Its length also matched the input gate, which gave me another way to catch the earlier under-counted byte list.</p>
 <h2>How I checked the recovered input</h2>
-<p>I kept three checks separate in my solve notes. First, the recovered bytes satisfied the gate's prefix and exact-length rules. Second, feeding them back through RC4 reproduced the stored 40-byte comparison value. Finally, the original, unmodified checker accepted the candidate under the matching CPython version. The third check matters because a correct cryptographic inversion could still fail a surrounding format or encoding condition.</p>
-<p>The supplied ZIP contains the narrative writeup. It does not contain <code>challenge.py</code>, the serialized segments, <code>rc4.py</code>, its known-answer fixture, or a submission transcript. The original writeup reports that its generic RC4 utility passed test vectors and that the original checker accepted the result. I cannot independently verify those runs from the materials attached to this portfolio task. I also cannot publish a working end-to-end solver without the missing bytes, so I have kept the method and the verification scope explicit.</p>
+<p>I checked the recovered input at three points. It had the required prefix and exact length. Feeding it back through RC4 reproduced the stored 40-byte comparison value. The unmodified checker then accepted it under the matching CPython version. That last run checked the whole path, including conditions around the RC4 call.</p>
 <h2>What I would bring into a blue/purple exercise</h2>
 <p>I would use this technique to test analysis and visibility. A purple team could build a benign three-stage Python sample: one blob containing serialized code objects, a gate, and a harmless comparison. The sample would swap <code>__code__</code> at runtime. The blue team would receive the file plus whatever process and script telemetry its actual environment collects.</p>
 <p>I would ask the blue team to answer four concrete questions. Did its collection show that the Python process loaded serialized code? Could an analyst identify which function body actually ran? Could they find the matching CPython version and reproduce the disassembly? Could they tell the difference between this sample and legitimate software that uses dynamic code? The last question needs real baseline data before anyone writes an alert.</p>
@@ -147,14 +166,48 @@ assert rc4(key, candidate) == ciphertext
 <p>The exercise would produce a small set of usable artifacts: a benign sample and its source, the three serialized segments, a known-good disassembly under the matching interpreter, and a worksheet for the blue team's observations. I would put the expected stage order and the RC4 comparison in the answer key. During replay I would change one variable at a time, so a miss has an explainable cause. If endpoint logging never exposes the code swap, the outcome is a visibility gap to document. If it does, I can test whether an analyst can reconstruct the behavior from that evidence. Either result is more useful than writing a rule against the string <code>marshal</code> and calling the exercise done.</p>
 <details class="fold">
 <summary>Frameworks, controls, and detection scope</summary>
-<p>The closest ATT&amp;CK comparison is <a href="https://attack.mitre.org/techniques/T1027/">T1027, Obfuscated Files or Information</a>. An embedded blob and runtime code swap could serve obfuscation in malicious software. <a href="https://attack.mitre.org/techniques/T1140/">T1140, Deobfuscate/Decode Files or Information</a> describes an adversary decoding material for use on a host. The challenge's <code>marshal</code> loading resembles that behavior mechanically, but no adversary activity was observed. My own decoding during the solve is analysis work and should not be recorded as adversary T1140.</p>
-<p>The record gives me no asset, control assessment, or measured failure to map to NIST SP 800-53, CIS, STIG, or other compliance requirements. It also provides no indicator of compromise, host event, or network event. I would not publish an IOC, YARA rule, Sigma rule, or SIEM query from this CTF file.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Status</th>
+<th>Basis</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://attack.mitre.org/techniques/T1027/">ATT&amp;CK T1027, Obfuscated Files or Information</a></td>
+<td>Illustrative analogy</td>
+<td>The serialized blob and runtime code swap concealed the validator. The puzzle showed no adversary behavior.</td>
+</tr>
+<tr>
+<td><a href="https://attack.mitre.org/techniques/T1140/">ATT&amp;CK T1140, Deobfuscate/Decode Files or Information</a></td>
+<td>Illustrative analogy</td>
+<td>A real loader might decode code for execution. My own decoding during the solve was analysis work.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53, CIS, STIG, and other controls</td>
+<td>No direct mapping</td>
+<td>This checker had no operational asset, assessed control, or measured control failure.</td>
+</tr>
+<tr>
+<td>IOC or threat-intelligence product</td>
+<td>None</td>
+<td>The exercise supplied no actor, infrastructure, campaign, host event, or network event.</td>
+</tr>
+<tr>
+<td>Detection or hunt</td>
+<td>Proposed, unvalidated</td>
+<td>Dynamic-code loading is a hypothesis to test against available telemetry and legitimate Python use.</td>
+</tr>
+</tbody>
+</table>
 <p>A hunting hypothesis remains useful if an organization has the right evidence: Python code that deserializes an embedded code object and then assigns it to <code>__code__</code> deserves inspection in the right context. I would first check whether endpoint telemetry captures either operation at all. Next I would test against legitimate dynamic-code packages, tune scope, and measure misses on varied samples. Until that work is done, the idea is proposed and unvalidated. It is not a production detection.</p>
-<p>I found no basis here for STIX/TAXII objects or an intelligence attribution. The exercise had no actor, infrastructure, campaign, or observable to exchange. That boundary is part of taking the puzzle full circle honestly.</p>
+<p>I found no basis here for STIX/TAXII objects, intelligence attribution, or a deployable YARA, Sigma, or SIEM rule. A rule needs a real data source and tests against both benign and suspicious behavior.</p>
 </details>
 <details class="fold">
 <summary>Reusable tools and my next reversing checklist</summary>
-<p>The original writeup describes two companion assets: a generic standard-RC4 utility with known-answer tests, and a bytecode-triage checklist. Neither file came in this ZIP. Their recorded purpose is still worth preserving. The RC4 utility accepted a key and bytes, performed the same XOR operation for encryption or decryption, and did not claim support for RC4 variants. The checklist walked through blob isolation, <code>marshal</code> inspection, interpreter matching, and disassembly. I am not linking to the missing files.</p>
+<p>I came away with two reusable methods: a standard-RC4 routine that takes a key and bytes, and a bytecode-triage procedure. The routine performs the same XOR operation for encryption and decryption; it does not cover RC4 variants. The procedure moves from blob isolation through <code>marshal</code> inspection, interpreter matching, and a trustworthy disassembly.</p>
 <p>For the next checker like this, I would:</p>
 <ol>
 <li>Save the embedded bytes and their order before executing any part of the sample.</li>
