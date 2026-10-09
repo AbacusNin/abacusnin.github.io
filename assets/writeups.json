@@ -35,7 +35,7 @@
     "title": "Four Merits and a Final Petition",
     "url": "/cyber-ops/ctf-writeups/ai/llm-court-gatekeeper/",
     "category": "AI Security",
-    "difficulty": "Medium (self-rated)",
+    "difficulty": "Medium",
     "date": "2026-10",
     "tags": [
       "LLM security",
@@ -51,7 +51,7 @@
   {
     "title": "Three Code Objects in One Python Function",
     "category": "Reversing",
-    "difficulty": "Moderate (self-rated)",
+    "difficulty": "Medium",
     "date": "2026-10",
     "tags": [
       "Python bytecode",
@@ -66,7 +66,7 @@
   {
     "title": "The Calculator That Waited for an ICMP Echo",
     "category": "Malware Analysis",
-    "difficulty": "Not provided",
+    "difficulty": "Hard",
     "date": "2026-10",
     "tags": [
       "ELF",
@@ -81,7 +81,7 @@
   {
     "title": "Fifteen Videos, One Hidden PDF",
     "category": "Forensics",
-    "difficulty": "Medium (self-rated)",
+    "difficulty": "Medium",
     "date": "2026-10",
     "tags": [
       "MP4",
@@ -96,7 +96,7 @@
   {
     "title": "The Calculator That Renamed Itself",
     "category": "Malware Analysis",
-    "difficulty": "Not provided",
+    "difficulty": "Medium",
     "date": "2026-10",
     "tags": [
       "ELF",
@@ -111,7 +111,7 @@
   {
     "title": "When the Answer File Stopped Carrying Information",
     "category": "Reversing",
-    "difficulty": "High",
+    "difficulty": "Hard",
     "date": "2026-10",
     "tags": [
       "Haskell",
@@ -126,7 +126,7 @@
   {
     "title": "The Click Between Two Meows",
     "category": "Forensics",
-    "difficulty": "Medium-hard (self-rated)",
+    "difficulty": "Hard",
     "date": "2026-10",
     "tags": [
       "audio steganography",
