@@ -64,16 +64,16 @@
   {
     "title": "The Calculator That Waited for an ICMP Echo",
     "category": "Malware Analysis",
-    "difficulty": "Medium",
+    "difficulty": "Not provided",
     "date": "2026-10",
     "tags": [
       "ELF",
-      "process masquerading",
       "ICMP",
       "raw sockets",
+      "traffic signaling",
       "reverse shell"
     ],
-    "summary": "I read a trojanized calculator without running it, found the process name it adopted, and traced the ICMP Echo Request that woke its reverse shell.",
+    "summary": "A stripped calculator contained a passive raw-ICMP receive loop. I read its packet checks and identified the crafted Echo Request that activated a reverse-shell callback.",
     "url": "/cyber-ops/ctf-writeups/malware/trojanized-calculator-icmp/"
   },
   {
