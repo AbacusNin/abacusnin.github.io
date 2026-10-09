@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Deanonymizing a Wi-Fi device from a probe-request capture - CTF Writeups</title>
-  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-1">
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
   <meta name="description" content="One device in a 39,000-device Wi-Fi probe capture forgot to randomize its MAC and leaked its whole saved-network list, which read back as a travel itinerary. The solve turned on a single bit.">
   <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/wifi-pnl-deanonymization/">
   <meta property="og:type" content="article">
@@ -75,14 +75,18 @@
 <li><strong>The line that should hold:</strong> the open-air probe exchange is supposed to stay anonymous, because phones randomize their MAC. On one device, randomization was off, so it did not hold.</li>
 </ul>
 
-<h2>2. Techniques, Tooling, and Actions Taken</h2>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
 <p>First I looked at what I was holding. A standard rogue-AP probe log. One <code>log</code> table, keyed on <code>(mac, ssid, created_at)</code>. About 185,000 rows, 184,700 of them probe records, across 39,000 MACs. The counts lined up with the brief, so I trusted the schema and moved on.</p>
 <p>One filter did most of the work. Modern phones randomize the MAC they probe with, and a randomized MAC sets one particular bit in its first octet: the locally-administered (U/L) bit. So I checked that bit on every MAC, and it split the crowd cleanly: most were randomized, roughly 37,600 of them, which left about 1,700 real ones. The randomized majority is doing exactly what it should, so I set it aside.</p>
 <p>That left about 1,700 real devices. I ranked them by how many different networks each had asked for. That gave me candidates, but the count lied: the device on top was just spitting out random, machine-looking SSIDs no person ever typed, so sorting by count pointed me straight at the wrong device. The real question was simpler: did a device's list read like someone's actual saved networks? One device's did, and it was the only one in the whole capture that had ever asked for an airport network.</p>
 <p>I read that device's list in the order it was captured and got a nine-stop trip: home, a local business, a city hotel, an airport, in-flight Wi-Fi, a second airport, a second-city hotel, then two more airports on the way home. The four airports, read in order, gave the codes for the flag.</p>
 <p>Two wrong turns are worth writing down, because they're how I actually got there. I tried treating "has a real MAC" as the answer, but that leaves 1,700 devices to wade through. I tried ranking by SSID count alone, but that floats a noise device to the top. Either way, the bit only narrows the field. You still have to read the lists to spot the one that belongs to a person.</p>
 
-<h2>3. Tooling and Scripts</h2>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
 <details class="fold">
 <summary>Show the queries</summary>
 <p>The whole solve is a handful of read-only SQL queries over the capture, run from Python's standard-library <code>sqlite3</code>. No third-party packages, no network, no talking to a target. The crux is the randomization test:</p>
@@ -113,13 +117,19 @@ ORDER BY created_at, rowid;   -- collection order
 <p>A generalized, sanitized version of this workflow is described in Section 8. Every query is read-only; only analyze captures you are authorized to handle.</p>
 </details>
 
-<h2>4. Concept Explanation</h2>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
 <p>Your phone keeps a list of the networks it has joined before. That's the Preferred Network List, the PNL. For years, phones advertised that list out loud. A phone would send a directed probe request for each saved network, a little frame that names the network and asks "are you around?" Anyone listening hears two things: the network name, and the MAC of the phone asking.</p>
 <p>Two things make that a problem. A real MAC never changes, so if you see it in two places, it's the same phone in two places. And the set of networks someone has saved is usually particular to them. It quietly says where they've been.</p>
 <p>Randomization is supposed to stop this. The 802 address format sets aside one bit of the first octet, the universal/local (U/L) bit, worth <code>0x02</code>. A real vendor MAC leaves that bit at zero. A software-made, randomized one sets it to one. Phones now randomize the MAC they probe with, often a fresh one per network, so the address on the air no longer points back to the hardware. Reading that one bit is all it takes to tell a real MAC from a randomized one, and it's the whole pivot of this challenge.</p>
 <p>But randomization only helps if it's turned on. Turn it off, say a phone where someone disabled the per-network "private address" toggle, and the phone goes back to broadcasting its real MAC right beside its saved-network list. That's the whole exposure randomization was meant to kill, and it's the device this challenge is built on.</p>
 
-<h2>5. Exploit / Analysis Mechanics</h2>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
 <p>The whole thing leans on one fact about the address format and one fact about how the target behaves. The only thing I needed from the data was that each probe row carries a source MAC, the SSID it asked for, and a timestamp. It did.</p>
 <p><strong>First cut, the bit.</strong> <code>octet0 &amp; 0x02</code> is defined by the address format to mean "randomized or real," so reading it is exact, never a guess. A randomized MAC always sets that bit, so the check drops all ~37,600 randomized devices with nothing lost. One test takes 39,000 devices down to about 1,700.</p>
 <p><strong>Second cut, reading the lists.</strong> Most of the 1,700 real-MAC devices are access points, IoT things, or old hardware. They probe for a few networks or throw out junk names. The target was the one whose list read like a person's: a handful of real, recognizable networks in a sensible order. The airport SSIDs settled it. Only one device had ever asked for any airport network, and that same device had asked for all four. I checked each airport SSID against the MACs that had probed it, and it came back the same device every time.</p>
@@ -127,7 +137,10 @@ ORDER BY created_at, rowid;   -- collection order
 <p>I can back every step. Each one is a plain query over the same fixed file. And the final pick doesn't rest on "this list looks right": the airport check settles it, coming back the same single device every time. The one bit of outside knowledge I needed was turning an airport network name into its code, which is standard. I submitted the flag, and it checked out.</p>
 <p>Where it breaks: this only works if the target sends named probes and has randomization off. A phone that randomizes and only broadcasts gives you no stable identifier and no readable list, and the whole approach falls apart.</p>
 
-<h2>6. Lessons Learned</h2>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned</summary>
 <p>Big takeaway: try the dumb, exact thing first. One defined bit did more here than any clever ranking. If I'd reached for it sooner I'd have finished sooner. The trap is counting. The device with the most SSIDs was pure noise. The one I wanted had fewer, but they meant something. A count is easy to sort on, and it feels like progress. But it only stands in for the real question: does this list belong to a person? Mistake the two and the challenge makes you pay.</p>
 <p>Next time I'd read the lists while I filter, rather than rank everything first and squint at it after. A few things here carry past the challenge. Tracking someone by a stable ID plus their behavior pattern is a real method; people do this. The same one-bit triage works on any Wi-Fi probe capture you're cleared to look at. And a privacy feature being available says nothing about whether it's switched on, which is a lesson that shows up all over endpoint security.</p>
 <p>One caveat I want to be honest about: the itinerary is me inferring behavior from made-up data. On a real capture you'd see far less named probing, so a leak this complete would be rare.</p>
@@ -141,7 +154,10 @@ ORDER BY created_at, rowid;   -- collection order
 </tbody>
 </table></div>
 
-<h2>7. Operational Extrapolation</h2>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Operational Extrapolation</summary>
 <h3>Individual practitioner development</h3>
 <p>This one sharpened a few basics for me. Reading the 802.11 address format down at the bit level. Working a big capture with queries instead of by eye. And the one I keep relearning, holding what the data actually shows apart from what I'm guessing about it. The obvious next step is to run the same thing against a live monitor-mode capture and see for myself how little named probing phones really do now.</p>
 <h3>Security operations</h3>
@@ -149,7 +165,10 @@ ORDER BY created_at, rowid;   -- collection order
 <h3>Intelligence operations</h3>
 <p>Also my own extrapolation. The core move here, tying a stable RF identifier to a behavior pattern to build someone's pattern-of-life, is the same move that matters in collection and OSINT. It's a clean reminder of why randomization and travel-mode device hygiene matter for anyone whose movements are sensitive. I'm not claiming any real attribution or collection, just drawing the parallel.</p>
 
-<h2>8. Reusable Tools, Scripts, and Artifacts</h2>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
 <details class="fold">
 <summary>Show the reusable abstraction</summary>
 <p>The part worth keeping is the triage routine, the thing that works on any probe capture. The exact queries above were specific to this one challenge.</p>
@@ -164,7 +183,10 @@ ORDER BY created_at, rowid;   -- collection order
 <p>The airport list and the target MAC are left out on purpose. The routine ships with no challenge data baked in.</p>
 </details>
 
-<h2>9. Framework Applicability and Mapping</h2>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Applicability and Mapping</summary>
 <details class="fold">
 <summary>Show the framework mapping</summary>
 <p>CAPEC fits this best; it has entries for exactly this tradecraft. ATT&amp;CK is here because I check it by default, but its enterprise matrix doesn't really cover harvesting Wi-Fi probes to track someone physically, so the honest mapping is only an analogy on the collection method. That gap is its own small lesson: not every technique has a clean ATT&amp;CK home.</p>
@@ -180,13 +202,19 @@ ORDER BY created_at, rowid;   -- collection order
 <p>STRIDE fits in spirit. This is mostly Information Disclosure: the device hands out a permanent ID and a behavior fingerprint, with a bit of Spoofing in the rogue AP. CAPEC-619 (Signal Strength Tracking) is close, but I can't claim it, since the capture has no signal-strength field. D3FEND, OWASP, and the rest I left alone; nothing in the data justifies forcing them in.</p>
 </details>
 
-<h2>10. Threat Intelligence and Standards Integration</h2>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intelligence and Standards Integration</summary>
 <details class="fold">
 <summary>Show the non-applicability note</summary>
 <p>Nothing here calls for a threat-intel product, so I'm not inventing one. This is a synthetic forensic capture, not threat-actor telemetry. No infrastructure, no malware, no campaign for STIX or TAXII to describe, and the MACs and SSIDs belong to the victim, not an attacker. I could write a STIX Attack Pattern pointing at CAPEC-613, but it would just restate Section 9, so I didn't. And nothing here is a system under assessment, so STIGs don't apply either.</p>
 </details>
 
-<h2>11. Controls Mapping and Mitigation Realization</h2>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
 <details class="fold">
 <summary>Show the controls and mitigations</summary>
 <p>I'm not forcing a numbered-control mapping (800-53, CIS, CMMC, and the rest). This is a client-side configuration and behavior problem. It isn't a finding against an enterprise system under one of those catalogs, so any control number I cited would be a stretch. The control that does hold up is the plain one below.</p>
@@ -199,7 +227,10 @@ ORDER BY created_at, rowid;   -- collection order
 <p>The first two are marked Proposed because I didn't deploy or test them in a real environment. Only the detective one was.</p>
 </details>
 
-<h2>12. Indicators, Artifacts, and Detection Engineering</h2>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
 <details class="fold">
 <summary>Show the detection work</summary>
 <p>You can actually detect this on real wireless telemetry, WIDS/WIPS logs, AP probe logs, or a monitor-mode capture, as long as the sensor keeps the source MAC and the SSID.</p>
@@ -216,7 +247,10 @@ ORDER BY created_at, rowid;   -- collection order
 </ul>
 </details>
 
-<h2>13. References</h2>
+
+</details>
+<details class="fold section-fold">
+<summary>13. References</summary>
 <details class="fold">
 <summary>Show references</summary>
 <ol>
@@ -229,6 +263,8 @@ ORDER BY created_at, rowid;   -- collection order
 </ol>
 </details>
 
+
+</details>
         </div>
       </div>
 
@@ -241,6 +277,6 @@ ORDER BY created_at, rowid;   -- collection order
       <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
     </footer>
   </div>
-  <script src="/assets/js/toc.js?v=20261009-1"></script>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
 </body>
 </html>

@@ -2,7 +2,7 @@
   const box = document.querySelector("[data-toc]");
   if (!box) return;
 
-  const sections = Array.from(document.querySelectorAll("main h2, main details.fold > summary"));
+  const sections = Array.from(document.querySelectorAll("main h2, main details.section-fold > summary"));
   if (sections.length < 2) { box.remove(); return; }
 
   const slug = (t) => t.toLowerCase().replace(/[^\w]+/g, "-").replace(/^-|-$/g, "");

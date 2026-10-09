@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Three Code Objects in One Python Function - CTF Writeups</title>
-  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-1">
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
   <meta name="description" content="A Python flag checker replaced one function&#x27;s code object three times. I matched its bytecode to the right interpreter, read the RC4 check, and recovered the accepted input.">
   <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/reversing/python-bytecode-rc4/">
   <meta property="og:type" content="article">
@@ -101,11 +101,15 @@
 <p>I was given one Python script that asked for a flag and answered yes or no. The hint talked about doing more with fewer named functions. In the source, I found an embedded byte blob split into three serialized code objects. The script assigned each object to one function's <code>__code__</code> attribute and called that function after each swap. The name stayed put while its instructions changed.</p>
 <p>My job was to recover the input that survived a format gate and the final validator. The expected answer had a fixed prefix and length. I withhold the flag and the embedded key and ciphertext values here, while keeping the mechanism and checks that established the result.</p>
 <p>This was a self-contained reversing puzzle. It supplied no attacker, victim system, or production telemetry. I treat the operational comparisons later in the article as proposed tests of the technique.</p>
-<h2>2. Techniques, Tooling, and Actions Taken</h2>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
 <p>I read the script's call path first. The visible function definition was only the starting body; I needed the code objects it would execute later. I isolated the embedded blob, split it on the script's delimiter, and inspected the three serialized objects. Their names and constants pointed to an input reader, a prefix-and-length gate, and a validator. Local names such as <code>S</code>, <code>key_length</code>, and <code>keystream_byte</code> suggested RC4 in the third stage.</p>
 <p>My first disassembly was incoherent. I had used the Python interpreter already on my machine. I tried two other CPython minor versions before one produced instructions that agreed with the script and the local-name clues. That was the point where I could follow the assignments instead of guessing from constants.</p>
 <p>I did guess too early once. I reversed the roles of the key and stored ciphertext, then under-counted a byte sequence after collapsing repeated values. The output was nonsense. I returned to the working disassembly, kept the byte sequence in order, and traced which value fed the RC4 key schedule and which value the checker compared with its output. From there I ran RC4 over the stored ciphertext, checked the gate, checked the round trip, and ran the recovered input through the unmodified checker.</p>
-<h2>3. Tooling and Scripts</h2>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
 <p>I used Python's <code>marshal</code> to inspect the code objects and <code>dis</code> under the matching interpreter to read their instructions. The important extraction step was the split and inspection:</p>
 <pre><code class="language-python">import marshal
 
@@ -157,18 +161,29 @@ assert rc4(key, candidate) == ciphertext
 </tr>
 </tbody>
 </table>
-<h2>4. Concept Explanation</h2>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
 <p>A Python function can run a different compatible code object after an assignment to <code>function.__code__</code>. That object carries bytecode along with constants, names, and local-variable metadata. In this checker, one callable acquired three bodies in sequence. Counting named functions in the visible source would have missed most of the behavior.</p>
 <p><code>marshal</code> serialized those bodies. I could inspect their structure on my first interpreter, but its <code>dis</code> module interpreted the raw opcode bytes under the wrong CPython minor version. CPython bytecode changes across releases, as the <a href="https://docs.python.org/3/library/dis.html">Python <code>dis</code> documentation</a> notes. A readable constant pool did not make the disassembly trustworthy. I needed a coherent listing under the producing interpreter before relying on operand order.</p>
 <p>RC4 starts with a 256-entry permutation, mixes it with the key, then advances two indices to produce a keystream byte for each data byte. XOR combines that stream with the input. Applying the same stream twice returns the original bytes. <a href="https://www.rfc-editor.org/rfc/rfc7465">RFC 7465</a> prohibits RC4 cipher suites in TLS; this challenge used the old primitive inside a local checker, not TLS.</p>
-<h2>5. Exploit / Analysis Mechanics</h2>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
 <p>The second body required a fixed prefix and exact length. The third body took the candidate as bytes, used the 128-byte key in RC4's key schedule, and compared the transformed candidate with a stored 40-byte value. The native disassembly settled those roles. My earlier key/ciphertext swap had come from looking at the constants without following their assignments.</p>
 <p>The validator's condition was <code>RC4(key, candidate) == ciphertext</code>. The same operation on the stored ciphertext recovered the candidate. That is why this solve did not need brute force or a guessed keystream. I kept repeated bytes in the order the instructions constructed them; dropping a duplicate changed the length and broke the check.</p>
 <p>I verified the result at three levels. The candidate met the prefix and length gate. RC4 over that candidate reproduced the stored comparison bytes. The original checker accepted it under the matching CPython version. The last run covered the surrounding input handling as well as the cipher equation.</p>
-<h2>6. Lessons Learned</h2>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned</summary>
 <p>I now separate code-object structure from instruction meaning when I triage Python bytecode. Names and constants can point me toward the algorithm, but I do not trust an opcode listing until I have matched the interpreter. An opening <code>RESUME</code> opcode can be a quick version clue where that opcode applies. I still require the whole listing to make sense.</p>
 <p>The failed RC4 attempt was my own avoidable error. I had inferred data roles from a pool of values and removed repeated bytes as though I were deduplicating a set. Next time I will trace store targets and byte construction before writing a decoder. Once those roles were clear, RC4's symmetry reduced the recovery to one call and a round-trip check.</p>
-<details class="fold">
+
+</details>
+<details class="fold section-fold">
 <summary>7. Operational Extrapolation</summary>
 <h3>Individual Practitioner Development</h3>
 <p>This exercise made me work across CPython code objects, serialized bytecode, interpreter versions, and a stream-cipher validator. I would repeat the method on a sample that also encrypts or reorders its embedded code objects. That would test whether I can still recover the behavior when the easy constant-pool clues disappear.</p>
@@ -178,13 +193,13 @@ assert rc4(key, candidate) == ciphertext
 <h3>Intelligence Operations</h3>
 <p>This checker gave me no actor, infrastructure, collection source, or attribution lead. I would not turn the puzzle into an intelligence finding. The transferable skill is unpacking an obfuscated Python sample when a real collection provides one.</p>
 </details>
-<details class="fold">
+<details class="fold section-fold">
 <summary>8. Reusable Tools, Scripts, and Artifacts</summary>
 <p>The two reusable pieces are a standard-RC4 byte routine and a bytecode-triage procedure. The RC4 routine takes key and data bytes and returns their keystream XOR. I used it for the inverse and the round trip; it does not cover RC4 variants. Known-answer vectors checked the primitive, while the checker run tested the whole challenge path.</p>
 <p>My bytecode procedure starts by saving the embedded bytes in order. I split the segments, inspect each code object's constants and locals, and match the CPython minor version before reading instructions. I then follow assignments, recover the validator equation, and test the candidate against every earlier gate. A large version gap may make <code>marshal</code> loading fail outright. Even when loading succeeds, I do not assume the opcodes mean the same thing.</p>
 <p>These methods need an isolated environment when the input is untrusted. The challenge's entry-point edit was tailored to its script and is not my general extraction procedure.</p>
 </details>
-<details class="fold">
+<details class="fold section-fold">
 <summary>9. Framework Applicability and Mapping</summary>
 <p>ATT&amp;CK describes adversary behavior. This puzzle did not show an adversary, so I do not treat either technique below as an observed TTP.</p>
 <table>
@@ -213,25 +228,28 @@ assert rc4(key, candidate) == ciphertext
 </table>
 <p>I found no challenge behavior that calls for D3FEND, CAPEC, STRIDE, OWASP, CACAO, or OpenC2 mapping. The operational test in Section 7 is a proposal, not a control or framework result.</p>
 </details>
-<details class="fold">
+<details class="fold section-fold">
 <summary>10. Threat Intelligence and Standards Integration</summary>
 <p>The checker supplied no real-world indicators, infrastructure, campaign, vulnerability, or configuration baseline. I have no STIX object to represent, TAXII exchange to make, or STIG/CIS finding to write. RFC 7465 is useful background on RC4's modern protocol status; it does not describe the CTF environment.</p>
 </details>
-<details class="fold">
+<details class="fold section-fold">
 <summary>11. Controls Mapping and Mitigation Realization</summary>
 <h3>Standards Mapping</h3>
 <p>I did not assess an operational system or a control failure. A NIST SP 800-53, CIS Controls, STIG, CMMC, PCI DSS, or HIPAA mapping would need an asset and scope that this puzzle did not provide.</p>
 <h3>Mitigation Realization</h3>
 <p>I have no validated mitigation to claim. For a real environment I would first establish whether dynamic code loading is visible and whether any alert can distinguish it from legitimate Python tooling. The purple team test in Section 7 describes how I would start that work.</p>
 </details>
-<details class="fold">
+<details class="fold section-fold">
 <summary>12. Indicators, Artifacts, and Detection Engineering</summary>
 <p>The local checker produced no production host or network events and no IOC. I would not publish a YARA, Sigma, or SIEM rule from it. My proposed hunting hypothesis is narrower: inspect Python processes that deserialize embedded code and assign a new function <code>__code__</code> where the environment can capture that behavior.</p>
 <p>I would validate the data source before writing a query, then test the hypothesis against benign dynamic-code use and variants of the sample. The status remains <strong>Proposed, unvalidated</strong>. A string hit on <code>marshal</code> alone would neither prove a malicious load nor cover other ways to hide code.</p>
 </details>
-<h2>13. Visual Artifact</h2>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
 <p>The <a href="#analysis-flow">diagram beside the summary</a> traces the actual solve path: one blob became three executable bodies, the right interpreter made the validator readable, and RC4 inversion produced the input I checked. It is a transformation flow, not an attack timeline.</p>
-<details class="fold">
+
+</details>
+<details class="fold section-fold">
 <summary>14. References</summary>
 <table>
 <thead>
@@ -274,6 +292,6 @@ assert rc4(key, candidate) == ciphertext
       <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
     </footer>
   </div>
-  <script src="/assets/js/toc.js?v=20261009-1"></script>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
 </body>
 </html>
