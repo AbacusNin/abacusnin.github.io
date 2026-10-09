@@ -7,5 +7,14 @@
     "date": "2026-05",
     "tags": ["MITM", "verification oracle", "CRT", "WebAssembly", "GF(2)", "key recovery"],
     "summary": "Recovered a 128-bit key from a stateful protocol using an adversary-in-the-middle seat, a verification oracle, and a factorable key schedule, then cut the edit cost with a two-stage residue lift."
+  },
+  {
+    "title": "Deanonymizing a Wi-Fi Device from a Probe-Request Capture",
+    "url": "/cyber-ops/ctf-writeups/forensics/wifi-pnl-deanonymization/",
+    "category": "Forensics",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": ["Wi-Fi", "probe requests", "MAC randomization", "PNL leakage", "device tracking", "SQLite forensics"],
+    "summary": "Found the one device in a 39,000-device Wi-Fi probe capture that never randomized its MAC, then read its leaked saved-network list back as a travel itinerary. The whole solve turned on a single bit."
   }
 ]
