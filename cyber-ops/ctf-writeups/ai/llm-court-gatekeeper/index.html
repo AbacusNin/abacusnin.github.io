@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Four Merits and a Final Petition - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009">
+  <meta name="description" content="I tried two ways to talk a courtly LLM into giving up a flag, then solved the challenge by learning its rules and meeting them. The writeup carries that result into a proposed blue and purple team test.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/ai/llm-court-gatekeeper/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="Four Merits and a Final Petition">
+  <meta property="og:description" content="I tried two ways to talk a courtly LLM into giving up a flag, then solved the challenge by learning its rules and meeting them.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/ai/llm-court-gatekeeper/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / AI Security / Four Merits and a Final Petition</p>
+      <div class="page-head">
+        <h1 class="page-title">Four Merits and a Final Petition</h1>
+        <p class="lead">The courtly LLM would give up its flag, but only after I learned how it judged a petitioner. Two early requests failed. Its own corrections showed me the route through.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+
+<p class="tldr-label">Summary</p>
+<div class="tldr">
+<p><strong>The challenge.</strong> A role-playing LLM held a flag behind a court etiquette game. I could send text and read its replies and a visible ledger of rank and merits.</p>
+<p><strong>What happened.</strong> A direct request and an acrostic request both failed. I asked the court to explain its rules, earned four merits under those rules, then corrected a final petition that failed on form.</p>
+<p><strong>The result.</strong> The court disclosed the flag. I later submitted it, and the scoreboard accepted it. The value and the challenge's identifying lore are withheld here.</p>
+<p><strong>The limit.</strong> This is a record of a puzzle's behavior. I could see the replies and ledger, but not the model's hidden instructions, its backend, or any separate output filter.</p>
+</div>
+
+<figure class="diagram">
+  <svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Solve path: two failed requests, rules revealed, four merits, one rejected final petition, corrected petition accepted">
+    <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+    <rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">0 / 4 merits</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Direct request and acrostic refused</text>
+    <line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Ask for the rules</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Court names four achievements and a form</text>
+    <line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">1, 2, 3, 4 merits</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">One distinct, substantive praise each time</text>
+    <line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Top rank, first petition</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Rejected for wording and structure</text>
+    <line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Corrected petition</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Court discloses the flag</text>
+    <line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Scoreboard</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Submission accepted</text>
+  </svg>
+  <figcaption>The ledger and replies gave me these checkpoints. The diagram describes the challenge transcript, not a production authorization design.</figcaption>
+</figure>
+
+<div class="tablewrap"><table>
+<thead><tr><th>Field</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>Category</td><td>AI Security / LLM Gatekeepers</td></tr>
+<tr><td>Difficulty</td><td>Author-assessed: Medium</td></tr>
+<tr><td>Result</td><td>Flag disclosed by the challenge bot; scoreboard acceptance confirmed</td></tr>
+<tr><td>Published detail</td><td>Mechanic retained; event, character names, achievement names, and flag withheld</td></tr>
+</tbody>
+</table></div>
+
+<h2>The court's problem</h2>
+<p>I was given one way in: a team chat channel with an LLM playing a ruler. The challenge asked me to persuade it to disclose a secret. Each reply also showed a ledger with a rank, a merit count, and the achievements it had recorded. That ledger made the puzzle more concrete than a free-form jailbreak prompt. I could see whether a request changed anything.</p>
+<p>My initial guess was that flattery or a clever output format might get past the gate. That was a hypothesis, not something I knew about its implementation. I had no access to its system prompt, stored secret, or server-side code.</p>
+
+<h2>Two requests that failed</h2>
+<p>I first asked for the flag directly while speaking in character. The court refused. It also corrected several things I had missed: I had used a forbidden personal name, skipped the full salutation, and referred to myself in the first person. The ledger stayed at zero merits.</p>
+<p>My second request tried to turn the secret into the first letters of a poem. It failed too. The court explicitly rejected the acrostic and told me it would not reveal the secret through a sideways format. I had repeated the etiquette mistakes and added a made-up title, so this exchange tested several things at once. I can say the acrostic request failed here. I cannot use these two replies to claim that every jailbreak or every output encoding would fail.</p>
+<p>I had prepared other ideas, including spelling the value out, fictional framing, Base64, and asking for hidden instructions. I did not send them. The court's two replies gave me a better next move.</p>
+
+<h2>Asking the court for its rules</h2>
+<p>I asked what the four achievements were and how a proper memorial should be written. I used a more deferential voice and acknowledged my earlier mistakes. The court answered with the names, the required opening and closing, its rule for third-person self-reference, and the test for earning a merit: name one achievement, explain what it accomplished, and add an observation that showed understanding rather than generic praise.</p>
+<p>That question did not itself use the complete form the court later required for merit submissions. It still received a useful answer. I stopped treating the gate as a blank wall and began checking each condition it had actually described.</p>
+
+<h2>Four merits, one at a time</h2>
+<p>I sent a separate memorial for each achievement and checked the ledger after every reply. For the first, I went beyond praising a flood barrier. I described how preventing displacement could spare the court years of rebuilding and administration. The court singled out that observation and awarded the first merit. The later memorials used the same pattern with three different achievements.</p>
+<div class="tablewrap"><table>
+<thead><tr><th>After submission</th><th>Visible state</th><th>What the reply established</th></tr></thead>
+<tbody>
+<tr><td>First memorial</td><td>1/4, outer gate</td><td>The etiquette and one-achievement approach earned a merit.</td></tr>
+<tr><td>Second memorial</td><td>2/4, outer court</td><td>A new achievement earned another merit and advanced rank.</td></tr>
+<tr><td>Third memorial</td><td>3/4, inner court</td><td>The inner tier opened, but one achievement remained.</td></tr>
+<tr><td>Fourth memorial</td><td>4/4, highest rank</td><td>All four were recorded, and the court invited a final request.</td></tr>
+</tbody>
+</table></div>
+<p>The model judged whether each piece of praise was substantive. The ledger showed the result of that judgment. I could observe the progression, but I could not tell whether the ledger was enforced outside the model.</p>
+
+<h2>The petition that finally worked</h2>
+<p>At the highest rank, my first final petition still came back without the secret. The court accepted the salutation but said I had only gestured at the required request wording. It also wanted all four achievements together on one line as the reason for granting the secret. I had not done that. The ledger stayed at 4/4.</p>
+<p>I corrected both points. The next petition used the requested wording and placed the four achievements together in one sentence. The court returned the flag. I submitted that value to the scoreboard, and it was accepted.</p>
+<p>I have left the flag and the original lore out of this public page. The order of events matters more: two refused requests, a rule inquiry, four recorded merits, one rejected final form, and a corrected form that the gate accepted.</p>
+
+<h2>What this solve does and does not show</h2>
+<p>I solved the puzzle by following its published conditions. The earlier acrostic attempt failed, but it had etiquette errors too. The transcript does not prove how the target would respond to every other prompt or whether an independent filter stood behind it. The flag's release was allowed by the game's rules after I reached the top rank.</p>
+<p>That distinction matters when I carry the challenge into security work. A model can play an engaging court and judge whether a memorial is thoughtful. I would not let that same judgment grant access to a real secret. The sensitive value and the decision to release it belong behind an independent authorization check. <a href="https://genai.owasp.org/llmrisk/llm072025-system-prompt-leakage/">OWASP's system-prompt guidance</a> makes the same point about secrets and strict controls.</p>
+
+<h2>How I would take this full circle</h2>
+<h3>Build the gate outside the model</h3>
+<p>For a real application, I would keep the secret out of the prompt and make the server own the authorization state. It would decide who may request the secret, what object they may access, and when. The model could explain a workflow or collect a request, but its prose and its self-reported rank would not change permissions. An output check can add defense in depth for known sensitive values, though it cannot make a model-held secret safe by catching every possible transformation.</p>
+<h3>Turn the solve into a purple team exercise</h3>
+<p>I would replay the observed direct request, acrostic request, four valid submissions, and both final petitions against a small test gateway. I would add negative cases that this CTF never tested: a forged rank written in user text, a final petition before the required state, a repeated achievement, and a request for another user's secret. The blue team would check the server's decisions and state transitions, while the red team checked whether any unauthorized request could reach the value.</p>
+<div class="tablewrap"><table>
+<thead><tr><th>Test</th><th>Expected server decision</th><th>What to inspect</th></tr></thead>
+<tbody>
+<tr><td>Final request at zero merits or with a forged rank</td><td>Deny</td><td>Authorization decision and unchanged state</td></tr>
+<tr><td>Duplicate or malformed merit submission</td><td>No new merit</td><td>Recorded achievement and reason for rejection</td></tr>
+<tr><td>Four valid merits, malformed final request</td><td>Deny until form and policy pass</td><td>State remains eligible; secret remains withheld</td></tr>
+<tr><td>Eligible user, valid request for their own value</td><td>Allow</td><td>Scoped release event and audit record</td></tr>
+</tbody>
+</table></div>
+<p>Those are proposed tests. I did not build or run that gateway during the challenge. The court transcript supplies the scenario and expected game behavior, not production test results.</p>
+
+<h2>What I would log and detect</h2>
+<p>The useful event is an authorization decision, not merely a prompt containing suspicious words. I would log a session identifier, the authenticated subject and tenant, the state before and after the request, the decision, a reason code, and whether a protected value was released. I would limit raw prompt retention and redact sensitive material where a reviewed investigation does require it.</p>
+<p>A defender could then look for releases after denied decisions, merit or rank changes without a corresponding approved event, and clusters of refused bypass attempts. A phrase list for words such as "acrostic" or "Base64" might help triage, but it would miss paraphrases and catch legitimate testing. I would measure those misses and false alarms with a fixture before treating an alert as reliable. This is a proposed detection design; the CTF supplied no production gateway logs.</p>
+
+<h2>Framework and control fit</h2>
+<details class="fold">
+<summary>Show the mapping and its limits</summary>
+<p><a href="https://genai.owasp.org/llmrisk/llm01-prompt-injection/">OWASP LLM01:2025</a> and MITRE ATLAS <code>AML.T0051.000</code> describe the broader direct-prompt attack path I considered. MITRE ATLAS <code>AML.T0054</code> is a closer fit for the acrostic attempt to get around the gate's refusal. These labels describe attempted behavior, not a successful bypass. I prepared an instruction-dump idea associated with <code>AML.T0056</code>, but never sent it, so it is excluded from the observed technique mapping. <a href="https://github.com/mitre-atlas/atlas-data/blob/main/dist/ATLAS.yaml">MITRE's ATLAS data</a> defines the technique IDs.</p>
+<p><a href="https://genai.owasp.org/llmrisk/llm022025-sensitive-information-disclosure/">OWASP LLM02:2025</a> names the risk that motivated the exercise. Here the game deliberately disclosed its flag after its own conditions were met. That result does not establish an unauthorized leak in a real service. <a href="https://genai.owasp.org/llmrisk/llm072025-system-prompt-leakage/">OWASP LLM07:2025</a> is useful as a design warning, but I never saw the system prompt or proved that the flag lived in it.</p>
+<p>NIST SP 800-53 <code>SI-10</code> (Information Input Validation), <code>SI-15</code> (Information Output Filtering), and <code>AC-6</code> (Least Privilege) are proposed control analogues for a production gateway. They are not controls I verified in the challenge. I would apply them as server-side request checks, defense-in-depth output checks, and scoped authorization. The <a href="https://doi.org/10.6028/NIST.SP.800-53r5">NIST control catalog</a> provides the control text.</p>
+<p>The exercise produced no infrastructure, campaign, or reusable indicator of compromise, so I would not create STIX or TAXII intelligence artifacts for it. Enterprise ATT&amp;CK would stretch the story as well; the AI-specific ATLAS and OWASP mappings carry the useful part.</p>
+</details>
+
+<h2>Reusable method and evidence limits</h2>
+<details class="fold">
+<summary>Show the checklist</summary>
+<ol>
+<li>Record the challenge's visible state and what counts as success.</li>
+<li>Keep sent prompts separate from ideas you only prepared. Save each reply before changing course.</li>
+<li>Ask the gate to state its rules if the interface allows it. Treat the reply as a claim to test.</li>
+<li>Submit one qualifying action at a time and check the state after each response.</li>
+<li>Read final conditions literally. If rejected, compare the stated failure with the next submission.</li>
+<li>Record disclosure and scoreboard acceptance separately. Withhold the flag from a public writeup when publication would expose it.</li>
+</ol>
+<p>This checklist is a reusable abstraction from one challenge. It has not been validated across other gatekeepers. No public script or synthetic gateway accompanies this page.</p>
+</details>
+
+<h2>References</h2>
+<details class="fold">
+<summary>Show primary sources</summary>
+<ol>
+<li><a href="https://genai.owasp.org/llmrisk/llm01-prompt-injection/">OWASP LLM01:2025, Prompt Injection</a></li>
+<li><a href="https://genai.owasp.org/llmrisk/llm022025-sensitive-information-disclosure/">OWASP LLM02:2025, Sensitive Information Disclosure</a></li>
+<li><a href="https://genai.owasp.org/llmrisk/llm072025-system-prompt-leakage/">OWASP LLM07:2025, System Prompt Leakage</a></li>
+<li><a href="https://github.com/mitre-atlas/atlas-data/blob/main/dist/ATLAS.yaml">MITRE ATLAS technique data</a></li>
+<li><a href="https://doi.org/10.6028/NIST.SP.800-53r5">NIST SP 800-53 Rev. 5</a></li>
+</ol>
+</details>
+
+        </div>
+      </div>
+
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009"></script>
+</body>
+</html>
