@@ -35,16 +35,18 @@
     "title": "Four Merits and a Final Petition",
     "url": "/cyber-ops/ctf-writeups/ai/llm-court-gatekeeper/",
     "category": "AI Security",
-    "difficulty": "Medium",
+    "difficulty": "Medium (self-rated)",
     "date": "2026-10",
     "tags": [
-      "LLM gatekeeper",
+      "LLM security",
       "prompt injection",
+      "jailbreak testing",
       "stateful authorization",
+      "sensitive information disclosure",
       "purple team",
       "access control"
     ],
-    "summary": "Two requests failed against a courtly LLM. I learned its rules, earned four merits, and corrected a final petition to recover the flag, then carried the lesson into access control and purple team testing."
+    "summary": "A courtly LLM refused my direct and acrostic requests. I earned four merits, corrected a final petition, and submitted the disclosed flag successfully. The case becomes a proposed gateway and purple team test."
   },
   {
     "title": "Three Code Objects in One Python Function",
