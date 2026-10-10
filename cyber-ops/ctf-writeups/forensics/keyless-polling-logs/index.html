@@ -107,6 +107,7 @@
 </tr>
 </tbody>
 </table>
+<p>Defensive proofs of concept for checking keyless record linkage in real workflows: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/keyless-polling-logs">view the files on GitHub</a>.</p>
 <h2>1. Problem Statement and Threat Scenario</h2>
 <p>I had three files from a fictional county election. The lookup CSV assigned each registered voter to a county block. A second file listed voters as they checked in. A third listed the votes in the order they were cast, with the chosen party. The vote file had no voter ID. My task was to count the blocks where the incumbent party won the most votes.</p>
 <p>"Won" mattered here. This was a first-past-the-post count, so a party could win a block with less than half the votes if every other party received fewer. The answer was a two-digit number inside the event's flag format. I withhold the actual number and party labels. The worked example below uses invented voters and three invented blocks.</p>
@@ -123,13 +124,13 @@
 <details class="fold section-fold">
 <summary>3. Tooling and Scripts</summary>
 <p>The first checks were plain shell commands. They show what I wanted to know before the tally: whether the files were stable, how many records they held, and where the fields actually sat. The names below match the <a href="fixtures/lookup.csv">synthetic fixture</a> used on this page.</p>
-<pre><code class="language-bash">sha256sum lookup.csv checkins.log votes.log
-wc -l lookup.csv checkins.log votes.log
-head -n 2 lookup.csv checkins.log votes.log
-awk -F: '{print $NF}' votes.log | sort | uniq -c | sort -rn
-comm -23 &lt;(awk '{print $NF}' checkins.log | sort -u) \
-  &lt;(tail -n +2 lookup.csv | cut -d, -f1 | sort -u) | wc -l
-awk '{print $1&quot; &quot;$2}' checkins.log | sort -c
+<pre><code class="language-bash">sha256sum fixtures/lookup.csv fixtures/checkins.log fixtures/votes.log
+wc -l fixtures/lookup.csv fixtures/checkins.log fixtures/votes.log
+head -n 2 fixtures/lookup.csv fixtures/checkins.log fixtures/votes.log
+awk -F: '{print $NF}' fixtures/votes.log | sort | uniq -c | sort -rn
+comm -23 &lt;(awk '{print $NF}' fixtures/checkins.log | sort -u) \
+  &lt;(tail -n +2 fixtures/lookup.csv | cut -d, -f1 | sort -u) | wc -l
+awk '{print $1&quot; &quot;$2}' fixtures/checkins.log | sort -c
 </code></pre>
 <p>The <code>comm</code> check looks for checked-in IDs missing from the lookup; its expected output is zero. The last line checks that check-ins are time sorted. Those quick commands helped me decide whether an order-based analysis was even plausible. The Python helper handles the actual CSV parsing, including quoted fields.</p>
 <p>For the repeatable calculation, the <a href="block_tally.py">Python helper</a> reads the lookup CSV with <code>csv.DictReader</code>, parses both logs, checks counts and unique IDs, and tallies party choices by block. It uses only the standard library. The command below runs it on the invented data:</p>
@@ -159,6 +160,7 @@ for block, parties in counts.items():
 <p>This is a record-linkage problem. I needed to connect a row in one file to a row in another file even though they shared no voter key. Fellegi and Sunter's work covers the broader problem of linking records without a reliable common identifier. My case used a much narrower rule: ordinal position. I did not calculate probabilistic match scores.</p>
 <p>The lookup could answer "which block owns this voter ID." It could not answer "which ballot did this voter cast." The event logs supplied an ordering that suggested a bridge. Before using it, I checked the parts the files could show: equal row counts, a one-to-one lookup of check-in IDs, sequential records, and increasing times.</p>
 <p>There is a limit to those checks. Imagine A checks in at 09:00 and B at 09:01. B votes at 09:02; A votes at 09:03. Both logs are sorted and each check-in precedes the vote in the same row. Pairing by row still assigns the votes to the wrong people. The join needs an additional process assumption: voters do not pass one another between check-in and ballot casting. The puzzle's accepted answer supported that interpretation for the requested aggregate, but the files alone did not prove each person's vote.</p>
+<p>I made that uncertainty visible with a separate four-voter toy case. In the <a href="linkage_sensitivity.py">bounded pairing check</a>, all 24 assignments satisfy the rule that each ballot follows its assigned check-in. The FIFO join gives Alpha one block win; other time-compatible pairings give either zero or one. This is a synthetic sensitivity test, not a reanalysis of the withheld challenge files or a claim about real voters.</p>
 <p>I also had to mind the formats. CSV can use CRLF line endings and quoted fields, as RFC 4180 describes. Python's CSV reader handles those details more safely than splitting each row on a comma. In the vote log, I split from the right so the colons inside <code>HH:MM:SS</code> stayed part of the timestamp. Finally, plurality meant the highest count in a block. It did not require more than 50 percent.</p>
 
 </details>
@@ -221,6 +223,7 @@ Groups won by Alpha: 2
 <details class="fold section-fold">
 <summary>8. Reusable Tools, Scripts, and Artifacts</summary>
 <p>The <a href="block_tally.py">block tally helper</a> and <a href="fixtures/lookup.csv">lookup</a>, <a href="fixtures/checkins.log">check-in</a>, and <a href="fixtures/votes.log">vote</a> fixture files let a reader rerun the public example. The helper takes <code>--lookup</code>, <code>--sequence</code>, <code>--values</code>, <code>--target</code>, and the required <code>--assume-fifo</code> acknowledgment. It prints each block's party counts, its unique plurality winner or <code>TIE</code>, and the target's win count.</p>
+<p>The <a href="linkage_sensitivity.py">linkage sensitivity checker</a> uses a second fictional <a href="fixtures/ambiguity_lookup.csv">lookup</a>, <a href="fixtures/ambiguity_checkins.log">check-in log</a>, and <a href="fixtures/ambiguity_votes.log">vote log</a> to enumerate all time-compatible pairings for a tiny case. The <a href="README.md">file guide</a> gives both commands, required inputs, expected outputs, and limits. The checker caps enumeration at eight rows. Its purpose is to test how much the result depends on FIFO; it does not identify how any real person voted.</p>
 <p>I validated the fixture's expected count of two. I also checked the failure path for a missing FIFO acknowledgment and for a malformed input. The helper uses Python 3's standard library. It assumes one lookup row and one check-in per voter, one vote per check-in, and a reliable common ordering. It does not solve missing events, duplicate events, or many-to-one relationships.</p>
 <p>The case-specific labels and the accepted two-digit count are withheld. The fixture is synthetic and its count of two is only a worked example.</p>
 
@@ -245,11 +248,13 @@ Groups won by Alpha: 2
 <summary>12. Indicators, Artifacts, and Detection Engineering</summary>
 <p>The artifacts here are the lookup, check-in, and vote records. They support a tally under the stated assumption. They are not indicators of malicious behavior. I did not produce a YARA rule, Sigma rule, or production query because the exercise contained no realistic security sensor or malicious event to detect.</p>
 <p>The useful quality checks were analytical: missing IDs, duplicate rows, unsorted times, a vote timestamp preceding its paired check-in, block-size mismatch, and vote-total mismatch. In the helper these stop the calculation or expose its assumptions. They are data-integrity checks, not deployed detections.</p>
+<p>The linked sensitivity case is one more quality check. The synthetic logs pass the ordinary count, ID, and time checks, yet permit different block results when pairing changes. I would use a result like that to flag the attribution assumption for review, not to alert on malicious activity.</p>
 
 </details>
 <details class="fold section-fold">
 <summary>13. Visual Artifact</summary>
-<p>The <a href="#analysis-flow">diagram above</a> shows how the three files meet. I placed the checks before the positional join because a tidy tally can hide a bad pairing. The path to the count depends on the first-in, first-out assumption even after every machine-checkable condition passes.</p>
+<p>The <a href="#analysis-flow">diagram above</a> shows how the three files meet. I placed the checks before the positional join because a tidy tally can hide a bad pairing. The path to the count depends on the first-in, first-out assumption even after every machine-checkable condition passes. The <a href="join-flow.svg">expanded data-flow diagram</a> shows the stop branch for failed checks and the separate FIFO step.</p>
+<p><img alt="Three polling files pass an invariant gate before a positional join, tally, and block count; failed checks stop the analysis." src="join-flow.svg" /></p>
 
 </details>
 <details class="fold section-fold">

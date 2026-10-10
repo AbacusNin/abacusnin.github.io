@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 610" role="img" aria-labelledby="title description">
+  <title id="title">Keyless polling-log join with a stop branch</title>
+  <desc id="description">A lookup maps voter IDs to blocks. Check-in and vote logs pass count, identifier, and time checks before a positional join under an explicit FIFO assumption. Failed checks stop the tally. A passing join produces per-block party counts and a plurality win count, while FIFO remains unproven from the files alone.</desc>
+  <defs>
+    <marker id="go" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#43d8c8"/></marker>
+    <marker id="stop" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#ff779b"/></marker>
+  </defs>
+  <rect width="1040" height="610" rx="18" fill="#0c1019"/>
+  <text x="30" y="42" font-family="Arial,sans-serif" font-size="22" font-weight="bold" fill="#f5f7f8">Three files, one assumption-sensitive join</text>
+  <g fill="#151d2b" stroke="#3d5b6c" stroke-width="2">
+    <rect x="35" y="92" width="260" height="85" rx="10"/>
+    <rect x="390" y="92" width="260" height="85" rx="10"/>
+    <rect x="745" y="92" width="260" height="85" rx="10"/>
+    <rect x="390" y="230" width="260" height="100" rx="10"/>
+    <rect x="745" y="230" width="260" height="100" rx="10" stroke="#ff779b"/>
+    <rect x="390" y="390" width="260" height="85" rx="10" stroke="#e2b970"/>
+    <rect x="745" y="390" width="260" height="85" rx="10"/>
+    <rect x="745" y="505" width="260" height="70" rx="10"/>
+  </g>
+  <g font-family="Arial,sans-serif" font-size="17" fill="#f5f7f8">
+    <text x="62" y="126">Lookup CSV</text><text x="62" y="151" font-size="14">voter ID to block</text>
+    <text x="419" y="126">Check-in log</text><text x="419" y="151" font-size="14">voter IDs in time order</text>
+    <text x="773" y="126">Vote log</text><text x="773" y="151" font-size="14">party choices in time order</text>
+    <text x="415" y="265">Check invariants</text><text x="415" y="289" font-size="14">counts, IDs, sequence, times</text>
+    <text x="771" y="266">Stop on failure</text><text x="771" y="290" font-size="14">do not report a tally</text>
+    <text x="414" y="425">Pair row i with row i</text><text x="414" y="450" font-size="14">FIFO assumption required</text>
+    <text x="771" y="425">Per-block tally</text><text x="771" y="450" font-size="14">unique plurality winner</text>
+    <text x="771" y="537">Count target wins</text><text x="771" y="558" font-size="14">aggregate answer only</text>
+  </g>
+  <g fill="none" stroke="#43d8c8" stroke-width="3" marker-end="url(#go)">
+    <path d="M520 177 V230"/>
+    <path d="M875 177 V202 H630 V230"/>
+    <path d="M165 177 V432 H390"/>
+    <path d="M520 330 V390"/>
+    <path d="M650 432 H745"/>
+    <path d="M875 475 V505"/>
+  </g>
+  <path d="M650 280 H745" fill="none" stroke="#ff779b" stroke-width="3" stroke-dasharray="8 6" marker-end="url(#stop)"/>
+  <text x="35" y="594" font-family="Arial,sans-serif" font-size="13" fill="#b8c8d0">Passing checks do not prove FIFO. Different time-compatible pairings may change the block result.</text>
+</svg>
