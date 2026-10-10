@@ -242,5 +242,27 @@
     ],
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/forensics/keyless-polling-logs/"
+  },
+  {
+    "title": "Three Allowed Fields, One Protected Code",
+    "category": "AI Security",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "LLM guardrail bypass",
+      "aggregation/inference disclosure",
+      "broken access control",
+      "prompt-based elicitation",
+      "agentic AI",
+      "OWASP LLM02"
+    ],
+    "summary": "An LLM records clerk refused to explain a protected code, then listed its parts and disclosed each one separately. I joined the allowed fields and used its verifier to release the target.",
+    "aliases": [
+      "release of information",
+      "composite authorization",
+      "session aggregation"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/ai/roi-clerk-aggregation/"
   }
 ]
