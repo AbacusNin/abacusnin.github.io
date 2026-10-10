@@ -105,6 +105,7 @@
 </tr>
 </tbody>
 </table>
+<p>Defensive proof of concept for checking an Atbash hypothesis in real investigations: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/crypto/atbash-flag">view the files on GitHub</a>.</p>
 <h2>1. Problem Statement and Threat Scenario</h2>
 <p>I had a short token and a taunting message. This was the first key in a series whose later framing mentioned combining keys with XOR. My immediate job was narrower: recover the flag represented by this one token. I had no program to reverse, no service to query, and no traffic capture. The token itself was the entire artifact.</p>
 <p>The answer was expected to fit a <code>&lt;ctf-prefix&gt;{...}</code> wrapper. I do not show the challenge's actual token or recovered flag here. The example throughout this page is a generic pair made to show the same transform. The challenge was a cipher puzzle, with no observed intrusion, victim, or operational threat model.</p>
@@ -177,7 +178,7 @@ assert atbash(result) == text
 </details>
 <details class="fold section-fold">
 <summary>8. Reusable Tools, Scripts, and Artifacts</summary>
-<p>The <a href="atbash_codec.py">Atbash codec</a> accepts one string and prints its reflected form. It needs Python 3 and the standard library only. Its built-in sample makes a quick smoke check possible; the <a href="sample_atbash.txt">sample fixture</a> records both sides of that example. Neither file contains the challenge value. The codec works on ASCII Latin letters and leaves all other characters unchanged.</p>
+<p>The <a href="atbash_codec.py">Atbash codec</a> accepts one string and prints its reflected form. It needs Python 3 and the standard library only. Its built-in sample makes a quick smoke check possible; the <a href="sample_atbash.txt">sample fixture</a> records both sides of that example. The <a href="README.md">file guide</a> gives the command, expected output, and limits for using the codec during authorized string triage. None of these files contains the challenge value. The codec works on ASCII Latin letters and leaves all other characters unchanged.</p>
 <p>I also keep a short triage sequence for similar puzzles:</p>
 <ol>
 <li>Record the raw character set, length, and delimiters.</li>
@@ -207,12 +208,13 @@ assert atbash(result) == text
 </details>
 <details class="fold section-fold">
 <summary>12. Indicators, Artifacts, and Detection Engineering</summary>
-<p>The supplied token is a challenge artifact, not a production indicator. The local decode created no host or network telemetry relevant to detection engineering. I therefore have no YARA or Sigma rule, SIEM query, hunt result, or SOC analytic to claim. If the same encoding appeared in a real artifact, I would first establish the file or process context and then test whether a detector could distinguish it from ordinary text.</p>
+<p>The supplied token is a puzzle input, not a production indicator. The local decode created no host or network telemetry relevant to detection engineering. I therefore have no YARA or Sigma rule, SIEM query, hunt result, or SOC analytic to claim. If the same encoding appeared in a real artifact, I would first establish the file or process context and then test whether a detector could distinguish it from ordinary text.</p>
 
 </details>
 <details class="fold section-fold">
 <summary>13. Visual Artifact</summary>
-<p>The <a href="#analysis-flow">flow diagram above</a> shows the decision I made before decoding: inspect the token, set aside the later XOR combination hint, then try an alphabet reflection. It also keeps the round-trip code check separate from the platform's acceptance of the answer.</p>
+<p>The <a href="#analysis-flow">flow diagram above</a> shows the decision I made before decoding: inspect the token, set aside the later XOR combination hint, then try an alphabet reflection. It also keeps the round-trip code check separate from the platform's acceptance of the answer. The <a href="representation-flow.svg">expanded representation diagram</a> restores the alternate byte-oriented route that I considered but did not need for this token.</p>
+<p><img alt="A flag-shaped token leads to an Atbash test, a round-trip check, flag-format validation, and submission; an alternate XOR or hex route remains separate." src="representation-flow.svg" /></p>
 
 </details>
 <details class="fold section-fold">
