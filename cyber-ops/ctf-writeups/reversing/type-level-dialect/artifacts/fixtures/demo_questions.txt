@@ -1,0 +1,7 @@
+greeting object
+object ending
+greeting ending
+greeting object ending
+object greeting
+ending object
+greeting object ending

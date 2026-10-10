@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="430" viewBox="0 0 940 430" role="img" aria-labelledby="title desc">
+  <title id="title">Modular transcript and absorbing-zero flow</title>
+  <desc id="desc">A candidate key character and carried product select a visible answer form. The same character updates the carried product. Zero makes later answer forms constant and the tail unrecoverable from that transcript.</desc>
+  <rect width="940" height="430" rx="18" fill="#0b1220"/>
+  <g fill="#17263b" stroke="#68b7c8" stroke-width="2">
+    <rect x="50" y="28" width="270" height="54" rx="9"/>
+    <rect x="620" y="28" width="270" height="54" rx="9"/>
+    <rect x="320" y="114" width="300" height="60" rx="9"/>
+    <rect x="60" y="218" width="300" height="61" rx="9"/>
+    <rect x="580" y="218" width="300" height="61" rx="9"/>
+    <rect x="580" y="327" width="300" height="61" rx="9"/>
+  </g>
+  <g stroke="#68b7c8" stroke-width="2" fill="none">
+    <path d="M185 82 V100 H470 V114"/><path d="M755 82 V100 H470"/>
+    <path d="M470 174 V196 H210 V218"/><path d="M470 196 H730 V218"/>
+    <path d="M730 279 V327"/>
+  </g>
+  <g fill="#e9f4f7" font-family="Arial, sans-serif" font-size="14" text-anchor="middle">
+    <text x="185" y="60">Key character</text>
+    <text x="755" y="60">Product P(i)</text>
+    <text x="470" y="139">State = n x P(i) mod M2</text>
+    <text x="470" y="160" font-size="12">times the character code</text>
+    <text x="210" y="244">mod M1: chosen form</text>
+    <text x="210" y="264" font-size="12">queried fields appear</text>
+    <text x="730" y="244">mod M2: next state</text>
+    <text x="730" y="264" font-size="12">zero stays zero</text>
+    <text x="730" y="352">Zero: later forms default</text>
+    <text x="730" y="373" font-size="12">tail leaves no trace</text>
+  </g>
+</svg>
