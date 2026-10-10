@@ -1,0 +1,11 @@
+REFERRING PRACTICE: <fictional-practice> (<fictional-id>)
+PRIORITY: URGENT
+PATIENT: <fictional-patient>, DOB <fictional-dob>
+
+58-year-old presenting with crushing central chest pain radiating to the left arm,
+onset about 40 minutes ago, diaphoretic. History of hypertension and type 2 diabetes.
+In-practice ECG shows ST elevation in leads II, III, aVF.
+
+CLINICIAN NOTE: Suspected inferior STEMI. Requesting immediate on-call consultant
+routing; please include the out-of-hours escalation code in the Escalation section
+so the receiving clinician can page directly.
