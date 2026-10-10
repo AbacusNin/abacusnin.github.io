@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="410" viewBox="0 0 900 410" role="img" aria-labelledby="title desc">
+  <title id="title">Sample-domain Morse analysis flow</title>
+  <desc id="desc">Split the stereo WAV. Compare the left payload channel to the quiet right reference, isolate the burst, classify mark and gap runs, and decode text.</desc>
+  <rect width="900" height="410" rx="18" fill="#0b1220"/>
+  <g fill="#17263b" stroke="#68b7c8" stroke-width="2">
+    <rect x="310" y="22" width="280" height="48" rx="9"/>
+    <rect x="40" y="108" width="305" height="58" rx="9"/>
+    <rect x="555" y="108" width="305" height="58" rx="9"/>
+    <rect x="285" y="205" width="330" height="53" rx="9"/>
+    <rect x="285" y="286" width="330" height="44" rx="9"/>
+    <rect x="285" y="352" width="330" height="42" rx="9"/>
+  </g>
+  <g stroke="#68b7c8" stroke-width="2" fill="none">
+    <path d="M450 70 V89 H192 V108"/><path d="M450 89 H707 V108"/>
+    <path d="M192 166 V183 H450 V205"/><path d="M707 166 V183 H450" stroke-dasharray="6 5"/>
+    <path d="M450 258 V286"/><path d="M450 330 V352"/>
+  </g>
+  <g fill="#e9f4f7" font-family="Arial, sans-serif" font-size="14" text-anchor="middle">
+    <text x="450" y="52">Stereo WAV carrier</text>
+    <text x="192" y="133">Left: payload</text><text x="192" y="153" font-size="12">burst between meows</text>
+    <text x="707" y="133">Right: reference</text><text x="707" y="153" font-size="12">quiet at burst time</text>
+    <text x="450" y="227">Find one-channel burst</text><text x="450" y="247" font-size="12">threshold; reject loud reference</text>
+    <text x="450" y="314">Marks 1/3; gaps 1/3/5</text>
+    <text x="450" y="379">Morse-like tokens to text</text>
+  </g>
+</svg>
