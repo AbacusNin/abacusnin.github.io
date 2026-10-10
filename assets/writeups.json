@@ -108,5 +108,28 @@
       "sample-domain analysis"
     ],
     "status": "Solved"
+  },
+  {
+    "title": "The Clinician Note That Crossed the Line",
+    "category": "AI Security",
+    "difficulty": "Hard",
+    "date": "2026-10",
+    "tags": [
+      "indirect prompt injection",
+      "confused deputy",
+      "LLM guardrail bypass",
+      "sensitive-information disclosure",
+      "AI red-teaming",
+      "social engineering"
+    ],
+    "summary": "A triage assistant refused direct requests for a protected escalation code. A realistic urgent referral and a requester-authored clinician note moved that code into its summary.",
+    "aliases": [
+      "clinical triage",
+      "referral note",
+      "escalation code",
+      "prompt injection"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/ai/clinician-note-triage/"
   }
 ]
