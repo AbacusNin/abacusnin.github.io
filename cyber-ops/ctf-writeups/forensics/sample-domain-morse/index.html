@@ -101,6 +101,7 @@
 </tr>
 </tbody>
 </table>
+<p>The <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/sample-domain-morse/artifacts">GitHub artifacts folder</a> holds the runnable defensive lab and its synthetic WAVs.</p>
 <h2>1. Problem Statement and Threat Scenario</h2>
 <p>I was given one stereo WAV and asked to find a message hidden in it. The recording was a few seconds of cat sounds. The prompt made an emphatic pun on a familiar audio editor, so the spectrogram was the obvious place to look first. The expected answer was a short English sentence inside the event's flag wrapper. I keep the sentence itself out of this public account.</p>
 <p>I had the audio file and worked offline. There was no service to query, no credentials, and no network target. The task was to find where the data lived in the WAV and turn it back into text. The challenge did not present an adversary or an operational environment, so the defender ideas later in this article are separate proposals.</p>
@@ -139,7 +140,7 @@ bits = (np.abs(left[lo:hi + 1]) &gt; 4000).astype(int)
 runs = [(value, sum(1 for _ in group)) for value, group in groupby(bits)]
 </code></pre>
 <p>The decoder then reads one-sample loud runs as dots and three-sample loud runs as dashes. A one-sample quiet run separates marks within a letter, three samples end a letter, and five end a word. It maps each finished dot/dash token through the Morse alphabet and flushes the final token after the loop. I would reject any unexpected run length or unmapped token rather than silently turn it into text.</p>
-<p>My working decoder also used a neutral synthetic WAV carrying <code>SAMPLE MORSE</code> to check the generic extraction path. The challenge decode was checked separately by its readable output and the accepted submission. A synthetic round trip verifies the implementation pattern; it does not prove that a detector will find this method in arbitrary noisy audio.</p>
+<p>The linked <a href="/cyber-ops/ctf-writeups/forensics/sample-domain-morse/artifacts/morse_channel_decoder.py">channel decoder</a> applies those measured run lengths to a neutral <a href="/cyber-ops/ctf-writeups/forensics/sample-domain-morse/artifacts/fixtures/sample_morse_burst.wav">synthetic WAV</a> carrying <code>SAMPLE MORSE</code>. Its <a href="/cyber-ops/ctf-writeups/forensics/sample-domain-morse/artifacts/fixtures/make_fixture.py">fixture generator</a> makes that file and two counterexamples. Run <code>python morse_channel_decoder.py fixtures/sample_morse_burst.wav</code> from the artifacts folder; it prints the sample span, the mark/gap run list, and <code>Text: SAMPLE MORSE</code>. The challenge decode was checked separately by its readable output and the accepted submission. This synthetic round trip verifies the extraction pattern, not detection in arbitrary noisy audio.</p>
 
 </details>
 <details class="fold section-fold">
@@ -229,7 +230,7 @@ runs = [(value, sum(1 for _ in group)) for value, group in groupby(bits)]
 </details>
 <details class="fold section-fold">
 <summary>8. Reusable Tools, Scripts, and Artifacts</summary>
-<p>The reusable method is a channel-aware burst decoder. Its inputs are a PCM WAV, payload and reference channel numbers, a region or burst-localization rule, an amplitude threshold, and a table of accepted mark and gap lengths. Its output is the decoded text plus the run list that supports it. The examples in Section 3 show the channel split, localization, and run-length core.</p>
+<p>The reusable method is a channel-aware burst decoder. Its inputs are a PCM WAV, payload and reference channel numbers, a region or burst-localization rule, an amplitude threshold, and a table of accepted mark and gap lengths. Its output is the decoded text plus the run list that supports it. The examples in Section 3 show the channel split, localization, and run-length core. The <a href="/cyber-ops/ctf-writeups/forensics/sample-domain-morse/artifacts/README.md">lab guide</a> gives the exact commands, inputs, expected results, and limits.</p>
 <table>
 <thead>
 <tr>
@@ -245,14 +246,14 @@ runs = [(value, sum(1 for _ in group)) for value, group in groupby(bits)]
 <td>Worked for this clean stereo carrier; a dual-channel payload would evade this condition</td>
 </tr>
 <tr>
-<td>Amplitude and run-length decoder</td>
+<td><a href="/cyber-ops/ctf-writeups/forensics/sample-domain-morse/artifacts/morse_channel_decoder.py">Amplitude and run-length decoder</a></td>
 <td>Turn the burst into dot/dash tokens and text</td>
 <td>Recorded challenge decode had no unmapped tokens; exact lengths are carrier-specific</td>
 </tr>
 <tr>
-<td>Neutral <code>SAMPLE MORSE</code> test</td>
-<td>Check that a synthetic burst decodes as expected</td>
-<td>Validates the generic path, not real-world detection performance</td>
+<td><a href="/cyber-ops/ctf-writeups/forensics/sample-domain-morse/artifacts/fixtures/sample_morse_burst.wav">Neutral <code>SAMPLE MORSE</code> WAV</a> and <a href="/cyber-ops/ctf-writeups/forensics/sample-domain-morse/artifacts/fixtures/make_fixture.py">generator</a></td>
+<td>Check the synthetic extraction path</td>
+<td>The local decoder returns <code>SAMPLE MORSE</code>; this is not a real-world detection test</td>
 </tr>
 </tbody>
 </table>
@@ -278,12 +279,12 @@ runs = [(value, sum(1 for _ in group)) for value, group in groupby(bits)]
 <details class="fold section-fold">
 <summary>12. Indicators, Artifacts, and Detection Engineering</summary>
 <p>I have no production IOC or validated YARA, Sigma, or SIEM rule from this file. The measurable artifact is a short high-amplitude mark/gap burst in one channel while the other is quiet. That supports a <strong>proposed forensic triage check</strong>, with required data being lossless stereo samples and per-channel amplitude by time window.</p>
-<p>I would test that check on benign clicks, edits, and recording defects before treating it as suspicious. I would also vary the threshold, channel, sample rate, and noise level. An alert on any one-channel transient would be noisy; the specific run-length groups provide a second filter, but I have not measured its sensitivity or false-positive rate. ATT&amp;CK's steganography entry supplies context for the technique, not validation of this proposed check.</p>
+<p>The lab includes a <a href="/cyber-ops/ctf-writeups/forensics/sample-domain-morse/artifacts/fixtures/benign_click.wav">benign two-sample click</a> and a <a href="/cyber-ops/ctf-writeups/forensics/sample-domain-morse/artifacts/fixtures/two_channel_near_miss.wav">two-channel near miss</a>. The decoder rejects the click for its unexpected mark length and rejects the copied burst because the reference channel is also loud. Both outcomes are synthetic checks. I would still test ordinary clicks, edits, and recording defects across varied thresholds, channels, sample rates, and noise before treating this as a screening method. An alert on any one-channel transient would be noisy; the specific run-length groups provide a second filter, but I have not measured sensitivity or false-positive rate. ATT&amp;CK's steganography entry supplies context for the technique, not validation of this proposed check.</p>
 
 </details>
 <details class="fold section-fold">
 <summary>13. Visual Artifact</summary>
-<p>The <a href="#analysis-flow">flow beside the summary</a> shows the actual solve path from stereo carrier to readable message. The decisive branch was the channel split: the left channel had a brief burst outside the meows, while the right channel stayed quiet at that moment. Thresholding and run-length encoding then exposed the timing.</p>
+<p>The <a href="#analysis-flow">flow beside the summary</a> shows the solve path from stereo carrier to readable message. The <a href="/cyber-ops/ctf-writeups/forensics/sample-domain-morse/artifacts/channel-flow.svg">expanded channel diagram</a> shows the quiet right channel feeding the isolation step. The decisive branch was the channel split: the left channel had a brief burst outside the meows, while the right channel stayed quiet at that moment. Thresholding and run-length encoding then exposed the timing.</p>
 <table>
 <thead>
 <tr>
