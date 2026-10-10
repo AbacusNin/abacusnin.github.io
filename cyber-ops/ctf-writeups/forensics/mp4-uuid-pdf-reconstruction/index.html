@@ -77,7 +77,7 @@
 </tr>
 <tr>
 <td>Tags</td>
-<td>MP4, ISO-BMFF, uuid` box, data hiding, file carving, PDF reconstruction, DEFLATE/zlib</td>
+<td>MP4, ISO-BMFF, uuid box, data hiding, file carving, PDF reconstruction, DEFLATE/zlib</td>
 </tr>
 <tr>
 <td>Status</td>
@@ -101,6 +101,7 @@
 </tr>
 </tbody>
 </table>
+<p>The <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/mp4-uuid-pdf-reconstruction/artifacts">GitHub artifacts folder</a> holds the runnable container-inspection and reconstruction lab.</p>
 <h2>1. Problem Statement and Threat Scenario</h2>
 <p>I was given fifteen short video files and a hint about information moving through shared reels. Every video played normally. The task was to find the concealed data, rebuild its original artifact, and recover the five-word flag inside it. I had the files only, with no live target or network capture.</p>
 <p>The prompt sounded like exfiltration, but the artifacts did not show an attacker, defender, or actual transfer. I treat that story as the puzzle's framing. Later sections use media-based data hiding as an operational analogy and propose a content-inspection exercise.</p>
@@ -168,6 +169,7 @@ if kind == b&quot;uuid&quot;:
 </tr>
 </tbody>
 </table>
+<p>The linked <a href="/cyber-ops/ctf-writeups/forensics/mp4-uuid-pdf-reconstruction/artifacts/mp4_uuid_pdf_reassemble.py">MP4/PDF lab tool</a> makes the parser and validation steps runnable. Its <a href="/cyber-ops/ctf-writeups/forensics/mp4-uuid-pdf-reconstruction/artifacts/make_fixture.py">fixture generator</a> builds a neutral PDF split across fifteen test containers and one benign metadata carrier. Those containers exercise the byte-level checks, including an extended-size <code>uuid</code> box, but they are not playable video. The lab takes an analyst-supplied structural order and tests bounded permutations of the opaque stream. It does not infer every PDF fragment's position on its own.</p>
 
 </details>
 <details class="fold section-fold">
@@ -188,6 +190,28 @@ if kind == b&quot;uuid&quot;:
 <summary>6. Lessons Learned</summary>
 <p>The container tree gave me the hiding place before I spent time decoding the video or audio. I will check extension boxes early when media plays cleanly but still seems to carry data. The first filename order was attractive because it came with a story. The PDF header, object grammar, and checksum were better witnesses.</p>
 <p>I also learned to build validation into the reassembler. The stream inflated and the cross-reference offsets landed on the expected objects. For a fuller PDF check, I would also compare <code>/Length</code> with the stored, encoded stream bytes. The same habit transfers to other checksummed or self-describing formats.</p>
+<table>
+<thead>
+<tr>
+<th>What happened in the puzzle</th>
+<th>Defensive analysis parallel</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>One PDF was split across video extension boxes</td>
+<td>Inspect container extensions and group related media before ruling out staged data.</td>
+</tr>
+<tr>
+<td>Filename short codes led to a failed order</td>
+<td>Use the recovered payload's structure to test an ordering hypothesis.</td>
+</tr>
+<tr>
+<td>zlib and PDF offsets checked the assembly</td>
+<td>Keep checksum and format checks with any recovered object.</td>
+</tr>
+</tbody>
+</table>
 
 </details>
 <details class="fold section-fold">
@@ -202,6 +226,7 @@ if kind == b&quot;uuid&quot;:
 <details class="fold section-fold">
 <summary>8. Reusable Tools, Scripts, and Artifacts</summary>
 <p>The reusable method is an MP4 <code>uuid</code>-box carver followed by a PDF reassembler. Its inputs are a set of MP4 carriers and an output path. It produces each extracted fragment, their recovered order, and the assembled PDF. Python's standard library is enough for the parser, permutations, and zlib checks. In the challenge run, the tool reproduced the target PDF byte for byte even after the carrier files were given generic names. Decompression and cross-reference offsets provided the structural checks.</p>
+<p>The <a href="/cyber-ops/ctf-writeups/forensics/mp4-uuid-pdf-reconstruction/artifacts/README.md">runnable lab guide</a> describes the separate synthetic check. The <a href="/cyber-ops/ctf-writeups/forensics/mp4-uuid-pdf-reconstruction/artifacts/mp4_uuid_pdf_reassemble.py">tool</a> scans <code>uuid</code> boxes and validates a guided reconstruction. The <a href="/cyber-ops/ctf-writeups/forensics/mp4-uuid-pdf-reconstruction/artifacts/make_fixture.py">generator</a> produces its own neutral test files. A manifest supplies the readable-fragment order; the tool searches at most seven compressed fragments and writes a PDF only when one order passes all of its checks. The lab restored a 627-byte, one-page PDF with the expected neutral text and SHA-256 <code>26db50075c6324217909e2ef22a55a9555ac5f8163e38634ada6c21240a9b11e</code>.</p>
 <p>The method assumes the carriers together hold one PDF with a small, reorderable compressed stream. It would need more constraints for a larger permutation space or multiple hidden documents. A parser used on untrusted uploads also needs strict box-size and file-size limits before allocating or trying combinations.</p>
 </details>
 <details class="fold section-fold">
@@ -244,6 +269,7 @@ if kind == b&quot;uuid&quot;:
 <details class="fold section-fold">
 <summary>12. Indicators, Artifacts, and Detection Engineering</summary>
 <p>The file content suggests a detection question: which media objects carry substantial user-extension data, and can the pipeline find documents split across several related files? A whole-file <code>%PDF-</code> signature could identify only the fragment containing the PDF header. It could not match every carrier in this set. A rule requiring both <code>uuid</code> and <code>%PDF-</code> therefore cannot support a 15-of-15 detection claim.</p>
+<p>In the neutral lab, the <a href="/cyber-ops/ctf-writeups/forensics/mp4-uuid-pdf-reconstruction/artifacts/mp4_uuid_pdf_reassemble.py">box scanner</a> found sixteen <code>uuid</code> payloads: fifteen PDF fragments and one benign metadata payload. Only one contained <code>%PDF-</code>. A deliberately wrong structural order failed validation and wrote no PDF. These checks show what the parser observes; they do not measure how a production collection pipeline would group files or how often legitimate media would trigger review.</p>
 <table>
 <thead>
 <tr>
@@ -286,7 +312,7 @@ if kind == b&quot;uuid&quot;:
 </details>
 <details class="fold section-fold">
 <summary>13. Visual Artifact</summary>
-<p>The <a href="#analysis-flow">diagram near the summary</a> shows the reconstruction path from fifteen playable carriers to the <code>uuid</code> fragments, PDF structure, zlib check, and final memo. It places the failed filename order beside the actual format-driven route.</p>
+<p>The <a href="#analysis-flow">diagram near the summary</a> shows the reconstruction path from fifteen playable carriers to the <code>uuid</code> fragments, PDF structure, zlib check, and final memo. The <a href="/cyber-ops/ctf-writeups/forensics/mp4-uuid-pdf-reconstruction/artifacts/reconstruction-flow.svg">expanded reconstruction diagram</a> separates the readable PDF syntax from the opaque compressed stream and places the failed filename order beside the format-driven route.</p>
 
 </details>
 <details class="fold section-fold">

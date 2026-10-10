@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="450" viewBox="0 0 1000 450" role="img" aria-labelledby="title desc">
+  <title id="title">MP4 uuid fragment reconstruction</title>
+  <desc id="desc">Fifteen MP4 carriers yield uuid payload fragments. PDF syntax orders readable fragments, zlib validates the opaque stream order, and xref offsets check the final PDF. Filename order is a failed path.</desc>
+  <rect width="1000" height="450" rx="18" fill="#0b1220"/>
+  <g fill="#17263b" stroke="#68b7c8" stroke-width="2">
+    <rect x="40" y="30" width="220" height="54" rx="9"/>
+    <rect x="390" y="30" width="220" height="54" rx="9"/>
+    <rect x="740" y="30" width="220" height="54" rx="9"/>
+    <rect x="120" y="170" width="290" height="61" rx="9"/>
+    <rect x="590" y="170" width="290" height="61" rx="9"/>
+    <rect x="355" y="295" width="290" height="59" rx="9"/>
+    <rect x="355" y="385" width="290" height="44" rx="9"/>
+  </g>
+  <g fill="#311f28" stroke="#e3978d" stroke-width="2">
+    <rect x="40" y="105" width="220" height="42" rx="9"/>
+  </g>
+  <g stroke="#68b7c8" stroke-width="2" fill="none">
+    <path d="M260 57 H390"/><path d="M610 57 H740"/>
+    <path d="M850 84 V137 H265 V170"/><path d="M850 137 V170 H735"/>
+    <path d="M265 231 V263 H500 V295"/><path d="M735 231 V263 H500"/>
+    <path d="M500 354 V385"/>
+  </g>
+  <g stroke="#e3978d" stroke-width="2" fill="none" stroke-dasharray="6 5">
+    <path d="M150 84 V105"/>
+  </g>
+  <g fill="#e9f4f7" font-family="Arial, sans-serif" font-size="14" text-anchor="middle">
+    <text x="150" y="62">15 MP4 files</text>
+    <text x="500" y="62">Trailing uuid</text>
+    <text x="850" y="62">15 fragments</text>
+    <text x="265" y="196">Read PDF syntax</text>
+    <text x="265" y="217" font-size="12">objects, xref, trailer</text>
+    <text x="735" y="196">Stream pieces</text>
+    <text x="735" y="217" font-size="12">try orders; validate zlib</text>
+    <text x="500" y="321">Validate PDF</text>
+    <text x="500" y="343" font-size="12">stream length and xref</text>
+    <text x="500" y="412">Read memo and flag</text>
+  </g>
+  <text x="150" y="132" fill="#f2c5bf" font-family="Arial, sans-serif" font-size="13" text-anchor="middle">Filename order fails</text>
+</svg>
