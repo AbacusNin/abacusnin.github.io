@@ -97,6 +97,7 @@
 </tr>
 </tbody>
 </table>
+<p>The <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/reversing/type-level-dialect/artifacts">GitHub artifacts folder</a> holds the runnable analysis lab and neutral transcript.</p>
 <h2>1. Problem Statement and Threat Scenario</h2>
 <p>I had a small Haskell program and two aligned text files. One held questions, and the other held the answers the program had produced. The program imported a secret string from a module I did not have. It used that string to choose a different surface form for each answer. I needed to work backward from the source and the transcript to recover the secret.</p>
 <p>The flag format helped: a fixed wrapper around a short run of concatenated Title-Case words, which I will write as <code>&lt;prefix&gt;{TitleCaseWords}</code>. That constraint mattered later because the answer forms did not identify every character by themselves. I had the transform, the questions, and the resulting answers. I did not have the module that defined the secret.</p>
@@ -122,7 +123,8 @@
     return forms
 </code></pre>
 <p>The reverse side needs the actual form table. I matched answer text to a field's longest valid form, read its index, and kept candidate characters whose computed index matched. A character also had to leave a state consistent with later lines. The constraint profile made the important boundary visible: a few choices remained at early positions; after zero, the whole allowed alphabet remained possible.</p>
-<p>The recorded validation had two layers. A synthetic fixture checked the general analyzer's parity. For the challenge candidate, the independently generated answer file matched the supplied answers byte for byte, with matching SHA-256 digests in the solve record. That is a consistency check on the model and candidate. It cannot prove that the transcript uniquely determines characters after the zero state.</p>
+<p>The <a href="/cyber-ops/ctf-writeups/reversing/type-level-dialect/artifacts/locale_machine_verifier.py">linked verifier</a> runs against a neutral <a href="/cyber-ops/ctf-writeups/reversing/type-level-dialect/artifacts/fixtures/demo_model.json">model</a>, <a href="/cyber-ops/ctf-writeups/reversing/type-level-dialect/artifacts/fixtures/demo_questions.txt">questions</a>, and <a href="/cyber-ops/ctf-writeups/reversing/type-level-dialect/artifacts/fixtures/demo_answers.txt">answers</a>. Its <a href="/cyber-ops/ctf-writeups/reversing/type-level-dialect/artifacts/fixtures/make_fixture.py">fixture generator</a> rebuilds the answer file. Run <code>python locale_machine_verifier.py</code> from the artifacts folder to see byte parity, both hashes, and candidate counts. The profile holds the candidate prefix fixed at each position; it does not search every possible prefix.</p>
+<p>The challenge candidate was separately forward-simulated, and the generated answer file matched the supplied answers byte for byte, with matching SHA-256 digests. That is a consistency check on the model and candidate. It cannot prove that the transcript uniquely determines characters after the zero state.</p>
 
 </details>
 <details class="fold section-fold">
@@ -186,7 +188,7 @@
 </details>
 <details class="fold section-fold">
 <summary>8. Reusable Tools, Scripts, and Artifacts</summary>
-<p>The useful reusable piece is the recurrence model paired with a constraint profile. A generic version needs question and answer files, form tables, a field-to-series map, <code>M1</code>, <code>M2</code>, and an allowed alphabet. It can return answer parity, hashes of the generated and observed outputs, per-position candidate counts, and positions that are completely unconstrained.</p>
+<p>The useful reusable piece is the recurrence model paired with a constraint profile. The <a href="/cyber-ops/ctf-writeups/reversing/type-level-dialect/artifacts/README.md">lab guide</a> gives its inputs, commands, expected results, and limits. The <a href="/cyber-ops/ctf-writeups/reversing/type-level-dialect/artifacts/locale_machine_verifier.py">verifier</a> needs question and answer files, form tables, a field-to-series map, <code>M1</code>, <code>M2</code>, a candidate key, and an allowed alphabet. It returns answer parity, hashes of the generated and observed outputs, and per-position candidate counts conditional on that key's prefix. A zero-state position is completely unconstrained by the transcript within the supplied alphabet.</p>
 <table>
 <thead>
 <tr>
@@ -199,7 +201,7 @@
 <tr>
 <td>Longest-form parser</td>
 <td>Recover a field's selected index from answer text</td>
-<td>Needs accurate form tables; overlapping forms require deliberate matching order</td>
+<td>Needs accurate form tables; the lab rejects ambiguous full-line parses</td>
 </tr>
 <tr>
 <td>State model</td>
@@ -208,8 +210,8 @@
 </tr>
 <tr>
 <td>Constraint profile</td>
-<td>Count surviving characters at each position</td>
-<td>Counts depend on the chosen alphabet and format prior</td>
+<td>Count surviving characters at each position along one candidate path</td>
+<td>Counts depend on the candidate prefix and alphabet; they do not establish prefix uniqueness</td>
 </tr>
 <tr>
 <td>Forward parity check</td>
@@ -218,7 +220,7 @@
 </tr>
 </tbody>
 </table>
-<p>I validated the generic method on a synthetic example during the solve and used the challenge's answer file for full-candidate parity. I would reuse the method by re-reading a new target's actual definitions, replacing the form tables and moduli, then checking how many inputs produce each output. The snippet in Section 3 is the recurrence, not a complete parser for an arbitrary transcript.</p>
+<p>The neutral demo uses <code>ABFCADE</code>. It returns matching transcript hashes and counts of 2, 1, and 2 choices at the first three positions. The state reaches zero before position 4, where all six alphabet letters fit. A changed informative prefix, <code>BBFCADE</code>, is rejected; a changed tail, <code>ABFBBBB</code>, still matches every answer byte. These are synthetic checks of the same failure mode. I would reuse the method by re-reading a new target's actual definitions, replacing the form tables and moduli, then checking how many inputs produce each output. The snippet in Section 3 is the recurrence, not a complete parser for an arbitrary transcript.</p>
 
 </details>
 <details class="fold section-fold">
@@ -241,12 +243,12 @@
 <details class="fold section-fold">
 <summary>12. Indicators, Artifacts, and Detection Engineering</summary>
 <p>The work was static and compile-time. It produced no production logs or network events, and it supplied no IOC. I have no YARA or Sigma rule, SIEM query, or hunt hypothesis to present as tested detection.</p>
-<p>The useful artifact is the constraint profile, because it tells me where the transcript stops carrying information. That is an analysis result for this puzzle, not a detector for an environment.</p>
+<p>The useful artifact is the constraint profile, because it tells me where the transcript stops carrying information along a candidate path. In the linked lab, the alternate tail reproduces the same bytes while the altered prefix fails. That is an analysis check, not a detector for an environment. A real system would need its own form tables, captured outputs, and an independently defined security goal before this check could support a finding.</p>
 
 </details>
 <details class="fold section-fold">
 <summary>13. Visual Artifact</summary>
-<p>The <a href="#analysis-flow">flow beside the summary</a> traces the solve: read the GHC transform, turn answer words into residues, carry candidate state, find zero, and verify the full candidate. The two calculations at each character deserve to be read together. One product selects a visible form modulo <code>M1</code>; the same product becomes the next state modulo <code>M2</code>.</p>
+<p>The <a href="#analysis-flow">flow beside the summary</a> traces the solve: read the GHC transform, turn answer words into residues, carry candidate state, find zero, and verify the full candidate. The <a href="/cyber-ops/ctf-writeups/reversing/type-level-dialect/artifacts/constraint-flow.svg">expanded state diagram</a> shows the two calculations at each character together. One product selects a visible form modulo <code>M1</code>; the same product becomes the next state modulo <code>M2</code>.</p>
 <table>
 <thead>
 <tr>

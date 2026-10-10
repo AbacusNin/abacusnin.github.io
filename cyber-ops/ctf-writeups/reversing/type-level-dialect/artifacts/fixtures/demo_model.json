@@ -1,0 +1,9 @@
+{
+  "mod_form": 5,
+  "mod_state": 7,
+  "fields": {
+    "greeting": {"series": 1, "forms": ["hello", "good day", "dear friend", "welcome", "salutations"]},
+    "object": {"series": 2, "forms": ["small note fragment", "small note", "note", "message", "letter"]},
+    "ending": {"series": 3, "forms": ["now", "at once", "later", "soon", "today"]}
+  }
+}
