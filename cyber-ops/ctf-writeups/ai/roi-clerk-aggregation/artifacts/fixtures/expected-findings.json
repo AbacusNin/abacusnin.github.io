@@ -1,0 +1,6 @@
+[
+  {"event_id": "sequence-4", "finding": "cumulative_disclosure", "composite_id": "custodian_code", "schema_seen": true},
+  {"event_id": "sequence-5", "finding": "unauthorized_verification", "composite_id": "custodian_code", "schema_seen": true},
+  {"event_id": "no-catalog-3", "finding": "cumulative_disclosure", "composite_id": "custodian_code", "schema_seen": false},
+  {"event_id": "missing-grant-3", "finding": "cumulative_disclosure", "composite_id": "custodian_code", "schema_seen": false}
+]

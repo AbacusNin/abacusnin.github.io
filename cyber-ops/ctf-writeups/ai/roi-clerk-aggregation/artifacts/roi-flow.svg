@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 650" role="img" aria-labelledby="title description">
+  <title id="title">From three permitted reads to a protected code</title>
+  <desc id="description">The clerk refused a direct recipe request. It disclosed a fourteen-label catalog and three code components in separate field reads. The caller joined the components offline and submitted the code for verification, which returned the protected result.</desc>
+  <defs>
+    <marker id="go" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#41d8c7"/></marker>
+    <marker id="stop" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#ff789d"/></marker>
+  </defs>
+  <rect width="1160" height="650" rx="18" fill="#0c1019"/>
+  <text x="34" y="43" font-family="Arial,sans-serif" font-size="23" font-weight="bold" fill="#f6f7f9">Three allowed fields, one protected code</text>
+  <g fill="#151e2c" stroke="#3c5b6c" stroke-width="2">
+    <rect x="35" y="95" width="180" height="80" rx="10"/>
+    <rect x="285" y="95" width="220" height="80" rx="10"/>
+    <rect x="585" y="95" width="210" height="80" rx="10" stroke="#ff789d"/>
+    <rect x="285" y="225" width="220" height="80" rx="10"/>
+    <rect x="585" y="225" width="210" height="80" rx="10"/>
+    <rect x="80" y="375" width="250" height="80" rx="10"/>
+    <rect x="455" y="375" width="250" height="80" rx="10"/>
+    <rect x="830" y="375" width="250" height="80" rx="10"/>
+    <rect x="470" y="510" width="220" height="85" rx="10" stroke="#e2b970"/>
+    <rect x="740" y="510" width="180" height="85" rx="10"/>
+    <rect x="965" y="510" width="170" height="85" rx="10" stroke="#ff789d"/>
+  </g>
+  <g font-family="Arial,sans-serif" font-size="16" fill="#f6f7f9">
+    <text x="64" y="128">Untrusted caller</text><text x="75" y="152" font-size="13">conversational access</text>
+    <text x="315" y="128">Ask for code recipe</text><text x="329" y="152" font-size="13">explicit assembly intent</text>
+    <text x="631" y="128">Clerk refuses</text><text x="621" y="152" font-size="13">including piecewise framing</text>
+    <text x="311" y="258">Request field catalog</text><text x="360" y="282" font-size="13">names only</text>
+    <text x="604" y="258">Fourteen field labels</text><text x="616" y="282" font-size="13">three component roles</text>
+    <text x="113" y="408">Prefix field</text><text x="105" y="433" font-size="13">first permitted read</text>
+    <text x="495" y="408">Serial field</text><text x="477" y="433" font-size="13">second permitted read</text>
+    <text x="868" y="408">Suffix field</text><text x="850" y="433" font-size="13">third permitted read</text>
+    <text x="491" y="545">Join values offline</text><text x="501" y="569" font-size="13">protected composite</text>
+    <text x="768" y="545">Verify code</text><text x="763" y="569" font-size="13">first candidate</text>
+    <text x="987" y="545">Target returned</text><text x="994" y="569" font-size="13">observed result</text>
+  </g>
+  <g fill="none" stroke="#41d8c7" stroke-width="3" marker-end="url(#go)">
+    <path d="M215 135 H285"/>
+    <path d="M215 155 H245 V265 H285"/>
+    <path d="M505 265 H585"/>
+    <path d="M690 305 V340 H205 V375"/>
+    <path d="M690 305 V375"/>
+    <path d="M690 305 V340 H955 V375"/>
+    <path d="M205 455 V480 H580 V510"/>
+    <path d="M580 455 V510"/>
+    <path d="M955 455 V480 H580 V510"/>
+    <path d="M690 552 H740"/>
+    <path d="M920 552 H965"/>
+  </g>
+  <path d="M505 135 H585" fill="none" stroke="#ff789d" stroke-width="3" stroke-dasharray="8 6" marker-end="url(#stop)"/>
+  <text x="35" y="628" font-family="Arial,sans-serif" font-size="14" fill="#b8c8d0">Teal paths were permitted in the recorded solve. The pink path was refused. The code and result are withheld.</text>
+</svg>

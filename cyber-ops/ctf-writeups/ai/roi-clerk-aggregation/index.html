@@ -105,6 +105,7 @@
 </tr>
 </tbody>
 </table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/ai/roi-clerk-aggregation/artifacts">view the files on GitHub</a>.</p>
 <h2>1. Problem Statement and Threat Scenario</h2>
 <p>I was talking to a fictional clinic's release-of-information clerk. It was an LLM with access to a patient's face sheet and a clear rule for callers: it could read one discrete element aloud, but a full chart copy required authorization I did not have. The challenge asked me to recover a custodian authorization code and get the clerk to confirm it. The final token was the value returned after that confirmation. I withhold both the code and the token.</p>
 <p>This was a conversation with a simulated clerk, not an intrusion into a real clinic. No patient data or production system was involved. The security question it raised was still useful: what happens when a gatekeeper protects a whole value while allowing its parts to leave one at a time?</p>
@@ -196,7 +197,7 @@
 </details>
 <details class="fold section-fold">
 <summary>8. Reusable Tools, Scripts, and Artifacts</summary>
-<p>The reusable artifact is the test sequence, not code. I would use it during an authorized review of a conversational disclosure system:</p>
+<p>The reusable part of the solve is the test sequence. I would use it during an authorized review of a conversational disclosure system:</p>
 <ol>
 <li>State the protected composite and the policy that should govern it.</li>
 <li>Ask how the interface classifies a single read and a whole-record request.</li>
@@ -206,6 +207,7 @@
 <li>Try a verifier only if the engagement authorizes that validation step, and record its exact response.</li>
 </ol>
 <p>The inputs are a test account, a defined sensitive composite, and a conversational interface that exposes fields. The output is a record of what the interface released and whether it enforced the composite policy. This challenge demonstrated the sequence once. It did not validate a general-purpose tool or prove that other systems share the same weakness.</p>
+<p>For the defensive side, the <a href="artifacts/README.md">composite disclosure lab guide</a> describes a fictional gateway event contract, a local correlation checker, and its test cases. Those files are synthetic proofs of concept for adapting the pattern to a real disclosure gateway. They do not replay the clerk's conversation or contain the protected code.</p>
 
 </details>
 <details class="fold section-fold">
@@ -288,7 +290,7 @@
 </table>
 <h3>Mitigation Realization</h3>
 <p>I would put the authorization decision in a trusted service behind the clerk. That service would identify the caller, the record, and the action for every request. It would treat the custodian code as a protected object and define its component set in policy. A session record would accumulate successful field disclosures. When the next field would complete the protected set for an unauthorized caller, the service would deny it and record why. The verifier would make its own authorization check before confirming a code or releasing anything.</p>
-<p>That is a proposed implementation of the AC-23 and AC-4 ideas above. It also gives the clerk fewer decisions to improvise. Prompt wording could no longer authorize a field by itself. None of these controls was built or tested in the exercise.</p>
+<p>That is a proposed implementation of the AC-23 and AC-4 ideas above. It also gives the clerk fewer decisions to improvise. Prompt wording could no longer authorize a field by itself. The <a href="artifacts/policy-gate-sketch.md">server-side composite gate sketch</a> spells out the pre-release check, durable ledger, independent verifier check, and purple-team acceptance cases. None of these controls was built or tested in the exercise.</p>
 
 </details>
 <details class="fold section-fold">
@@ -302,12 +304,14 @@
     also record verification attempts and their authorization outcomes
 </code></pre>
 <p>The direct prevention belongs in authorization; this alert helps find missed or attempted sequences. A 15-minute correlation window could catch a fast replay, but a patient caller could wait it out. Session-level accounting should therefore persist for the policy's relevant lifetime, with role and workflow exceptions handled explicitly.</p>
-<p>I would test the rule with a three-field reconstruction, an authorized staff workflow, a single unrelated field read, and a slow sequence across the time window. I did not run those tests here. Legitimate multi-field work is an obvious false-positive source. No IOC, YARA rule, or validated Sigma rule came from this challenge.</p>
+<p>I tested the logic locally with an <a href="artifacts/audit_aggregation.py">event correlation checker</a>, a <a href="artifacts/fixtures/composites.json">fictional composite policy</a>, <a href="artifacts/fixtures/gateway-events.jsonl">26 synthetic gateway events</a>, and their <a href="artifacts/fixtures/expected-findings.json">expected findings</a>. The replay produced four expected findings: complete disclosure after a catalog lookup, an allowed verification without a grant, complete disclosure without a catalog lookup, and a case where a missing grant tag creates an operational false positive. Authorized reads, a two-field near miss, record and session splits, and a denied final read produced no finding. The checker requires trusted caller, record, decision, and grant fields; it does not ingest patient text or code values.</p>
+<p>That local check validates only the synthetic event logic. It has not been mapped to a production gateway, converted into a SIEM rule, or measured against real traffic. Legitimate multi-field work and missing authorization tags need review. A session split can evade this example, so the proposed gateway control needs a ledger whose lifetime matches the protection policy. No IOC, YARA rule, or validated Sigma rule came from the challenge.</p>
 
 </details>
 <details class="fold section-fold">
 <summary>13. Visual Artifact</summary>
-<p>The <a href="#analysis-flow">diagram above</a> follows the actual fork in the solve: a refused recipe request, an allowed catalog, separate field reads, and a verifier that returned the target. I kept the diagram near the start so the relationship between the permitted parts and the protected whole is visible before the longer mechanics.</p>
+<p>The <a href="#analysis-flow">diagram above</a> follows the actual fork in the solve: a refused recipe request, an allowed catalog, separate field reads, and a verifier that returned the target. I kept it near the start so the relationship between the permitted parts and the protected whole is visible before the longer mechanics. The <a href="artifacts/roi-flow.svg">expanded flow diagram</a> shows the three independent reads and their join more clearly.</p>
+<p><img alt="The clerk refused a recipe request, then allowed a catalog and three separate field reads that were joined into a code and verified." src="artifacts/roi-flow.svg" /></p>
 
 </details>
 <details class="fold section-fold">

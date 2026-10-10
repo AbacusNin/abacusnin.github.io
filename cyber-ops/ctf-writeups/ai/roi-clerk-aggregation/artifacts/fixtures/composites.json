@@ -1,0 +1,8 @@
+{
+  "composites": [
+    {
+      "id": "custodian_code",
+      "component_fields": ["custodian_prefix", "authorization_serial", "verification_suffix"]
+    }
+  ]
+}
