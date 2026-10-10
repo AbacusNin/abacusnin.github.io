@@ -220,5 +220,27 @@
       "substitution cipher"
     ],
     "status": "Solved"
+  },
+  {
+    "title": "Three Polling Logs and No Shared Key",
+    "category": "Forensics",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "log correlation",
+      "deterministic record linkage",
+      "positional/temporal join",
+      "CSV and log parsing",
+      "plurality tally",
+      "Python"
+    ],
+    "summary": "Three polling logs gave me voters, blocks, and party choices, but no key connecting a ballot to a voter. I tested an order-based join, checked its limits, and recovered the accepted block count.",
+    "aliases": [
+      "keyless join",
+      "election logs",
+      "record linkage"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/forensics/keyless-polling-logs/"
   }
 ]

@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Three Polling Logs and No Shared Key - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="Three polling logs gave me voters, blocks, and party choices, but no key connecting a ballot to a voter. I tested an order-based join, checked its limits, and recovered the accepted block count.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/keyless-polling-logs/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="Three Polling Logs and No Shared Key">
+  <meta property="og:description" content="Three polling logs gave me voters, blocks, and party choices, but no key connecting a ballot to a voter. I tested an order-based join, checked its limits, and recovered the accepted block count.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/keyless-polling-logs/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Forensics / <span aria-current="page">Three Polling Logs and No Shared Key</span></p>
+      <div class="page-head">
+        <h1 class="page-title">Three Polling Logs and No Shared Key</h1>
+        <p class="lead">I could count the votes, and I could place each voter in a block. The missing piece was which vote belonged to which voter.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Count the county blocks in which the incumbent party won a plurality, using three leaked polling-place files.</p>
+<p><strong>What I did.</strong> I inspected the three schemas, rejected a false identifier join, paired check-ins and votes by order, and cross-checked the tallies.</p>
+<p><strong>The result.</strong> The plurality count matched the accepted challenge answer. The count and party labels are withheld here.</p>
+<p><strong>The limit.</strong> Order, equal counts, and timestamps support the pairing but cannot prove a first-in, first-out voting process; the accepted answer is the strongest check available in the exercise.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Lookup CSV; Check-in log; Vote log; Check the join; Pair by position; Tally each block">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Lookup CSV</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Voter ID to county block</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Check-in log</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Ordered voter IDs</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Vote log</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Ordered party choices</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Check the join</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Counts, IDs, time order</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Pair by position</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Assume voting order holds</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Tally each block</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Plurality winners, then count</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Log Analysis / data correlation</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>log correlation, deterministic record linkage, positional/temporal join, CSV and log parsing, plurality tally, Python</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved</td>
+</tr>
+<tr>
+<td>Files</td>
+<td>Voter-to-block lookup CSV, ordered check-in log, ordered vote log</td>
+</tr>
+<tr>
+<td>Join</td>
+<td>Row position, under a first-in, first-out voting assumption</td>
+</tr>
+<tr>
+<td>Result</td>
+<td>Incumbent plurality wins counted; challenge answer accepted; exact count withheld</td>
+</tr>
+<tr>
+<td>Public example</td>
+<td>Synthetic three-block fixture; target wins two blocks</td>
+</tr>
+<tr>
+<td>Scope</td>
+<td>Offline data puzzle; no attacker, defender telemetry, or observed security incident</td>
+</tr>
+</tbody>
+</table>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I had three files from a fictional county election. The lookup CSV assigned each registered voter to a county block. A second file listed voters as they checked in. A third listed the votes in the order they were cast, with the chosen party. The vote file had no voter ID. My task was to count the blocks where the incumbent party won the most votes.</p>
+<p>"Won" mattered here. This was a first-past-the-post count, so a party could win a block with less than half the votes if every other party received fewer. The answer was a two-digit number inside the event's flag format. I withhold the actual number and party labels. The worked example below uses invented voters and three invented blocks.</p>
+<p>The leaked-file framing did not give me an attacker or a defensive system to investigate. I treated this as an offline correlation puzzle. Later sections draw a narrow lesson for security and intelligence work, where analysts also have to connect records with missing identifiers.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I started with the file shapes. The lookup used <code>id,name,block</code>; the check-in lines held a date, time, sequence number, and voter ID; the vote lines held a date, time, vote ID, and party. I checked file hashes and record counts before writing a join. That let me tell a parsing mistake from a data change if the tally moved.</p>
+<p>I first looked for a direct identifier or fixed offset between the logs. The voter ID, check-in sequence, and vote ID were separate series. I found no common field or stable arithmetic relationship. Joining on those values would have made up a link the files did not contain.</p>
+<p>Both event logs had the same number of rows, sorted timestamps, and contiguous sequence numbers. Every check-in ID appeared once in the lookup. Those checks made a positional join worth trying: pair check-in row <code>i</code> with vote row <code>i</code>, then use the lookup to assign that vote to a block. Each paired check-in also came before its vote. I used that pairing for the block tally and compared the resulting party totals with the vote file.</p>
+<p>One parser mistake interrupted the first pass. A vote line has colons inside its timestamp. My first field choice treated the vote IDs as parties, so every supposed party appeared once. Reading a complete sample line made the mistake obvious. The party was the <em>last</em> colon-delimited field.</p>
+<p>The result used the plurality rule and the challenge accepted the submitted count. I also calculated the stricter majority interpretation. It produced a smaller count, which helped explain why the wording mattered. I did not treat the successful submission as proof that every individual ballot-to-voter pairing was uniquely determined.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>The first checks were plain shell commands. They show what I wanted to know before the tally: whether the files were stable, how many records they held, and where the fields actually sat. The names below match the <a href="fixtures/lookup.csv">synthetic fixture</a> used on this page.</p>
+<pre><code class="language-bash">sha256sum lookup.csv checkins.log votes.log
+wc -l lookup.csv checkins.log votes.log
+head -n 2 lookup.csv checkins.log votes.log
+awk -F: '{print $NF}' votes.log | sort | uniq -c | sort -rn
+comm -23 &lt;(awk '{print $NF}' checkins.log | sort -u) \
+  &lt;(tail -n +2 lookup.csv | cut -d, -f1 | sort -u) | wc -l
+awk '{print $1&quot; &quot;$2}' checkins.log | sort -c
+</code></pre>
+<p>The <code>comm</code> check looks for checked-in IDs missing from the lookup; its expected output is zero. The last line checks that check-ins are time sorted. Those quick commands helped me decide whether an order-based analysis was even plausible. The Python helper handles the actual CSV parsing, including quoted fields.</p>
+<p>For the repeatable calculation, the <a href="block_tally.py">Python helper</a> reads the lookup CSV with <code>csv.DictReader</code>, parses both logs, checks counts and unique IDs, and tallies party choices by block. It uses only the standard library. The command below runs it on the invented data:</p>
+<pre><code class="language-bash">python3 block_tally.py \
+  --lookup fixtures/lookup.csv \
+  --sequence fixtures/checkins.log \
+  --values fixtures/votes.log \
+  --target Alpha \
+  --assume-fifo
+</code></pre>
+<p>The <code>--assume-fifo</code> switch is deliberate. Without a rule saying voters cast ballots in check-in order, the program cannot prove the pairing. It refuses to tally until I acknowledge that assumption. It also rejects mismatched counts, duplicate voters or votes, broken check-in sequences, unsorted timestamps, and any positional pair whose vote time does not follow its check-in. It checks the final block sizes and the global party totals. Those checks catch malformed inputs and some bad joins; they do not certify ballot identity.</p>
+<p>The core is short:</p>
+<pre><code class="language-python">counts = defaultdict(Counter)
+for (_, _, voter_id), (_, _, party) in zip(checkins, votes):
+    counts[lookup[voter_id]][party] += 1
+
+for block, parties in counts.items():
+    high = max(parties.values())
+    winners = [party for party, n in parties.items() if n == high]
+    # A tied block has no unique plurality winner.
+</code></pre>
+<p>I ran the public helper against the synthetic fixture. It reported Alpha as the unique winner of Group-A and Group-C, Beta as the winner of Group-B, and <strong>two</strong> target wins. The fixture demonstrates the computation; it contains no challenge votes or flag.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>This is a record-linkage problem. I needed to connect a row in one file to a row in another file even though they shared no voter key. Fellegi and Sunter's work covers the broader problem of linking records without a reliable common identifier. My case used a much narrower rule: ordinal position. I did not calculate probabilistic match scores.</p>
+<p>The lookup could answer "which block owns this voter ID." It could not answer "which ballot did this voter cast." The event logs supplied an ordering that suggested a bridge. Before using it, I checked the parts the files could show: equal row counts, a one-to-one lookup of check-in IDs, sequential records, and increasing times.</p>
+<p>There is a limit to those checks. Imagine A checks in at 09:00 and B at 09:01. B votes at 09:02; A votes at 09:03. Both logs are sorted and each check-in precedes the vote in the same row. Pairing by row still assigns the votes to the wrong people. The join needs an additional process assumption: voters do not pass one another between check-in and ballot casting. The puzzle's accepted answer supported that interpretation for the requested aggregate, but the files alone did not prove each person's vote.</p>
+<p>I also had to mind the formats. CSV can use CRLF line endings and quoted fields, as RFC 4180 describes. Python's CSV reader handles those details more safely than splitting each row on a comma. In the vote log, I split from the right so the colons inside <code>HH:MM:SS</code> stayed part of the timestamp. Finally, plurality meant the highest count in a block. It did not require more than 50 percent.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>The mechanics are easiest to see as three passes. First, map each checked-in voter to a block. Next, pair each check-in row with the vote row at the same position, under the first-in, first-out assumption. Then count each party's assigned votes in each block. A block contributes one to the answer only when the incumbent is its unique top vote-getter.</p>
+<p>Some totals do not depend on the pairing. If every lookup voter checked in once and every check-in receives one ballot, each block has as many assigned votes as it has voters in the lookup, regardless of how the ballots are permuted. Likewise, the sum of a party's block tallies always equals that party's count in the vote file. I checked both. They are conservation checks, useful for catching dropped or duplicated records, but neither can validate the identity of a positional match.</p>
+<p>The <em>party breakdown</em> in each block does depend on that match. A different permutation can move votes between blocks while leaving both conservation checks intact. I therefore kept the ordering assumption visible. I also checked for ties at the top; none occurred in the exercise result, so the block winners were unambiguous under the chosen pairing.</p>
+<p>Here is the separate synthetic example used by the linked helper:</p>
+<pre><code class="language-text">BLOCK    TOTAL  WINNER  BREAKDOWN
+Group-A      4  Alpha   Alpha:2, Beta:1, Gamma:1
+Group-B      4  Beta    Alpha:1, Beta:2, Gamma:1
+Group-C      4  Alpha   Alpha:2, Beta:1, Gamma:1
+
+Groups won by Alpha: 2
+</code></pre>
+<p>The original exercise produced a different, withheld count. I submitted the plurality count and the platform accepted it. That confirms the answer to the challenge question. It does not turn the timestamp checks into a mathematical proof of ballot attribution.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned</summary>
+<p>The false key join was a useful dead end. I looked for a shared ID and a fixed offset before leaning on order. Neither existed. I could stop trying to force one field into another and spend the time checking the actual relationship the files offered.</p>
+<p>The colon mistake was more mundane. My first tally made every vote ID look like a unique party. A single full vote line would have prevented it. I now check field meanings against a sample record before I write the parser, especially when a delimiter also appears inside a timestamp.</p>
+<p>I would keep the guard checks ahead of the tally. The public helper does that. A failed cardinality or uniqueness check stops the run instead of producing a polished wrong answer. I would also want a separate record of ballot order or a known FIFO process before using row position to make claims about individual voters outside this puzzle.</p>
+<table>
+<thead>
+<tr>
+<th>Exercise behavior</th>
+<th>Operational analogy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ordered files without a shared ID</td>
+<td>Connecting system events when a correlation ID is missing</td>
+</tr>
+<tr>
+<td>Checking counts, uniqueness, and time</td>
+<td>Testing the assumptions behind a join before using its output</td>
+</tr>
+<tr>
+<td>Stable aggregates but pairing-dependent breakdowns</td>
+<td>Separating reliable totals from uncertain attribution</td>
+</tr>
+</tbody>
+</table>
+<p>The clean one-to-one logs were part of the constructed challenge. Real feeds have gaps, retries, duplicated events, and clock drift. Those conditions need another linkage method and an explicit error model.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Operational Extrapolation</summary>
+<h3>Individual Practitioner Development</h3>
+<p>I came away with a practical habit: write down what a join assumes, then test the pieces the data can actually confirm. The next useful exercise would inject a missing check-in, a duplicated vote, and a voter who overtakes another in the line. The first two should stop the helper. The last one shows why a successful check cannot establish FIFO behavior.</p>
+<h3>Security Operations</h3>
+<p>As an analogy, an analyst may have to connect an authentication log to later actions with no shared request ID. Time order can narrow candidates, but concurrent sessions and delayed writes can scramble them. I would use additional fields or a process guarantee before calling that an attribution. This challenge supplied no production telemetry and yielded no detection rule.</p>
+<h3>Intelligence Operations</h3>
+<p>The same caution applies when two collections seem to describe the same entities. A deterministic join is attractive because it is easy to explain. If the underlying streams can reorder or omit records, a probabilistic approach or manual review may be needed. I did not make an intelligence attribution from these election files.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The <a href="block_tally.py">block tally helper</a> and <a href="fixtures/lookup.csv">lookup</a>, <a href="fixtures/checkins.log">check-in</a>, and <a href="fixtures/votes.log">vote</a> fixture files let a reader rerun the public example. The helper takes <code>--lookup</code>, <code>--sequence</code>, <code>--values</code>, <code>--target</code>, and the required <code>--assume-fifo</code> acknowledgment. It prints each block's party counts, its unique plurality winner or <code>TIE</code>, and the target's win count.</p>
+<p>I validated the fixture's expected count of two. I also checked the failure path for a missing FIFO acknowledgment and for a malformed input. The helper uses Python 3's standard library. It assumes one lookup row and one check-in per voter, one vote per check-in, and a reliable common ordering. It does not solve missing events, duplicate events, or many-to-one relationships.</p>
+<p>The case-specific labels and the accepted two-digit count are withheld. The fixture is synthetic and its count of two is only a worked example.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Applicability and Mapping</summary>
+<p>I assessed ATT&amp;CK applicability and found no behavior to map. The exercise asked for an offline tally. It did not show an adversary technique, a defender action, or a security control failure. An ATT&amp;CK tactic or technique ID here would imply evidence that the files did not contain.</p>
+<p>D3FEND, CAPEC, STRIDE, and OWASP do not add a useful mapping for the observed task either. Section 7 discusses a method that can transfer to investigations; it does not turn this election puzzle into a security event.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intelligence and Standards Integration</summary>
+<p>I found no indicator, adversary infrastructure, or observed campaign behavior to express as STIX or exchange through TAXII. I also found no STIG or CIS finding in the three files. I would be inventing one if I filled this section with a threat-intelligence object. The format reference that <em>does</em> matter to the analysis is RFC 4180 for the CSV input.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<p>The puzzle did not exercise or evaluate an election-system control, so I have no tested mitigation to report. A real election system would raise questions about log integrity and ballot secrecy. These files did not provide enough system detail to map a particular control or assess whether it worked.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>The artifacts here are the lookup, check-in, and vote records. They support a tally under the stated assumption. They are not indicators of malicious behavior. I did not produce a YARA rule, Sigma rule, or production query because the exercise contained no realistic security sensor or malicious event to detect.</p>
+<p>The useful quality checks were analytical: missing IDs, duplicate rows, unsorted times, a vote timestamp preceding its paired check-in, block-size mismatch, and vote-total mismatch. In the helper these stop the calculation or expose its assumptions. They are data-integrity checks, not deployed detections.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">diagram above</a> shows how the three files meet. I placed the checks before the positional join because a tidy tally can hide a bad pairing. The path to the count depends on the first-in, first-out assumption even after every machine-checkable condition passes.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<table>
+<thead>
+<tr>
+<th>REF ID</th>
+<th>Source</th>
+<th>What I used it for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>REF.001</td>
+<td>Y. Shafranovich, <a href="https://www.rfc-editor.org/rfc/rfc4180">RFC 4180: Common Format and MIME Type for Comma-Separated Values (CSV) Files</a>, IETF, 2005</td>
+<td>CSV records, quoting, and CRLF line endings in Section 4.</td>
+</tr>
+<tr>
+<td>REF.002</td>
+<td>I. P. Fellegi and A. B. Sunter, <a href="https://www.tandfonline.com/doi/abs/10.1080/01621459.1969.10501049">A Theory for Record Linkage</a>, <em>Journal of the American Statistical Association</em> 64(328), 1969, pp. 1183-1210</td>
+<td>The broader record-linkage problem discussed in Section 4; the paper does not validate this puzzle's positional join.</td>
+</tr>
+</tbody>
+</table>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
