@@ -356,5 +356,28 @@
     ],
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/reversing/packed-integer-ascii/"
+  },
+  {
+    "title": "The Source Line I Could Not See",
+    "category": "Forensics",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "invisible-unicode",
+      "ascii-smuggling",
+      "unicode-tags",
+      "defense-evasion",
+      "supply-chain",
+      "repeating-key-xor",
+      "git-forensics"
+    ],
+    "summary": "I found invisible Unicode Tag characters on one line of a Python app, decoded the hidden source, recovered its XOR-protected flag value, and traced the insertion through Git history.",
+    "aliases": [
+      "source tampering",
+      "Unicode Tags",
+      "code review"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/forensics/invisible-unicode-source-tampering/"
   }
 ]

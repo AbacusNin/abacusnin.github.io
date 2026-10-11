@@ -1,0 +1,1 @@
+message = "ordinary ASCII source"
