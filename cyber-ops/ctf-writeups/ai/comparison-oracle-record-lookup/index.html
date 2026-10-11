@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Kiosk That Told Me Which Way to Guess - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="A kiosk refused to tell me its record ID, then told me whether every guess sorted before or after it. I used those answers to narrow a 65,536-value space to one accepted identifier.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/ai/comparison-oracle-record-lookup/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Kiosk That Told Me Which Way to Guess">
+  <meta property="og:description" content="A kiosk refused to tell me its record ID, then told me whether every guess sorted before or after it. I used those answers to narrow a 65,536-value space to one accepted identifier.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/ai/comparison-oracle-record-lookup/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / AI Security / <span aria-current="page">The Kiosk That Told Me Which Way to Guess</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Kiosk That Told Me Which Way to Guess</h1>
+        <p class="lead">The kiosk kept its record ID to itself. Then it told me which side of each guess the record was on. That was enough.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Find the one valid four-hex-digit record identifier within the kiosk&#x27;s attempt cap and receive the flag.</p>
+<p><strong>What I did.</strong> I learned the response grammar with a well-formed miss, searched the remaining ordered space by midpoint, and submitted the final candidate.</p>
+<p><strong>The result.</strong> The case record reports that the final identifier was accepted and the flag was released.</p>
+<p><strong>The limit.</strong> The interaction transcript and attempt-cap value were not retained; the bundled scripts validate the method against a synthetic oracle, not the live kiosk.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="One well-formed miss; Set a 16-bit window; Probe the midpoint; Probe again; One value remains">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">One well-formed miss</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Kiosk says the record sorts AFTER it</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Set a 16-bit window</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Fixed-width hex gives 65,536 candidates</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Probe the midpoint</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">AFTER raises the low bound</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Probe again</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">BEFORE lowers the high bound</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">One value remains</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Submit the ID and receive the flag</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Logic and information leakage in an LLM kiosk</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>comparison oracle, information leakage, binary search, LLM kiosk security, enumeration, differential response, rate limiting</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved</td>
+</tr>
+<tr>
+<td>Starting point</td>
+<td>Interactive kiosk; one record ID with a constant prefix and four hex digits</td>
+</tr>
+<tr>
+<td>Constraint</td>
+<td>Hard attempt cap and per-message cooldown; exact cap was not preserved</td>
+</tr>
+<tr>
+<td>Result</td>
+<td>Final identifier accepted and flag released, as recorded in the case notes</td>
+</tr>
+<tr>
+<td>Defensive scope</td>
+<td>Proposed controls and a synthetic detector test, with no production telemetry</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/ai/comparison-oracle-record-lookup/artifacts">view the files on GitHub</a>. The <a href="artifacts/comparison_oracle_search.py">search demonstration</a> and <a href="fixtures/mock_oracle.py">mock oracle</a> are separate, supplied teaching files.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>The self-service kiosk had exactly one record it would accept. Its identifier had a fixed prefix and four hexadecimal characters. I could send candidate IDs to the kiosk, but I could not inspect a local database or download an artifact. The goal was to give it the valid ID and collect the flag it released.</p>
+<p>Four hex digits make 65,536 possible suffixes. That is small for a computer and much too large for a chat interface with an attempt cap and a cooldown. The prompt also described the kiosk as honest about what it found. I took that seriously. If the kiosk's answer contained more than a plain yes or no, the answer might be more useful than the guess.</p>
+<p>The exercise did not supply a real attacker or a real service. In the defensive sections I treat the kiosk as a model of an unauthorized record-lookup endpoint. That analogy depends on a specific boundary: a caller who has not proved a right to the record can still ask the service a question about the secret ID.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I started with one well-formed candidate I did not expect to match. The kiosk said the record "sorts AFTER" it. That response gave me a direction. I no longer needed to sample random IDs: every miss could rule out a whole part of the ordered space.</p>
+<p>I also tried asking for the identifier directly and for its leading characters. The kiosk refused to disclose it in either form and pushed me back to candidate comparison. That refusal mattered. The obvious disclosure route was closed, but the ordering route stayed open. The refusal was outside the comparison budget recorded in the case notes.</p>
+<p>I worked across <code>0x0000</code> through <code>0xFFFF</code>, probing the middle of the current window. An <code>AFTER</code> answer moved the low bound above my guess. A <code>BEFORE</code> answer moved the high bound below it. I continued until one suffix remained, submitted that identifier, and received the flag according to the case record. The recovered ID and flag stay out of the public page.</p>
+<p>I considered sending several guesses in one message to save cooldown time. I did not run that variant. Each useful midpoint depends on the previous answer, so a batch would spend scarce attempts on guesses chosen before I knew which half survived. I used one adaptive probe at a time.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>I made the challenge submissions by hand. The supplied <a href="artifacts/comparison_oracle_search.py">comparison search module</a> captures the method and the <a href="fixtures/mock_oracle.py">mock oracle</a> lets me test it without a live kiosk. The module expects an <code>oracle(candidate)</code> function, inclusive integer bounds, and an optional maximum query count. It returns the matched value, query count, and trace. It raises an error for a response outside <code>AFTER</code>, <code>BEFORE</code>, or <code>MATCH</code> rather than silently treating it as a direction.</p>
+<p>Here is the decision at the center of the loop:</p>
+<pre><code class="language-python">mid = (lo + hi) // 2
+response = oracle(mid)
+if response == &quot;MATCH&quot;:
+    return mid
+if response == &quot;AFTER&quot;:
+    lo = mid + 1
+elif response == &quot;BEFORE&quot;:
+    hi = mid - 1
+else:
+    raise ValueError(&quot;unexpected oracle response&quot;)
+</code></pre>
+<p>For this exact floor-midpoint routine, the first candidate over the full 16-bit range is <code>ID-7FFF</code>. A synthetic secret above it produces this kind of trace:</p>
+<pre><code class="language-text">ID-7FFF -&gt; AFTER   remaining 0x8000-0xFFFF
+ID-BFFF -&gt; BEFORE  remaining 0x8000-0xBFFE
+ID-9FFF -&gt; AFTER   remaining 0xA000-0xBFFE
+...                 keep narrowing from the last answer
+</code></pre>
+<p>The prefix is a stand-in. I use fixed-width uppercase hex in this example because it preserves numeric order under ordinary lexicographic comparison. That assumption needs checking against a real endpoint's casing and collation rules. The files use only Python's standard library. Running the module in its intended <code>artifacts/</code> and <code>fixtures/</code> layout performs an offline self-check; it does not send requests to the challenge.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>A comparison oracle tells me where a hidden value sits relative to my candidate: higher, lower, or equal. One answer partitions the remaining space. With a midpoint guess, the larger surviving side is about half as big as the previous window. The kiosk's phrase "sorts AFTER" was enough to recognize that interface.</p>
+<p>There are <code>16^4 = 65,536 = 2^16</code> possible suffixes. Sixteen yes/no answers can distinguish that many possibilities in principle. The supplied algorithm keeps asking until it receives <code>MATCH</code>. Across every possible 16-bit secret, its observed query distribution peaks at 16 except for <code>0xFFFF</code>, which needs 17 calls. The difference matters under a hard cap: narrowing the window to one candidate can establish the answer after 16 directional responses, while asking the kiosk to accept that candidate can spend one more attempt. The first exploratory miss could also cost an attempt if the platform counts it. I cannot give an exact session total because the interaction log and cap value were not retained.</p>
+<p>The integer model works for equally long uppercase hexadecimal suffixes under ordinary character ordering: <code>0</code> through <code>9</code> precede <code>A</code> through <code>F</code> in both representations. A variable-width ID, case-sensitive mixed alphabets, locale-aware collation, or server-side normalization could break the equivalence. I would test the endpoint's real ordering before relying on the math outside this exercise.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>The kiosk wanted a valid identifier before releasing the flag. Its direct-disclosure rule held when I asked for the ID. The leak was in the comparison answer. Each <code>AFTER</code> or <code>BEFORE</code> response exposed a function of the protected value to an unauthenticated caller. Repeating that question adaptively recovered the value.</p>
+<p>The method needs a finite ordered keyspace, a truthful and stable comparison, and enough queries to finish. Those conditions were present in the puzzle. Starting at <code>[0x0000, 0xFFFF]</code>, I removed every value on the wrong side of each guess. A <code>MATCH</code> would end the search immediately; otherwise the surviving interval stayed contiguous and kept the secret inside it. Once only one value remained, the ordering responses had already identified it. The final accepted submission was the case's success check.</p>
+<p>The record does not include a full prompt-by-prompt transcript, so I cannot replay the live kiosk's path or quote every response. The deterministic convergence and query bound are independently testable with the synthetic oracle. They support the method; they do not substitute for a preserved live response log.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned</summary>
+<p>The useful probe was the one that taught me the response grammar. If I had started guessing IDs without reading the miss carefully, I could have spent the whole allowance on random values. I had 16 bits to recover and a cap above the search cost, so I needed the answer to each guess to do more work than a blind hit-or-miss test.</p>
+<p>The direct request refusal was also informative. It showed the kiosk had a disclosure rule, but that rule did not cover relational answers. I would look for the same gap in a real lookup API: different errors, sort hints, prefix checks, or timing differences may expose state even when the service never prints the secret.</p>
+<p>I would fold the grammar check into the first useful midpoint next time if the query budget were tight. In this case, one exploratory probe was affordable and made the strategy clear before I committed the rest of the attempts.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Operational Extrapolation</summary>
+<p>The following work is my defensive extension of the puzzle. It describes what I would inspect in a real service. The challenge itself was a puzzle, with no intrusion evidence.</p>
+<h3>Individual Practitioner Development</h3>
+<p>The case gave me a clean place to practice three habits: count the keyspace, characterize the response before automating, and track the surviving interval after every answer. A noisier timing or padding oracle would need repeated measurements and uncertainty handling. Here the oracle spoke in exact directions, so the interval proof was enough.</p>
+<h3>Security Operations</h3>
+<p>For a real record endpoint, I would ask whether an unauthorized caller ever sees a relational response and whether logs retain enough context to spot adaptive narrowing. The <a href="artifacts/oracle_bisection_hunt.py">synthetic bisection detector</a> models one hunt: it walks request events in time order, checks whether candidates follow the interval that previous answers created, and separates a strong bisection sequence from a few ordinary lookups. It requires actor, endpoint, candidate, response class, and timestamp. Those fields are sensitive; access and retention should be limited.</p>
+<p>If the pattern appeared in production, I would preserve the request IDs and response classes, determine whether any protected record was returned, contain the actor's access, and remove the comparison response from the endpoint. A rate rule can slow a session, but the server still needs to close the information channel.</p>
+<h3>Intelligence Operations</h3>
+<p>There was no adversary infrastructure, attribution, or campaign evidence here. I would share a behavior description with a detection team if we found this pattern in a real endpoint. I would not turn this one CTF sequence into a threat-actor claim.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The challenge-method files are the <a href="artifacts/comparison_oracle_search.py">search module</a> and <a href="fixtures/mock_oracle.py">mock comparison oracle</a>. The module takes a truthful three-outcome callable and a bounded keyspace. Its self-check and the mock's test harness exercise generic synthetic secrets. The code does not model cooldowns or know a live service's attempt cap, case rules, or response parsing.</p>
+<p>The separate defensive proof of concept is the <a href="artifacts/oracle_bisection_hunt.py">bisection hunt</a>, with <a href="artifacts/oracle_events.jsonl">synthetic events</a>, <a href="artifacts/expected_findings.json">expected findings</a>, <a href="artifacts/test_oracle_bisection_hunt.py">local tests</a>, and a <a href="artifacts/README.md">run and field guide</a>. It consumes newline-delimited JSON request events and prints JSON findings. The positive actor follows midpoints and ordering answers. A benign actor makes a few unrelated lookups. A near miss repeats a candidate without narrowing. These are tests of local logic, not measurements from a production sensor.</p>
+<p>The distinction matters. The search module demonstrates how the puzzle was solved. The hunt is something a defender could adapt after mapping real application fields and privacy requirements. Neither file contains the recovered ID or flag.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Applicability and Mapping</summary>
+<p>I kept the mapping close to the observed behavior. These are analytical connections to a fictional service, not vulnerability IDs assigned to a deployed product.</p>
+<table>
+<thead>
+<tr>
+<th>Behavior in this case</th>
+<th>Framework</th>
+<th>Mapping</th>
+<th>Why it fits, and where it stops</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Different answers expose the secret's position</td>
+<td>CWE</td>
+<td><a href="https://cwe.mitre.org/data/definitions/204.html">CWE-204 Observable Response Discrepancy</a>, under <a href="https://cwe.mitre.org/data/definitions/203.html">CWE-203</a></td>
+<td>Direct weakness analogy. The response tells an unauthorized caller about internal state.</td>
+</tr>
+<tr>
+<td>Trial against a finite lookup-key space</td>
+<td>CAPEC</td>
+<td><a href="https://capec.mitre.org/data/definitions/112.html">CAPEC-112 Brute Force</a></td>
+<td>CAPEC explicitly includes database lookup keys. The ordering hint makes this search far faster than exhaustive trial.</td>
+</tr>
+<tr>
+<td>Guessing a secret used for access</td>
+<td>ATT&amp;CK</td>
+<td><a href="https://attack.mitre.org/techniques/T1110/">T1110 Brute Force</a></td>
+<td>Loose analogy only. ATT&amp;CK T1110 describes credential guessing; this puzzle's record ID was not shown to be an authentication credential.</td>
+</tr>
+<tr>
+<td>Automation of a sensitive lookup</td>
+<td>OWASP API Security</td>
+<td><a href="https://api-security.owasp.org/editions/2023/en/0xa6-unrestricted-access-to-sensitive-business-flows/">API6:2023</a></td>
+<td>Useful if a real lookup flow can be automated beyond its intended use. The challenge alone does not establish an API deployment.</td>
+</tr>
+<tr>
+<td>Many repeated calls consume endpoint capacity</td>
+<td>OWASP API Security</td>
+<td><a href="https://api-security.owasp.org/editions/2023/en/0xa4-unrestricted-resource-consumption/">API4:2023</a></td>
+<td>Secondary concern if query volume creates a resource problem; the secret leak comes from the directional answer.</td>
+</tr>
+</tbody>
+</table>
+<p>The source analysis also considered <a href="https://cwe.mitre.org/data/definitions/307.html">CWE-307</a>. That CWE is specific to authentication attempts. I would use it only if a real implementation treats the record ID as an authenticator. I do not map it as a direct observed weakness here. The same limit applies to ATT&amp;CK's credential framing. D3FEND, a STIG, or a sector control would add labels without better explaining this case.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intelligence and Standards Integration</summary>
+<p>The puzzle produced no durable IOC: no hostile domain, IP address, file hash, malware sample, or actor identity. A STIX Indicator or TAXII feed entry would imply evidence I do not have. If this behavior were seen across real applications, a knowledge-base entry describing the comparison-oracle pattern and a proposed Course of Action could help teams share a fix. I did not create a STIX bundle for one synthetic sequence.</p>
+<p>The most useful exchange item now is a field-level detection contract: endpoint name, actor or session key, candidate suffix, ordering response class, event time, and request ID. With that, an application team can test the <a href="artifacts/oracle_bisection_hunt.py">local hunt</a> on approved telemetry and decide whether the behavior merits a rule. A production detector still needs field mapping, baseline traffic, access controls for logged IDs, and false-positive review.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<p>These controls are proposed for a real service. I did not change or retest the kiosk.</p>
+<h3>Standards Mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Guidance</th>
+<th>Case-specific use</th>
+<th>Boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://cwe.mitre.org/data/definitions/204.html">CWE-204 mitigation</a></td>
+<td>Give unauthorized callers the same minimal miss response, without sort direction or detailed error differences.</td>
+<td>A uniform message must also be checked for status, size, and timing differences.</td>
+</tr>
+<tr>
+<td><a href="https://pages.nist.gov/800-63-4/sp800-63b.html#rate-limiting-throttling">NIST SP 800-63B rate limiting</a></td>
+<td>Apply when the ID is actually an authentication secret.</td>
+<td>This is authentication guidance, not a universal numeric limit for record lookup APIs.</td>
+</tr>
+<tr>
+<td><a href="https://api-security.owasp.org/editions/2023/en/0xa6-unrestricted-access-to-sensitive-business-flows/">OWASP API6:2023</a></td>
+<td>Bound automation of a sensitive lookup flow.</td>
+<td>Anti-automation controls supplement the response fix.</td>
+</tr>
+</tbody>
+</table>
+<h3>Mitigation Realization</h3>
+<p>First, remove the <code>AFTER</code> and <code>BEFORE</code> branches from the external response contract. Return a uniform unauthorized result, and keep detailed diagnostics on the trusted side. Then test the full observable surface: body text, status code, length, and timing. That is the primary fix for the channel I used.</p>
+<p>Second, stop treating a four-hex-digit identifier as proof of authorization in any real application. If an ID is meant to be secret, issue a high-entropy unpredictable value and bind access to authenticated identity and object-level authorization. The service should verify the actor can access this record even when the ID is correct. A bigger ID makes guessing harder; it does not replace that check.</p>
+<p>Third, set per-actor and per-resource attempt controls using real usage data. The source cap was above the cost of this search, so it could not protect this 16-bit secret while directional answers remained. Throttling and alerting buy response time. They do not make a truthful comparison safe to expose.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>There are no host or network IOCs to list. The behavioral signal is a series of lookup guesses by one actor that follow the shrinking interval implied by earlier <code>AFTER</code> and <code>BEFORE</code> replies. A raw volume threshold would see some of this, but it would also see legitimate bulk use. The midpoint sequence is more specific.</p>
+<p>The proposed <a href="artifacts/oracle_bisection_hunt.py">Python hunt</a> expects JSONL events with <code>timestamp</code>, <code>actor</code>, <code>endpoint</code>, <code>candidate</code>, and <code>response</code>. It groups by actor and endpoint, orders events, and checks consecutive midpoint guesses against the interval implied by each response. Its threshold is configurable and deliberately a local triage setting. It reports the actor, endpoint, query count, and request times. It does not publish candidate IDs in the finding.</p>
+<p>The <a href="artifacts/oracle_events.jsonl">fixture</a> gives a positive sequence, a low-volume benign sequence, and a repeated-guess near miss; <a href="artifacts/expected_findings.json">expected findings</a> state the one synthetic result. The <a href="artifacts/test_oracle_bisection_hunt.py">tests</a> also check a long gap and reject a timestamp without a timezone. The <a href="artifacts/README.md">guide</a> includes field mapping, run command, tuning, privacy, and validation limits. A real API may use several sessions, multiple records, normal binary-search features, or hidden candidate transformations. Those cases need an endpoint-specific design and baseline. This test has no production telemetry, no measured precision or recall, and no claim of a deployable SIEM rule.</p>
+<p>For incident response, I would preserve the exact request and response sequence with a narrow retention window, check whether the final lookup succeeded, and compare the account's authorization state to the record accessed. I would then revoke access if needed and fix the response behavior. The sequence can show attempted enumeration; it cannot by itself identify the human behind the requests.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">diagram above</a> follows the narrowing loop from the first useful miss to the final accepted ID. It shows the two directional branches separately because that was the entire leak. The visual uses a generic prefix and contains no challenge identifier or flag value.</p>
+<p>For a defender, the same sequence describes the telemetry to preserve: candidate, direction, actor, endpoint, and time. If a real service gives every unauthorized miss the same response, the attacker no longer gets the branch information shown in the diagram.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<table>
+<thead>
+<tr>
+<th>Ref</th>
+<th>Source</th>
+<th>Why I used it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>REF-01</td>
+<td><a href="https://cwe.mitre.org/data/definitions/204.html">MITRE CWE-204, Observable Response Discrepancy</a></td>
+<td>Response leak and uniform-response mitigation.</td>
+</tr>
+<tr>
+<td>REF-02</td>
+<td><a href="https://cwe.mitre.org/data/definitions/203.html">MITRE CWE-203, Observable Discrepancy</a></td>
+<td>Parent weakness class.</td>
+</tr>
+<tr>
+<td>REF-03</td>
+<td><a href="https://cwe.mitre.org/data/definitions/307.html">MITRE CWE-307, Improper Restriction of Excessive Authentication Attempts</a></td>
+<td>Conditional authentication analogy, not a direct mapping.</td>
+</tr>
+<tr>
+<td>REF-04</td>
+<td><a href="https://capec.mitre.org/data/definitions/112.html">MITRE CAPEC-112, Brute Force</a></td>
+<td>Finite secret and database lookup-key example.</td>
+</tr>
+<tr>
+<td>REF-05</td>
+<td><a href="https://attack.mitre.org/techniques/T1110/">MITRE ATT&amp;CK T1110, Brute Force</a></td>
+<td>Credential-guessing comparison with explicit scope limit.</td>
+</tr>
+<tr>
+<td>REF-06</td>
+<td><a href="https://api-security.owasp.org/editions/2023/en/0xa4-unrestricted-resource-consumption/">OWASP API4:2023, Unrestricted Resource Consumption</a></td>
+<td>Secondary query-volume concern.</td>
+</tr>
+<tr>
+<td>REF-07</td>
+<td><a href="https://api-security.owasp.org/editions/2023/en/0xa6-unrestricted-access-to-sensitive-business-flows/">OWASP API6:2023, Unrestricted Access to Sensitive Business Flows</a></td>
+<td>Sensitive lookup automation analogy.</td>
+</tr>
+<tr>
+<td>REF-08</td>
+<td><a href="https://pages.nist.gov/800-63-4/sp800-63b.html#rate-limiting-throttling">NIST SP 800-63B, Rate Limiting</a></td>
+<td>Current authentication throttling guidance, conditionally applicable.</td>
+</tr>
+</tbody>
+</table>
+<p>These source pages were checked on 2026-10-11. The framework connections above are my analysis; none is a confirmed finding against a production kiosk.</p>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>

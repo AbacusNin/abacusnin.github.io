@@ -1,0 +1,10 @@
+[
+  {
+    "actor": "case-positive",
+    "endpoint": "record-lookup",
+    "midpoint_queries": 5,
+    "first_seen": "2026-10-01T12:00:00Z",
+    "last_seen": "2026-10-01T12:00:20Z",
+    "status": "synthetic_midpoint_pattern"
+  }
+]

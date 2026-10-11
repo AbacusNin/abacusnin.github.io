@@ -312,5 +312,28 @@
     ],
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/ai/audit-token-break-glass/"
+  },
+  {
+    "title": "The Kiosk That Told Me Which Way to Guess",
+    "category": "AI Security",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "comparison oracle",
+      "information leakage",
+      "binary search",
+      "LLM kiosk security",
+      "enumeration",
+      "differential response",
+      "rate limiting"
+    ],
+    "summary": "A kiosk refused to tell me its record ID, then told me whether every guess sorted before or after it. I used those answers to narrow a 65,536-value space to one accepted identifier.",
+    "aliases": [
+      "record lookup",
+      "sort order",
+      "response discrepancy"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/ai/comparison-oracle-record-lookup/"
   }
 ]
