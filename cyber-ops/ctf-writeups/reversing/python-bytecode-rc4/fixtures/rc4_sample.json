@@ -1,0 +1,7 @@
+{
+  "purpose": "neutral RC4 round-trip fixture with repeated bytes",
+  "key_hex": "0102030405",
+  "plaintext_hex": "00010001ff00",
+  "ciphertext_hex": "b23863040f3d",
+  "reference": "RFC 6229 key 0102030405, keystream offset 0"
+}

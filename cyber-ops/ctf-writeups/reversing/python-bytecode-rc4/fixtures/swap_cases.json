@@ -1,0 +1,26 @@
+[
+  {
+    "name": "synthetic-code-swap",
+    "source": "import marshal\nblob = b'neutral-bytes'\nco = marshal.loads(blob)\nfn.__code__ = co\n",
+    "expected_lead": true,
+    "label": "synthetic static match, never executed"
+  },
+  {
+    "name": "benign-marshal-only",
+    "source": "import marshal\nmetadata = marshal.loads(b'neutral')\n",
+    "expected_lead": false,
+    "label": "marshal use without a code-object swap"
+  },
+  {
+    "name": "legitimate-code-swap",
+    "source": "def replacement():\n    return 1\nfn.__code__ = replacement.__code__\n",
+    "expected_lead": false,
+    "label": "code-object swap without marshal"
+  },
+  {
+    "name": "text-near-miss",
+    "source": "note = 'marshal.loads(blob); fn.__code__ = co'\n",
+    "expected_lead": false,
+    "label": "pattern text inside a string, no behavior"
+  }
+]

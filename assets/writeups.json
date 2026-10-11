@@ -83,7 +83,7 @@
       "flag-checker",
       "reverse-engineering"
     ],
-    "summary": "A Python flag checker kept replacing one function's code object. I matched its bytecode to the right interpreter, read the RC4 check, and reversed it to recover the accepted input.",
+    "summary": "A Python flag checker replaced one function's code object three times. I matched its bytecode to the right interpreter, read the RC4 check, and recovered the accepted input.",
     "url": "/cyber-ops/ctf-writeups/reversing/python-bytecode-rc4/",
     "aliases": [
       "code objects"

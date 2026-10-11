@@ -101,6 +101,7 @@
 </tr>
 </tbody>
 </table>
+<p>Defensive proofs of concept for adapting this analysis: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/reversing/python-bytecode-rc4/artifacts">view the tools and checklist on GitHub</a> and the <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/reversing/python-bytecode-rc4/fixtures">neutral fixtures</a>. They contain no key, ciphertext, or flag from the challenge.</p>
 <h2>1. Problem Statement and Threat Scenario</h2>
 <p>I was given one Python script that asked for a flag and answered yes or no. The hint talked about doing more with fewer named functions. In the source, I found an embedded byte blob split into three serialized code objects. The script assigned each object to one function's <code>__code__</code> attribute and called that function after each swap. The name stayed put while its instructions changed.</p>
 <p>My job was to recover the input that survived a format gate and the final validator. The expected answer had a fixed prefix and length. I withhold the flag and the embedded key and ciphertext values here, while keeping the mechanism and checks that established the result.</p>
@@ -122,13 +123,35 @@ codes = [marshal.loads(segment) for segment in segments]
 for code in codes:
     print(code.co_varnames, code.co_names, code.co_consts)
 </code></pre>
-<p>Here, <code>functions</code> is the script's embedded blob and <code>delimiter</code> is the byte sequence it used to separate the bodies. I neutralized the interactive entry point before loading the script to obtain that blob. This worked for the challenge, but that exact text edit still executed the rest of the script. I would parse out the literal or use an isolated analysis environment for an untrusted sample. <a href="https://docs.python.org/3/library/marshal.html">Python warns that <code>marshal</code> is unsafe for untrusted data</a>.</p>
-<p>I fetched candidate CPython builds and disassembled the validator with each interpreter's <code>dis</code> module. The first two listings made no sense; the matching version exposed the gate and RC4 data flow. I used the ordered byte construction from that listing because the constant pool alone did not preserve the roles I needed.</p>
-<p>The recovery operation was small:</p>
-<pre><code class="language-python">candidate = rc4(key, ciphertext)
-assert rc4(key, candidate) == ciphertext
+<p>Here, <code>functions</code> is the script's embedded blob and <code>delimiter</code> is the byte sequence it used to separate the bodies. My challenge-specific extraction replaced the exact interactive entry point before compiling and executing the remaining source. I then saved the three segments in their original order. This describes what I did, not a safe loader for arbitrary Python:</p>
+<pre><code class="language-python">ns = {}
+src = open(&quot;challenge.py&quot;, &quot;rb&quot;).read()
+src = src.replace(b&quot;if __name__=='__main__':main()&quot;, b&quot;pass&quot;)
+exec(compile(src, &quot;challenge.py&quot;, &quot;exec&quot;), ns)
+segments = ns[&quot;functions&quot;].split(b&quot;&lt;DELIM&gt;&quot;)
+for i, segment in enumerate(segments):
+    open(f&quot;seg{i}.bin&quot;, &quot;wb&quot;).write(segment)
+    print(i, len(segment), segment[:1].hex())
 </code></pre>
-<p>The helper accepted bytes for both arguments. I checked its standard-RC4 behavior against known-answer vectors, then used the challenge's 128-byte key and 40-byte comparison value. The table separates what each tool produced from what I concluded from it.</p>
+<p>The replacement disabled that one entry point; it still ran other top-level statements. For an unknown script, I would first use the <a href="artifacts/static_swap_triage.py">non-executing static triage tool</a> or an isolated analysis environment. <a href="https://docs.python.org/3/library/marshal.html">Python warns that <code>marshal</code> is unsafe for untrusted data</a>; the tool does not call it.</p>
+<p>I fetched candidate CPython builds and disassembled the validator with each interpreter's <code>dis</code> module. The first two listings made no sense; the matching version exposed the gate and RC4 data flow. I used the ordered byte construction from that listing because the constant pool alone did not preserve the roles I needed.</p>
+<pre><code class="language-bash">uv python install 3.x
+python3.x - &lt;&lt;'PY'
+import marshal, dis
+dis.dis(marshal.loads(open(&quot;seg2.bin&quot;, &quot;rb&quot;).read()))
+PY
+</code></pre>
+<p>Here <code>3.x</code> stands for each candidate minor version I tried. The command loads untrusted serialized data, so it belongs in an isolated analysis environment.</p>
+<p>The recovery operation was small:</p>
+<pre><code class="language-python">from rc4 import rc4
+
+key = bytes.fromhex(&quot;REDACTED_KEY&quot;)
+ciphertext = bytes.fromhex(&quot;REDACTED_CIPHERTEXT&quot;)
+candidate = rc4(key, ciphertext)
+assert rc4(key, candidate) == ciphertext
+print(candidate.decode())
+</code></pre>
+<p>The redacted values stand for constants I read from the validator. The <a href="artifacts/rc4.py">byte-oriented RC4 helper</a> accepted bytes for both arguments and used only Python's standard library. I checked its standard-RC4 behavior against a published known-answer vector, then used the challenge's 128-byte key and 40-byte comparison value. Its <a href="fixtures/rc4_sample.json">neutral repeated-byte fixture</a> demonstrates why the order and duplicates matter without exposing challenge values. The table separates what each tool produced from what I concluded from it.</p>
 <table>
 <thead>
 <tr>
@@ -185,6 +208,28 @@ assert rc4(key, candidate) == ciphertext
 <summary>6. Lessons Learned</summary>
 <p>I now separate code-object structure from instruction meaning when I triage Python bytecode. Names and constants can point me toward the algorithm, but I do not trust an opcode listing until I have matched the interpreter. An opening <code>RESUME</code> opcode can be a quick version clue where that opcode applies. I still require the whole listing to make sense.</p>
 <p>The failed RC4 attempt was my own avoidable error. I had inferred data roles from a pool of values and removed repeated bytes as though I were deduplicating a set. Next time I will trace store targets and byte construction before writing a decoder. Once those roles were clear, RC4's symmetry reduced the recovery to one call and a round-trip check.</p>
+<table>
+<thead>
+<tr>
+<th>What the exercise did</th>
+<th>What I would carry into another investigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Swapped one function's <code>__code__</code> three times</td>
+<td>Follow the body that actually runs, rather than counting definitions on disk.</td>
+</tr>
+<tr>
+<td>Exposed useful constants while disassembly was garbled</td>
+<td>Treat readable object metadata as a lead, then match the bytecode's interpreter before trusting instructions.</td>
+</tr>
+<tr>
+<td>Compared RC4 output with stored bytes</td>
+<td>Trace the key and comparison value in order, then use the cipher's symmetry and a round trip to check the inverse.</td>
+</tr>
+</tbody>
+</table>
 
 </details>
 <details class="fold section-fold">
@@ -194,14 +239,16 @@ assert rc4(key, candidate) == ciphertext
 <h3>Security Operations</h3>
 <p>I would build a benign three-stage sample with the same <code>__code__</code> swap and give the blue team the sample plus its ordinary endpoint and script telemetry. The first question is whether its collection reveals the dynamic load at all. Then I would ask an analyst to recover the actual bodies and identify the right CPython version. I would vary the delimiter and placement of the embedded blob during replay to see whether the process depends on a brittle string match.</p>
 <p>I would record the collected evidence, time to recover the stage sequence, legitimate dynamic-code examples that look similar, and misses from the varied samples. If telemetry cannot show the behavior, the exercise documents a visibility gap. If it can, I can evaluate an analyst workflow. I have not run this drill or measured a production detection rate.</p>
+<p>For a source sample supplied to an analyst, the <a href="artifacts/static_swap_triage.py">static swap triage tool</a> is a first-pass lead finder. It parses source without running it and reports a lead when a direct <code>marshal.loads</code> call and <code>__code__</code> assignment appear in the same case. It does not replace endpoint telemetry or establish that code ran.</p>
 <h3>Intelligence Operations</h3>
 <p>This checker gave me no actor, infrastructure, collection source, or attribution lead. I would not turn the puzzle into an intelligence finding. The transferable skill is unpacking an obfuscated Python sample when a real collection provides one.</p>
 </details>
 <details class="fold section-fold">
 <summary>8. Reusable Tools, Scripts, and Artifacts</summary>
-<p>The two reusable pieces are a standard-RC4 byte routine and a bytecode-triage procedure. The RC4 routine takes key and data bytes and returns their keystream XOR. I used it for the inverse and the round trip; it does not cover RC4 variants. Known-answer vectors checked the primitive, while the checker run tested the whole challenge path.</p>
-<p>My bytecode procedure starts by saving the embedded bytes in order. I split the segments, inspect each code object's constants and locals, and match the CPython minor version before reading instructions. I then follow assignments, recover the validator equation, and test the candidate against every earlier gate. A large version gap may make <code>marshal</code> loading fail outright. Even when loading succeeds, I do not assume the opcodes mean the same thing.</p>
-<p>These methods need an isolated environment when the input is untrusted. The challenge's entry-point edit was tailored to its script and is not my general extraction procedure.</p>
+<p>The <a href="artifacts/rc4.py">RC4 helper</a> takes key and data bytes and returns their keystream XOR. I used this operation for the inverse and the round trip; it does not cover RC4 variants. Its self-test checks a published RC4 keystream vector and a repeated-byte round trip. The <a href="fixtures/rc4_sample.json">neutral RC4 fixture</a> holds a separate example key, plaintext, and ciphertext so another person can check byte order without seeing challenge secrets. The historical checker run tested the whole challenge path; the neutral fixture tests the helper alone.</p>
+<p>The <a href="artifacts/marshal_bytecode_triage.md">bytecode triage checklist</a> starts with source inspection and preserving the embedded bytes in order. For this challenge, I split the segments, inspected each code object's constants and locals, and matched the CPython minor version before reading instructions. I then followed assignments, recovered the validator equation, and tested the candidate against every earlier gate. A large version gap may make <code>marshal</code> loading fail outright. Even when loading succeeds, I do not assume the opcodes mean the same thing.</p>
+<p>The <a href="artifacts/static_swap_triage.py">static swap triage tool</a> takes a bounded JSON list of source snippets and returns JSON with direct <code>marshal.loads</code> and <code>__code__</code> assignment counts plus a lead flag. Its <a href="fixtures/swap_cases.json">four neutral cases</a> include one combined lead and three controls. This is syntactic triage, not an execution trace, malware verdict, or production detection. The <a href="artifacts/README.md">artifact README</a> has the commands, inputs, outputs, and limits in one place.</p>
+<p>These methods need an isolated environment when the input is untrusted. The challenge's entry-point edit was tailored to its script and is not my general extraction procedure. The static tool does not deserialize or execute the supplied snippets.</p>
 </details>
 <details class="fold section-fold">
 <summary>9. Framework Applicability and Mapping</summary>
@@ -245,12 +292,12 @@ assert rc4(key, candidate) == ciphertext
 </details>
 <details class="fold section-fold">
 <summary>12. Indicators, Artifacts, and Detection Engineering</summary>
-<p>The local checker produced no production host or network events and no IOC. I would not publish a YARA, Sigma, or SIEM rule from it. My proposed hunting hypothesis is narrower: inspect Python processes that deserialize embedded code and assign a new function <code>__code__</code> where the environment can capture that behavior.</p>
-<p>I would validate the data source before writing a query, then test the hypothesis against benign dynamic-code use and variants of the sample. The status remains <strong>Proposed, unvalidated</strong>. A string hit on <code>marshal</code> alone would neither prove a malicious load nor cover other ways to hide code.</p>
+<p>The local checker produced no production host or network events and no IOC. I would not publish a YARA, Sigma, or SIEM rule from it. My proposed hunting hypothesis is narrower: inspect Python processes that deserialize embedded code and assign a new function <code>__code__</code> where the environment can capture that behavior. The <a href="artifacts/static_swap_triage.py">static source triage tool</a> lets an analyst queue source text in a JSON case for review, but its <code>lead</code> result does not show that a process executed the code.</p>
+<p>I would validate the data source before writing a query, then test the hypothesis against benign dynamic-code use and variants of the sample. The <a href="fixtures/swap_cases.json">synthetic cases</a> exercise a combined lead, a <code>marshal</code>-only case, a code-swap-only case, and a string near miss. Those are tool checks, not detection validation. The operational hunt remains <strong>Proposed, unvalidated</strong>. A string hit on <code>marshal</code> alone would neither prove a malicious load nor cover other ways to hide code.</p>
 </details>
 <details class="fold section-fold">
 <summary>13. Visual Artifact</summary>
-<p>The <a href="#analysis-flow">diagram beside the summary</a> traces the actual solve path: one blob became three executable bodies, the right interpreter made the validator readable, and RC4 inversion produced the input I checked. It is a transformation flow, not an attack timeline.</p>
+<p>The <a href="#analysis-flow">diagram beside the summary</a> traces the solve path. The first blob branched into three code objects: input reader, format gate, and validator. The script swapped those bodies into one function in turn. Matching the interpreter made the validator readable; RC4 inversion produced the input I checked. It is a transformation flow, not an attack timeline.</p>
 
 </details>
 <details class="fold section-fold">
@@ -270,6 +317,10 @@ assert rc4(key, candidate) == ciphertext
 <tr>
 <td><a href="https://docs.python.org/3/library/dis.html">Python <code>dis</code> documentation</a></td>
 <td>CPython bytecode disassembly and version changes.</td>
+</tr>
+<tr>
+<td><a href="https://www.rfc-editor.org/rfc/rfc6229">RFC 6229, Test Vectors for the Stream Cipher RC4</a></td>
+<td>The published keystream vector used by the helper's self-test.</td>
 </tr>
 <tr>
 <td>Bruce Schneier, <em>Applied Cryptography</em>, 2nd ed. (1996), ISBN 978-0471117094</td>
