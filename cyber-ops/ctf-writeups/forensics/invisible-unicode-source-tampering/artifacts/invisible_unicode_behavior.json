@@ -1,0 +1,41 @@
+{
+  "type": "bundle",
+  "id": "bundle--63195143-fe35-4881-ab4f-8890702091dc",
+  "objects": [
+    {
+      "type": "attack-pattern",
+      "spec_version": "2.1",
+      "id": "attack-pattern--b3b9c745-fdf8-4058-a50f-94d644899a90",
+      "created": "2026-10-11T00:00:00.000Z",
+      "modified": "2026-10-11T00:00:00.000Z",
+      "name": "Invisible Unicode in source review",
+      "description": "Analytical pattern: invisible Unicode can conceal source content from visual review. This bundle contains no incident indicator or attribution.",
+      "external_references": [
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1027.018",
+          "url": "https://attack.mitre.org/techniques/T1027/018/"
+        }
+      ]
+    },
+    {
+      "type": "course-of-action",
+      "spec_version": "2.1",
+      "id": "course-of-action--bb84adf7-bd6a-439c-b15e-55c80a239597",
+      "created": "2026-10-11T00:00:00.000Z",
+      "modified": "2026-10-11T00:00:00.000Z",
+      "name": "Review invisible Unicode in source before build",
+      "description": "Scan raw source bytes and code points, decode suspicious Tag runs in an isolated analysis workspace, and review legitimate uses before blocking a build. Proposed, not deployed."
+    },
+    {
+      "type": "relationship",
+      "spec_version": "2.1",
+      "id": "relationship--442e18dc-b2a6-469e-9cfb-008a04d592e6",
+      "created": "2026-10-11T00:00:00.000Z",
+      "modified": "2026-10-11T00:00:00.000Z",
+      "relationship_type": "mitigates",
+      "source_ref": "course-of-action--bb84adf7-bd6a-439c-b15e-55c80a239597",
+      "target_ref": "attack-pattern--b3b9c745-fdf8-4058-a50f-94d644899a90"
+    }
+  ]
+}

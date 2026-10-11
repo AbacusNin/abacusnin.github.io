@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Source Line I Could Not See - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="I found invisible Unicode Tag characters on one line of a Python app, decoded the hidden source, recovered its XOR-protected flag value, and traced the insertion through Git history.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/invisible-unicode-source-tampering/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Source Line I Could Not See">
+  <meta property="og:description" content="I found invisible Unicode Tag characters on one line of a Python app, decoded the hidden source, recovered its XOR-protected flag value, and traced the insertion through Git history.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/invisible-unicode-source-tampering/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Forensics / <span aria-current="page">The Source Line I Could Not See</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Source Line I Could Not See</h1>
+        <p class="lead">The line looked ordinary in the editor. Its bytes told a different story.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Find an unseen change in a note-taking application&#x27;s source history, decode it, and recover the embedded flag-format value.</p>
+<p><strong>What I did.</strong> I compared raw bytes with rendered text, identified Unicode Tags, decoded their ASCII content, isolated the XOR arithmetic, and counted Tags across commits.</p>
+<p><strong>The result.</strong> The case record reports a recovered flag-format value and a mid-history insertion; the network-bearing tail was not executed.</p>
+<p><strong>The limit.</strong> The repository, commit hash, original payload bytes, and flag are withheld, so the linked defensive lab uses synthetic fixtures.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="One altered source line; Unicode Tag characters; Recovered source text; Embedded XOR values; Git history">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">One altered source line</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Raw bytes differ from the visible line</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Unicode Tag characters</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Count code points, then decode ASCII</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Recovered source text</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Inspect commands without running them</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Embedded XOR values</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Repeat the key in isolated arithmetic</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Git history</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Locate the first commit with Tag bytes</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Forensics and source-code reverse engineering</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>invisible-unicode, ascii-smuggling, unicode-tags, defense-evasion, supply-chain, repeating-key-xor, git-forensics</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved</td>
+</tr>
+<tr>
+<td>Material</td>
+<td>Python note-taking app and Git history</td>
+</tr>
+<tr>
+<td>Goal</td>
+<td>Locate the unseen change and recover its embedded flag-format value</td>
+</tr>
+<tr>
+<td>Observed result</td>
+<td>Hidden source and XOR-protected value recovered statically; insertion traced to a mid-history commit</td>
+</tr>
+<tr>
+<td>Boundary</td>
+<td>The network-bearing tail was not run; no live download or exfiltration was observed</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/invisible-unicode-source-tampering/artifacts">view the artifacts on GitHub</a> and <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/invisible-unicode-source-tampering/fixtures">their synthetic fixtures</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>The developer of a small Python note-taking app believed someone had changed the repository before a commit. The odd part was that the altered line still looked harmless during review. I had the source tree and Git history, and I needed to find the change, decode what it carried, and recover the hidden flag-format value. I did not need to run the app.</p>
+<p>This was an adversarial CTF story with a concrete source-integrity problem. A malicious contributor could put extra bytes into a file that a reviewer sees as ordinary text. The protected boundary was the source-to-commit review, and the downstream risk belonged to anyone who later built or ran compromised code. The decoded content described an outbound request and a second-stage fetch. That gave me a reason to treat it as hostile content during analysis.</p>
+<p>The page makes a narrower claim than a full compromise story. I found and decoded the hidden content and traced its appearance in history. I did not execute the decoded network code or observe a victim system making either connection. A hidden comment or string does not run by itself; a separate loader or execution path would have to use it.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I started with the simplest question: which tracked file had bytes that the editor might hide? I cloned the repository, inventoried tracked files, and checked size, line count, and SHA-256. A raw scan found non-ASCII bytes in exactly one file, the app entrypoint. That brought a repository-wide mystery down to one line.</p>
+<p>The first count was misleading. My byte scan treated each UTF-8 byte outside ASCII as a separate mark. These characters live outside the Basic Multilingual Plane and take four UTF-8 bytes each, so the count was about four times the number of hidden code points. I switched to a Unicode-aware read and listed the code points. They fell in the Tags block around <code>U+E0020</code> through <code>U+E007E</code>.</p>
+<p>Those Tag characters can carry printable ASCII by subtracting <code>0xE0000</code> from each code point. I decoded them in order and got Python source text. I read that text. I did not execute it. For the flag, I lifted only the byte-array and repeating-key XOR arithmetic into an isolated calculation. That produced the flag-format value without touching the code that built an outbound URL or fetched another binary.</p>
+<p>I then checked Git history for the affected file, counting Tag characters in each committed version. The first increase identified a mid-history insertion. The available account does not include the commit ID or the original file bytes, so I cannot reproduce that attribution here. The method and the synthetic detection lab below show exactly what I would preserve in a real review.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>My first pass looked for bytes outside ASCII. A byte count is a quick locator, while the next step needs a character count. A shell loop that splits filenames on spaces can also miss files. This small Python fragment shows the safer code-point step after I have identified a suspect file:</p>
+<pre><code class="language-python">from pathlib import Path
+
+data = Path(&quot;app.py&quot;).read_text(encoding=&quot;utf-8&quot;)
+tagged_ascii = &quot;&quot;.join(
+    chr(ord(char) - 0xE0000)
+    for char in data
+    if 0xE0020 &lt;= ord(char) &lt;= 0xE007E
+)
+print(tagged_ascii)  # inspect the recovered text; do not execute it
+</code></pre>
+<p>That range is deliberate. <code>U+E0001</code> is LANGUAGE TAG and <code>U+E007F</code> is CANCEL TAG. I count them as Tag characters, but I do not convert them into printable payload bytes. The <a href="artifacts/unicode_smuggling_scanner.py">read-only scanner</a> reports code points, file hash, location, and decoded Tag runs. Its <a href="artifacts/README.md">guide</a> gives the directory and CI usage.</p>
+<p>The redacted payload's flag calculation used a short XOR key more than once. A faithful generic form is:</p>
+<pre><code class="language-python">def repeating_xor(ciphertext: bytes, key: bytes) -&gt; bytes:
+    if not key:
+        raise ValueError(&quot;empty key&quot;)
+    return bytes(value ^ key[index % len(key)] for index, value in enumerate(ciphertext))
+</code></pre>
+<p>I ran the equivalent arithmetic on the embedded values alone. The source text's network-bearing statements stayed inert. For attribution, I reviewed committed versions of <code>app.py</code> and compared Tag counts; <code>git log --format=%H -- app.py</code> identifies revisions to examine, and <code>git show &lt;commit&gt;:app.py</code> retrieves a committed blob for byte-aware inspection. I did not use commit authorship as proof of a person's identity.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>Unicode gives each character a code point; UTF-8 encodes that code point as bytes. A printable ASCII Tag component at <code>U+E0020</code> through <code>U+E007E</code> corresponds to an ASCII character at <code>0x20</code> through <code>0x7E</code>. The arithmetic is simple: <code>tag_codepoint - 0xE0000 = ascii_codepoint</code>. The Tags block also contains special characters, including LANGUAGE TAG and CANCEL TAG. They are part of the block, but they are not ordinary printable payload characters.</p>
+<p>These characters can be hard to see in editors. Twenty Tag characters occupy eighty UTF-8 bytes in the <a href="fixtures/sample_carrier.py">synthetic carrier</a>, yet its line renders much shorter. That same fixture decodes to the harmless text <code>print("review only")</code>. It sits in a Python comment and has no effect when the file is interpreted. A real attack needs a code path that reads, decodes, and uses the hidden content. The recovered source in this case described such hostile actions, but I did not observe them run.</p>
+<p>Tag sequences also have benign uses, including subdivision-flag emoji. The <a href="fixtures/benign_emoji_tags.py">emoji fixture</a> is an expected detection hit, not malicious code. The distinction matters when this becomes a pre-commit check. I cannot label every Tag character an intrusion.</p>
+<p>This is related to Trojan Source, which used bidirectional controls and confusable characters to make reviewed text differ from program behavior. My case carried hidden ASCII source in Tag characters. The shared review problem is that a rendered line does not reveal every byte it contains. The mechanisms are different.</p>
+<p>The second decoding step was repeating-key XOR. I XORed each ciphertext byte with the matching key byte, wrapping the key index with <code>% len(key)</code>. XORing again with the same key recovers the original bytes. The key and ciphertext were embedded together, so this was an obfuscation layer over the flag, not a claim of strong encryption.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>The first boundary crossed was visual review. The file's bytes included a run of Tag characters that the editor did not make obvious. I located them through a repository-wide byte scan, decoded the printable Tag components to ASCII, and got source text. The content included an XOR-protected flag value, an outbound URL-building path, and a <code>curl</code> second-stage fetch. Only the decode and isolated XOR calculation were needed to solve the challenge.</p>
+<p>My local proof of the flag did not depend on a network connection. I decoded the embedded bytes with the repeating key and checked that the result had the expected flag structure. A separate decoding route reproduced it according to the case record. The raw flag remains withheld. The record does not provide an organizer acceptance transcript, so I make no platform-acceptance claim.</p>
+<p>Counting Tags in each committed blob showed when the invisible content entered the history. That establishes insertion timing within the repository. It does not by itself identify the actor, prove that the app executed the hidden text, or prove a download or exfiltration occurred. Those would require loader analysis, build provenance, and runtime evidence.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned</summary>
+<p>The prompt said the developer could not see the change. I treated that as a representation problem before looking for a subtle logic bug. One raw-byte pass put me on the right file. The four-to-one count mistake was useful: it forced me to separate UTF-8 bytes from Unicode code points, which made the hiding method clear.</p>
+<p>Static decoding gave me the flag without letting the recovered source do anything on my machine. That separation is worth keeping. A decoded line can describe a dangerous command while remaining only text in the analyst's workspace.</p>
+<p>Git history was the last step, not a substitute for the byte work. I could date the insertion by looking for the first committed version with Tag characters. I would still preserve the parent and child blobs and review any build or loader path before telling a team what ran.</p>
+<table>
+<thead>
+<tr>
+<th>Exercise behavior</th>
+<th>Operational use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hidden source on one line</td>
+<td>Inspect suspicious commits and dependencies as bytes</td>
+</tr>
+<tr>
+<td>Manual review missed it</td>
+<td>Add a Unicode-aware source check before build</td>
+</tr>
+<tr>
+<td>Static decode exposed intent</td>
+<td>Triage an artifact without executing recovered code</td>
+</tr>
+<tr>
+<td>Decoded text described a second stage</td>
+<td>Investigate the loader and runtime telemetry before claiming transfer</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Operational Extrapolation</summary>
+<h3>Individual Practitioner Development</h3>
+<p>This case sharpened my source-integrity workflow: inventory, compare raw bytes and rendering, classify code points, decode in a read-only path, and then use Git history for timing. The next step would be to run the <a href="artifacts/unicode_smuggling_scanner.py">scanner</a> in a real review pipeline with a controlled allowlist and measured false-positive rate. I have not deployed it there.</p>
+<h3>Security Operations</h3>
+<p>At commit or CI time, the relevant sensor is the repository content itself. A hit on invisible characters deserves a focused review of the line, the decoded text, the commit, and any code path that consumes it. The <a href="artifacts/invisible_unicode.yar">YARA rule</a> gives a fast byte-level lead; the Python scanner gives code-point counts and locations. The <a href="artifacts/invisible_unicode_review_checklist.md">review checklist</a> walks from preservation to a scoped response.</p>
+<p>For runtime hunting, MITRE's <a href="https://attack.mitre.org/detectionstrategies/DET0920/">DET0920</a> describes correlating hidden Unicode in a script with decode or evaluation behavior and later process or network events. That is a proposed extension here. I would need file hash or script identity, execution telemetry, child-process events, and network connections tied to the same process or time window. None of those live events were collected in this exercise.</p>
+<h3>Intelligence Operations</h3>
+<p>The decoded code's fetch and outbound URL are leads for a real investigation, where I would preserve the exact destination and compare it with network logs and other samples. The sanitized case gives me no shareable infrastructure IOC or actor attribution. I would not connect it to a campaign from the hiding method alone.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The <a href="artifacts/unicode_smuggling_scanner.py">Unicode scanner</a> reads a file or source directory without importing or executing it. It reports Tag, zero-width, bidi, joiner, and embedded-BOM code points, a SHA-256 hash, byte size, line and column, and Tag-run length. <code>--show-decoded</code> emits at most 500 ASCII characters per run in JSON; default output does not print hidden text. Exit codes distinguish clean input, a finding, and incomplete scanning. The <a href="artifacts/README.md">guide</a> lists its suffix filters, file and count caps, and CI boundary.</p>
+<p>The separate <a href="artifacts/invisible_unicode.yar">YARA rule</a> looks for UTF-8 byte prefixes of Tags and selected controls. It compiled under yara-python 4.5.4 and matched the <a href="fixtures/sample_carrier.py">synthetic carrier</a>. It left the <a href="fixtures/clean_source.py">ASCII control</a> and <a href="fixtures/benign_unicode_source.py">visible-accented control</a> clear. Both scanner and rule also flag the <a href="fixtures/benign_emoji_tags.py">legitimate emoji Tag sequence</a>, an expected false positive. The <a href="artifacts/test_unicode_smuggling.py">test file</a> checks those cases, special Tags that must not decode to ASCII, and a bidi control.</p>
+<p>The <a href="artifacts/invisible_unicode_review_checklist.md">review checklist</a> gives a human workflow for preserving the blob, decoding in isolation, checking a loader, and tracing a commit. The <a href="artifacts/invisible_unicode_behavior.json">behavior bundle</a> is an illustrative STIX 2.1 Attack Pattern, Course of Action, and relationship. It has no Indicator or challenge IOC. These are new, synthetic defensive assets. They do not replay the original repository or validate a production pipeline.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Applicability and Mapping</summary>
+<p>The strongest fit is <a href="https://attack.mitre.org/techniques/T1027/018/">ATT&amp;CK T1027.018, Invisible Unicode</a>. The case's Tag bytes concealed source content from ordinary visual review. MITRE's GlassWorm example uses private-use characters rather than this case's Tags block; it supports the broader family, not a claim that these are the same sample.</p>
+<table>
+<thead>
+<tr>
+<th>Behavior or condition</th>
+<th>Framework</th>
+<th>Mapping</th>
+<th>Evidence limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hidden Tag-encoded source content</td>
+<td>ATT&amp;CK</td>
+<td><a href="https://attack.mitre.org/techniques/T1027/018/">T1027.018 Invisible Unicode</a></td>
+<td>Direct technique analogy from the static source behavior.</td>
+</tr>
+<tr>
+<td>Code describes a decoder for its hidden bytes</td>
+<td>ATT&amp;CK</td>
+<td><a href="https://attack.mitre.org/techniques/T1140/">T1140 Deobfuscate/Decode Files or Information</a></td>
+<td>Intended runtime behavior in decoded text; execution was not observed.</td>
+</tr>
+<tr>
+<td>Code describes a <code>curl</code> binary fetch</td>
+<td>ATT&amp;CK</td>
+<td><a href="https://attack.mitre.org/techniques/T1105/">T1105 Ingress Tool Transfer</a></td>
+<td>A static transfer path, with no observed download.</td>
+</tr>
+<tr>
+<td>Hidden hostile code in a product source file</td>
+<td>CWE</td>
+<td><a href="https://cwe.mitre.org/data/definitions/506.html">CWE-506 Embedded Malicious Code</a></td>
+<td>Fits the fictional source-tampering scenario; no production product was assessed.</td>
+</tr>
+<tr>
+<td>Untrusted source entering a build path</td>
+<td>OWASP Top 10 2021</td>
+<td><a href="https://top10.owasp.org/2021/A08_2021-Software_and_Data_Integrity_Failures/">A08 Software and Data Integrity Failures</a></td>
+<td>Relevant integrity risk, not a measured deployment failure.</td>
+</tr>
+</tbody>
+</table>
+<p>I also considered <a href="https://attack.mitre.org/techniques/T1567/">T1567 Exfiltration Over Web Service</a>. A redacted outbound URL and no observed transfer cannot establish a web-service exfiltration technique, so I do not assign that technique here. I also avoid a D3FEND ID merely to fill a framework row; the practical defensive work is the byte and code-point review below.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intelligence and Standards Integration</summary>
+<p>The <a href="artifacts/invisible_unicode_behavior.json">illustrative STIX bundle</a> has an Attack Pattern for the hidden-Unicode method and a proposed Course of Action for source review. The relationship says the review can mitigate that pattern. It contains no IP, domain, hash Indicator, actor, or campaign. Its JSON and internal object references passed local checks; I did not run a full STIX schema validator or publish it through TAXII.</p>
+<p>A filename-only pattern such as <code>[file:name MATCHES '.*\\.py$']</code> would match ordinary Python files. It cannot assert that a file contains Tag characters, so it would be a misleading Indicator for this case. The scanner and YARA rule express the content test more directly. A future real incident could add file hashes and observed infrastructure with their own provenance and expiry.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>Standards Mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Guidance</th>
+<th>Use here</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 SI-7</a></td>
+<td>Review source integrity before build and preserve evidence of unauthorized changes.</td>
+<td>Proposed pipeline control</td>
+</tr>
+<tr>
+<td><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 SA-11</a></td>
+<td>Test and analyze source with a byte-aware check.</td>
+<td>Synthetic tool validated locally</td>
+</tr>
+<tr>
+<td><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 SA-15</a></td>
+<td>Define a development process that includes the check and review exception path.</td>
+<td>Proposed process</td>
+</tr>
+<tr>
+<td><a href="https://csrc.nist.gov/pubs/sp/800/218/final">NIST SSDF PW.7</a></td>
+<td>Review human-readable code with tooling that exposes hidden code points.</td>
+<td>Proposed process</td>
+</tr>
+<tr>
+<td><a href="https://www.cisecurity.org/controls/application-software-security">CIS Control 16</a></td>
+<td>Put the source check in application security development work.</td>
+<td>Proposed process</td>
+</tr>
+<tr>
+<td><a href="https://www.cisecurity.org/controls/malware-defenses">CIS Control 10</a></td>
+<td>Apply malware defenses if a real downstream build or endpoint is affected.</td>
+<td>Conditional</td>
+</tr>
+</tbody>
+</table>
+<h3>Mitigation Realization</h3>
+<p>I would place the <a href="artifacts/unicode_smuggling_scanner.py">scanner</a> at a review or CI boundary and require an explicit decision on each hit. The <a href="artifacts/invisible_unicode.yar">YARA rule</a> can quickly identify files for deeper code-point inspection. Both were validated against synthetic files. Neither has been wired to a production repository, tested at scale, or given a production allowlist.</p>
+<p>The <a href="artifacts/invisible_unicode_review_checklist.md">checklist</a> makes the human step concrete: preserve the raw blob and commit, decode without execution, inspect the loader path, and distinguish legitimate Unicode uses. Protected branches and signed commits can improve provenance and gate changes, but a signed commit can still contain hidden bytes. Those repository controls are proposals here, not proof that the code is safe.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>The primary observable is the raw source file. Tag code points in the <code>U+E0000</code> to <code>U+E007F</code> area, selected zero-width and bidi controls, and an unusual gap between byte length and visible line length can justify inspection. These are <strong>structural leads</strong>, not malicious IOCs by themselves. A legitimate emoji Tag sequence is the clearest counterexample in the fixtures.</p>
+<p>The <a href="artifacts/unicode_smuggling_scanner.py">scanner</a> takes files or a directory and emits JSON findings and errors. For each hit it records path, SHA-256, byte count, code-point category and count, and up to 100 positions. The <a href="artifacts/invisible_unicode.yar">YARA rule</a> checks a smaller byte-pattern set. A commit/CI implementation needs raw file access, repository and commit identifiers, the scanner version, a protected result log, and a path-specific allowlist review. Scan errors must fail the gate or route to manual review; they cannot count as clean files.</p>
+<p>On the <a href="fixtures/sample_carrier.py">synthetic carrier</a>, the scanner reports 20 Tag characters and 80 corresponding UTF-8 bytes. It decodes the placeholder only when asked. The <a href="fixtures/clean_source.py">clean file</a> and <a href="fixtures/benign_unicode_source.py">visible Unicode file</a> produce no findings. The <a href="fixtures/benign_emoji_tags.py">emoji fixture</a> is a deliberate benign hit. The <a href="artifacts/test_unicode_smuggling.py">tests</a> check these cases and the special Tag boundary. YARA compiled and matched the same positive and negative files, including the benign emoji hit. This establishes local behavior, not a measured field false-positive rate.</p>
+<p>The runtime hypothesis is separate. <a href="https://attack.mitre.org/detectionstrategies/DET0920/">DET0920</a> looks for hidden Unicode associated with decoding or evaluation and later process or network behavior. A real hunt would join file hash or script identity to process creation, child processes, and outbound connections. I have no such telemetry from this exercise, so that hunt remains Proposed. I would not treat the decoded <code>curl</code> text as a network event.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow diagram above</a> follows the evidence path: visible line, raw Tag characters, decoded source, isolated XOR arithmetic, and Git timing. It stops before a runtime outcome because the network-bearing tail was not executed. The code described a fetch and outbound URL, but the diagram does not turn those statements into observed traffic.</p>
+<p>The byte-versus-code-point mismatch is the key visual idea for a reviewer. A short-looking line can hold many four-byte Tag characters. Opening the raw file and naming those code points is what made the hidden content visible to me.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<table>
+<thead>
+<tr>
+<th>Ref</th>
+<th>Primary source</th>
+<th>Use and limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R1</td>
+<td><a href="https://attack.mitre.org/techniques/T1027/">MITRE ATT&amp;CK T1027, Obfuscated Files or Information</a></td>
+<td>Parent technique context.</td>
+</tr>
+<tr>
+<td>R2</td>
+<td><a href="https://attack.mitre.org/techniques/T1027/018/">MITRE ATT&amp;CK T1027.018, Invisible Unicode</a></td>
+<td>Direct technique analogy and distinct GlassWorm example.</td>
+</tr>
+<tr>
+<td>R3</td>
+<td><a href="https://cwe.mitre.org/data/definitions/506.html">MITRE CWE-506, Embedded Malicious Code</a></td>
+<td>Fictional source-integrity weakness.</td>
+</tr>
+<tr>
+<td>R4</td>
+<td><a href="https://top10.owasp.org/2021/A08_2021-Software_and_Data_Integrity_Failures/">OWASP Top 10 2021 A08, Software and Data Integrity Failures</a></td>
+<td>Supply-chain integrity context.</td>
+</tr>
+<tr>
+<td>R5</td>
+<td><a href="https://arxiv.org/abs/2111.00169">Boucher and Anderson, Trojan Source</a></td>
+<td>Related visual-review failure with a different Unicode mechanism.</td>
+</tr>
+<tr>
+<td>R6</td>
+<td><a href="https://attack.mitre.org/techniques/T1140/">MITRE ATT&amp;CK T1140, Deobfuscate/Decode Files or Information</a></td>
+<td>Conditional runtime decode mapping.</td>
+</tr>
+<tr>
+<td>R7</td>
+<td><a href="https://attack.mitre.org/techniques/T1105/">MITRE ATT&amp;CK T1105, Ingress Tool Transfer</a></td>
+<td>Static second-stage-fetch intent, without observed transfer.</td>
+</tr>
+<tr>
+<td>R8</td>
+<td><a href="https://attack.mitre.org/techniques/T1567/">MITRE ATT&amp;CK T1567, Exfiltration Over Web Service</a></td>
+<td>Considered and withheld for lack of transfer evidence.</td>
+</tr>
+<tr>
+<td>R9</td>
+<td><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5</a></td>
+<td>SI-7, SA-11, and SA-15 control fit.</td>
+</tr>
+<tr>
+<td>R10</td>
+<td><a href="https://csrc.nist.gov/pubs/sp/800/218/final">NIST SP 800-218, SSDF</a></td>
+<td>PW.7 source-review practice.</td>
+</tr>
+<tr>
+<td>R11</td>
+<td><a href="https://www.cisecurity.org/controls/v8">CIS Critical Security Controls v8</a></td>
+<td>Control 16 and conditional Control 10.</td>
+</tr>
+<tr>
+<td>R12</td>
+<td><a href="https://attack.mitre.org/detectionstrategies/DET0920/">MITRE detection strategy DET0920</a></td>
+<td>Proposed runtime correlation, not locally tested.</td>
+</tr>
+<tr>
+<td>R13</td>
+<td><a href="https://www.unicode.org/charts/PDF/UE0000.pdf">Unicode Tags chart</a></td>
+<td>Exact Tag component and special-character ranges.</td>
+</tr>
+<tr>
+<td>R14</td>
+<td><a href="https://docs.oasis-open.org/cti/stix/v2.1/cs03/stix-v2.1-cs03.html">OASIS STIX 2.1 specification</a></td>
+<td>Attack Pattern, Course of Action, and relationship structure.</td>
+</tr>
+</tbody>
+</table>
+<p>I checked the framework and Unicode references on 2026-10-11. The case-specific network behavior and Git attribution remain bounded by the static record described above.</p>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
