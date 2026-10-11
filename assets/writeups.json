@@ -403,5 +403,28 @@
     ],
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/crypto/spoken-pgp-word-list/"
+  },
+  {
+    "title": "The Passwords in the PNG Comment",
+    "category": "Forensics",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "image metadata",
+      "XMP/EXIF",
+      "BLAKE2b",
+      "unsalted fast hash",
+      "offline password cracking",
+      "dictionary + constrained grammar"
+    ],
+    "summary": "Three password digests sat in a PNG's XMP comment. I followed the metadata, tested the hash family, and used the given word-plus-digits pattern to recover the passwords.",
+    "aliases": [
+      "PNG metadata",
+      "password hashes",
+      "image forensics",
+      "wedding password puzzle"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/forensics/png-xmp-hash-recovery/"
   }
 ]

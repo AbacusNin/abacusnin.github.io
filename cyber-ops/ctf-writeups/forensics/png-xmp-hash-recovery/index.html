@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Passwords in the PNG Comment - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="Three password digests sat in a PNG&#x27;s XMP comment. I followed the metadata, tested the hash family, and used the given word-plus-digits pattern to recover the passwords.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/png-xmp-hash-recovery/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Passwords in the PNG Comment">
+  <meta property="og:description" content="Three password digests sat in a PNG&#x27;s XMP comment. I followed the metadata, tested the hash family, and used the given word-plus-digits pattern to recover the passwords.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/png-xmp-hash-recovery/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Forensics / <span aria-current="page">The Passwords in the PNG Comment</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Passwords in the PNG Comment</h1>
+        <p class="lead">The image looked like the evidence. Its comment held the actual puzzle.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Recover three wedding-site passwords from one PNG and assemble them in the required flag order.</p>
+<p><strong>What I did.</strong> I inspected image metadata, found three 128-character values in XMP, tested candidate hash algorithms, and searched wedding words with three-digit suffixes.</p>
+<p><strong>The result.</strong> The challenge record reports three matching BLAKE2b preimages and manual flag acceptance. I independently confirmed the PNG and its three-value metadata pattern.</p>
+<p><strong>The limit.</strong> The original passwords and flag are withheld. I did not independently rerun the original recovery or witness the platform submission.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="PNG triage; Three values; Hash check; Grammar search; Result">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">PNG triage</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Valid chunks and an XMP comment</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Three values</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">128 hex characters each</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Hash check</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">A BLAKE2b preimage confirmed the lead</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Grammar search</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Wedding word plus three digits</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Result</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Three reported matches in source order</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Forensics / Password Cracking</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>image metadata, XMP/EXIF, BLAKE2b, unsalted fast hash, offline password cracking, dictionary + constrained grammar</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved</td>
+</tr>
+<tr>
+<td>Material</td>
+<td>One PNG image; no live service or account</td>
+</tr>
+<tr>
+<td>Goal</td>
+<td>Recover three passwords and assemble <code>FLAG{password1-password2-password3}</code></td>
+</tr>
+<tr>
+<td>Reported result</td>
+<td>Three BLAKE2b matches and a manually accepted flag</td>
+</tr>
+<tr>
+<td>Independently checked here</td>
+<td>PNG chunk CRCs and three 128-character values in XMP <code>exif:UserComment</code></td>
+</tr>
+<tr>
+<td>Boundary</td>
+<td>Passwords, digests, and flag are withheld; submission transcript was unavailable</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for reviewing similar files and testing weak password storage: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/png-xmp-hash-recovery/artifacts">browse the tools on GitHub</a> and <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/png-xmp-hash-recovery/fixtures">the synthetic fixtures</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I had one PNG and a short story about three passwords from wedding-planning sites. The challenge said they had been "stored and encrypted in an unorthodox manner." I needed all three passwords, in order, to form <code>FLAG{password1-password2-password3}</code>. The useful hint was unusually specific: each password had one wedding-related word followed by three digits. <code>ceremony042</code> is an illustrative example of the shape, not a disclosed challenge password.</p>
+<p>There was no site to log into and no live target to probe. This was an offline puzzle about a supplied file. The security problem it resembles is real, though: if an application stores password verifiers as fast, unsalted hashes, someone who obtains those values can try guesses locally. I use that connection in the later sections as an operational analogy. The challenge did not show an intrusion, an attacker, or production telemetry.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I started with the file itself. The challenge record lists a SHA-256 baseline and file-type check, then a metadata pass. That was a sensible first move for a PNG described as an unusual storage location. It also saved me from treating the pixels as a steganography puzzle without evidence.</p>
+<p><code>exiftool</code> was unavailable during the solve, so I used <code>strings</code> to inspect readable data. The useful text came from an Adobe XMP packet. Its <code>exif:UserComment</code> field held three hexadecimal values separated by hyphens. The count lined up with the three passwords I was looking for. In a later structural check, I parsed the local PNG rather than relying on printable strings: all nine chunk CRCs passed, and the XMP comment held exactly three values of 128 hex characters each. That check confirms the location and shape of the data. It does not identify the hash function or reveal the passwords.</p>
+<p>The 128-character length means 64 bytes, or 512 bits, if the field is a hex-encoded digest. The challenge's name suggested BLAKE2b. I still needed a matching input to test that guess. The recorded trial covered SHA-512, SHA3-512, SHA-256, SHA-384, BLAKE2s, and BLAKE2b. A short wedding-word list yielded one preimage under BLAKE2b and none under the alternatives. That first match earned the algorithm choice.</p>
+<p>The first list did not get all three. I expanded the hand-built wedding vocabulary, still without another hit, then moved to a broad English wordlist. The source record reports that this recovered the other two passwords. Each recovered candidate reproduced its stored digest, and the flag was assembled in the order of the metadata values. The record also says the flag was submitted manually and accepted. I have the recorded result, not a separate submission transcript or an independent replay of the three original passwords.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>My triage used a hash baseline, a type check, and a text pass through the image. <code>strings -n 6</code> exposed the XMP <code>UserComment</code> after <code>exiftool</code> proved unavailable. This is the useful command sequence, with the local image name generalized:</p>
+<pre><code class="language-sh">sha256sum authorized-image.png
+file authorized-image.png
+strings -n 6 authorized-image.png | grep -A2 UserComment
+</code></pre>
+<p>The digest-length check was small but necessary. I counted 128 hexadecimal characters in each of the three values. That gave me candidate 512-bit output, not a unique algorithm. <a href="https://www.rfc-editor.org/rfc/rfc7693">RFC 7693</a> allows BLAKE2b outputs from 1 to 64 bytes; Python's default <code>hashlib.blake2b()</code> output is 64 bytes.</p>
+<p>For the reusable check, I wrote <a href="artifacts/png_xmp_audit.py">a bounded PNG/XMP scanner</a>. It validates chunk CRCs, parses the Adobe XMP <code>iTXt</code> packet, and looks inside <code>exif:UserComment</code>. By default it reports counts and a file SHA-256 without printing the embedded values. I ran that scanner against the local challenge image: one XMP packet, one <code>UserComment</code>, three candidate 512-bit values, and the expected hyphenated pattern. A match is a review lead, not an algorithm verdict.</p>
+<p>The offline <a href="artifacts/suffix_crack.py">suffix recovery tool</a> takes a wordlist and a separate digest file. It tries each alphabetic word with zero-padded numeric suffixes and compares every candidate with all targets. It hashes the word prefix once, copies the hash state, and adds each suffix. That is the same optimization described in the challenge record, using Python's documented <code>hashlib</code> <code>copy()</code> behavior.</p>
+<pre><code class="language-sh">python artifacts/png_xmp_audit.py authorized-image.png
+python artifacts/suffix_crack.py fixtures/sample_words.txt fixtures/sample_hashes.txt --algorithm blake2b --suffix-width 3
+</code></pre>
+<p>The second command uses invented data. The <a href="fixtures/sample_words.txt">sample words</a> and <a href="fixtures/sample_hashes.txt">sample hashes</a> recover <code>ceremony042</code>, <code>vows173</code>, and <code>bouquet999</code>; they are not the challenge values. I tested the linked implementation and fixtures locally. They do not constitute a replay of the password recovery. The <a href="artifacts/README.md">tool guide</a> gives inputs, limits, exit codes, and validation scope.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>The image rendered normally, but PNG can carry text metadata outside the visible pixels. This file used an <code>iTXt</code> chunk with Adobe XMP XML. The <code>exif:UserComment</code> field was a convenient place to hide three long strings from casual viewing. Anyone who checks the file's metadata can read them. The word "encrypted" in the prompt did not describe what I found: the field contained one-way digest values, not ciphertext that could be decrypted with a key.</p>
+<p>Digest length helped me choose tests. A 128-character hex string represents 64 bytes, but several algorithms can produce that length. BLAKE2b itself permits different output lengths. Only a candidate password that hashes to the stored value can validate the algorithm for that value. The first small-list hit served that purpose in the source account; the remaining two were checked the same way after the wordlist expanded.</p>
+<p>The password-storage lesson has two parts. A random, per-password salt prevents precomputed tables and stops the same candidate hash from being reused across several accounts. A suitable password hashing function adds deliberate cost to every guess. A fast general-purpose hash such as one pass of BLAKE2b supplies neither property by itself. <a href="https://pages.nist.gov/800-63-4/sp800-63b/authenticators/">NIST SP 800-63B-4</a> addresses salted, costed storage of memorized secrets. <a href="https://cwe.mitre.org/data/definitions/759.html">CWE-759</a> and <a href="https://cwe.mitre.org/data/definitions/916.html">CWE-916</a> describe the two weakness classes illustrated here.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>The hint turned an open-ended search into <code>word + NNN</code>. A list of 370,000 words would produce up to 370 million candidate strings across all 000-999 suffixes. With three unsalted digests, a single candidate hash can be compared with all three targets. That is 370 million candidate evaluations for the set, assuming the full list is searched, rather than three separate full passes. The actual search can stop as soon as all targets are found. I have no benchmark for the full list, so I do not assign a runtime.</p>
+<p>For each word, the tool normalizes case according to its option, hashes the word as a prefix, copies that state, and feeds each three-digit suffix. The resulting hexadecimal digest is compared with the stored values. Equality verifies that the candidate is a preimage of that digest under the selected algorithm. It does not, by itself, prove who chose the password or where else it was used.</p>
+<p>The first curated list made the BLAKE2b hypothesis testable. The unsuccessful expanded hand list mattered too: it showed that a narrow wedding vocabulary could miss ordinary words that still fit the challenge's theme. A comprehensive dictionary gave the remaining matches in the source record. The unsalted design allowed one hash computation to serve all three targets. A salt would prevent that cross-target reuse and precomputation, while a properly configured password KDF would raise the cost of each guess. Neither measure can make weak passwords magically strong; parameters, hardware, and the actual candidate space determine the work.</p>
+<p>I kept the recovered strings and final flag out of this page. The evidence I can publish is the method, the file structure, and the source-reported outcome.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned</summary>
+<p>Metadata was the shortest route to the answer. I would still inspect a suspicious image's type and integrity first, but the prompt's "unorthodox storage" clue made a metadata check much cheaper than diving into pixel analysis.</p>
+<p>Length was a filter, not an algorithm identifier. The first matching preimage settled a question that the 512-bit appearance could not settle. The wordlist progression also deserves to stay in the record: a fast, small list found one answer; a larger hand list stalled; a general English list found the rest.</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>This challenge</th>
+<th>Operational analogue</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Where the values appeared</td>
+<td>Three digests in PNG XMP metadata</td>
+<td>Credential data in a file, export, or store</td>
+</tr>
+<tr>
+<td>Storage weakness</td>
+<td>Fast BLAKE2b output with no reported salt or stretching</td>
+<td>Unsalted or inexpensive password verifier design</td>
+</tr>
+<tr>
+<td>Search reduction</td>
+<td>Known wedding word plus three digits</td>
+<td>Predictable composition patterns or exposed policy</td>
+</tr>
+<tr>
+<td>Evidence of cost</td>
+<td>No measured full-dictionary runtime in this record</td>
+<td>Work depends on KDF, parameters, hardware, and guesses</td>
+</tr>
+<tr>
+<td>Defensive response</td>
+<td>Recognize the metadata and verifier pattern</td>
+<td>Review file handling and use salted, costed password storage</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Operational Extrapolation</summary>
+<h3>Individual Practitioner Development</h3>
+<p>This case let me practice the handoff between file forensics and password analysis. The image structure told me where to look. The grammar told me how to search. A matching digest kept me from declaring the algorithm based on a title or a byte count alone. A good follow-up lab would compare the same invented passwords under fast BLAKE2b and a configured password KDF, measuring both cost and resource use rather than repeating an assumed speed figure. Hashcat or John could also reproduce the word-plus-suffix rule on an authorized fixture.</p>
+<h3>Security Operations</h3>
+<p>The operational lead is a file that carries long, unexplained values in comment metadata. An upload scanner or DLP process could parse XMP, record the specific field, and send a review event. An analyst would then ask whether the value is a harmless content hash, an application identifier, a test fixture, or an exposed credential verifier. The <a href="artifacts/png_xmp_audit.py">PNG scanner</a> demonstrates that first extraction step. It needs an authorized file feed and context from the real environment before it could support alerting.</p>
+<h3>Intelligence Operations</h3>
+<p>This puzzle gave me no infrastructure, actor behavior, victim environment, or collection trail. I cannot turn three metadata values into attribution or a threat-intelligence report. If a real investigation found the same pattern, intelligence value would depend on surrounding evidence: where the file traveled, who could access it, and whether a known campaign used the technique. Those facts are absent here.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/png-xmp-hash-recovery/artifacts">artifact folder</a> contains two runnable proofs of concept and their validation material. The <a href="artifacts/png_xmp_audit.py">PNG XMP scanner</a> takes a local file and returns a redacted review summary. The <a href="artifacts/suffix_crack.py">suffix recovery tool</a> takes authorized digests and a wordlist, then returns ordered preimages if it finds them. Both use the Python standard library.</p>
+<p>The <a href="artifacts/test_tools.py">synthetic tests</a> cover positive, benign, and near-miss metadata cases; compressed XMP; a damaged CRC; complete recovery; an unresolved target; and a candidate cap. The <a href="fixtures/sample_words.txt">sample wordlist</a> and <a href="fixtures/sample_hashes.txt">sample hashes</a> make the recovery test repeatable without disclosing challenge material. The <a href="artifacts/README.md">README</a> documents the commands, input boundaries, outputs, event-field mapping, false-positive surfaces, and unmeasured production limits. The <a href="artifacts/metadata_review_checklist.md">review checklist</a> describes what an analyst would need to collect and decide after a match. The checklist is proposed; no organization has deployed it here.</p>
+<p>The tools passed the local synthetic suite. The scanner also recognized the pattern in the local PNG. I did not rerun the three password matches or the manual platform submission with these new files. That is the validation boundary for this artifact set.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Applicability and Mapping</summary>
+<p>This was an offline puzzle, so I use ATT&amp;CK as an analogy for the cracking technique. <a href="https://attack.mitre.org/techniques/T1110/002/">T1110.002, Password Cracking</a> describes offline attempts against obtained password hashes. The exercise did not show credential theft, access to a real account, or any other adversary step.</p>
+<table>
+<thead>
+<tr>
+<th>Observed or reported behavior</th>
+<th>Framework</th>
+<th>ID</th>
+<th>Fit and limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Offline guesses against three obtained digests</td>
+<td>MITRE ATT&amp;CK</td>
+<td>T1110.002</td>
+<td>Technique analogy; no observed intrusion</td>
+</tr>
+<tr>
+<td>Single fast hash used as a password verifier</td>
+<td>MITRE CWE</td>
+<td>CWE-916</td>
+<td>Weakness illustrated by the reported storage design</td>
+</tr>
+<tr>
+<td>No salt in the reported digests</td>
+<td>MITRE CWE</td>
+<td>CWE-759</td>
+<td>Weakness illustrated by cross-target reuse</td>
+</tr>
+</tbody>
+</table>
+<p>D3FEND, CAPEC, STRIDE, and OWASP labels would need a defined defender system or attack path to add anything precise. I have no such system in the challenge record. The two CWE entries and one bounded ATT&amp;CK analogy cover the mechanism without implying more evidence than I have.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intelligence and Standards Integration</summary>
+<p>The three values are challenge data, not indicators of compromise. There is no domain, address, malware sample, CVE, actor, or observed campaign to put into STIX or move over TAXII. Publishing the values as IOCs would mislabel them and expose material that the method does not need. The standards that matter here concern password storage, covered in Section 11, and the file format used for the extraction, covered by the linked scanner.</p>
+<p>In a real incident, I would revisit this decision only after corroborating file movement, unauthorized access, or reuse of the values in an application. The metadata pattern alone supports triage. It cannot establish intent or attribution.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>Standards Mapping</h3>
+<p>The control issue is storage of memorized secrets. <a href="https://pages.nist.gov/800-63-4/sp800-63b/authenticators/">NIST SP 800-63B-4</a> calls for salted password hashing with a suitable cost factor. <a href="https://cwe.mitre.org/data/definitions/759.html">CWE-759</a> addresses an absent salt, and <a href="https://cwe.mitre.org/data/definitions/916.html">CWE-916</a> addresses too little computational effort. Those are relevant to the design the puzzle models. They are not findings against a named production service.</p>
+<table>
+<thead>
+<tr>
+<th>Guidance</th>
+<th>Concrete check suggested by this case</th>
+<th>Status here</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NIST SP 800-63B-4, memorized-secret verifiers</td>
+<td>Confirm per-record salts and a costed password hashing scheme</td>
+<td>Proposed application review</td>
+</tr>
+<tr>
+<td>CWE-759</td>
+<td>Check that identical passwords do not share reusable unsalted digests</td>
+<td>Illustrated by puzzle storage</td>
+</tr>
+<tr>
+<td>CWE-916</td>
+<td>Measure the configured per-guess cost against current hardware</td>
+<td>No production benchmark performed</td>
+</tr>
+</tbody>
+</table>
+<h3>Mitigation Realization</h3>
+<p>For an application I control, I would replace a bare BLAKE2b password digest with a maintained password hashing library. Argon2id is one suitable option when its parameters are chosen for the service's hardware and load. A library should generate a fresh random salt for each stored password, retain the parameters needed for verification, and provide a verification method. The application still needs rate limits and appropriate credential-reset handling if an old unsalted database was exposed.</p>
+<pre><code class="language-python"># Illustrative application design; not executed against a challenge service.
+from argon2 import PasswordHasher
+
+hasher = PasswordHasher()
+stored = hasher.hash(password)
+hasher.verify(stored, candidate_password)
+</code></pre>
+<p>This is a proposed remediation example using <code>argon2-cffi</code>, not a deployed control or a tested configuration. I would select and load-test the memory, time, and parallelism settings before using it in production, then keep a process to review those settings as hardware changes. A salt stops reuse and precomputation across records. The costed function slows each individual guess.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>My first YARA sketch looked for <code>exif:UserComment</code> somewhere in a file and a run of at least 64 hex characters somewhere else. That could pair unrelated strings and could not prove either string was inside the parsed comment. I had no YARA-engine or benign-corpus validation for that sketch. I kept the hunt idea and made the field boundary testable with the <a href="artifacts/png_xmp_audit.py">PNG XMP scanner</a>.</p>
+<p>The scanner validates PNG chunk framing and CRCs, finds Adobe XMP <code>iTXt</code>, parses XML, then counts 128-hex values inside <code>exif:UserComment</code>. It reports whether the specific three-value pattern from this case appears. A defender could run it over authorized image uploads or attachments and join the result with owner, path, source, and collection-time fields from the file sensor. The rule is a file-content triage signal. This challenge supplied no event schema or backend on which I could test a Sigma, KQL, or SPL rule.</p>
+<p>The <a href="artifacts/test_tools.py">test suite</a> observed the expected positive result on seeded XMP, no result when the long hex string sat in another metadata field, no result for a 127-character near miss, and rejection of a bad CRC. It also covered compressed XMP. The local challenge PNG produced three candidate values and the exact hyphenated pattern. No production image corpus was labeled or scored, so sensitivity, false-positive rate, and alert load are unknown. Legitimate software may put long hex in comments. Encoded, split, altered-length, or stripped metadata can evade this exact rule. The <a href="artifacts/metadata_review_checklist.md">proposed review checklist</a> tells an analyst how to preserve context and resolve a lead before escalation.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow diagram above</a> follows the evidence from PNG triage to a three-value XMP comment, then to the hash check and the constrained search. The 128-character length narrows the field to a 512-bit value; the reported matching preimage is the point where BLAKE2b becomes more than a guess. I end the visual at the source-reported matches. I have not added an independently witnessed submission step.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<table>
+<thead>
+<tr>
+<th>Ref</th>
+<th>Source</th>
+<th>Use and limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>REF-1</td>
+<td><a href="https://www.rfc-editor.org/rfc/rfc7693">RFC 7693, The BLAKE2 Cryptographic Hash and MAC</a></td>
+<td>BLAKE2b output length and algorithm context; length alone does not identify it.</td>
+</tr>
+<tr>
+<td>REF-2</td>
+<td><a href="https://docs.python.org/3/library/hashlib.html">Python <code>hashlib</code> documentation</a></td>
+<td>BLAKE2b defaults and hash-state <code>copy()</code> behavior.</td>
+</tr>
+<tr>
+<td>REF-3</td>
+<td><a href="https://attack.mitre.org/techniques/T1110/002/">MITRE ATT&amp;CK T1110.002, Password Cracking</a></td>
+<td>Offline cracking analogy; no real intrusion observed.</td>
+</tr>
+<tr>
+<td>REF-4</td>
+<td><a href="https://cwe.mitre.org/data/definitions/916.html">MITRE CWE-916</a></td>
+<td>Insufficient cost in password hashing.</td>
+</tr>
+<tr>
+<td>REF-5</td>
+<td><a href="https://cwe.mitre.org/data/definitions/759.html">MITRE CWE-759</a></td>
+<td>Missing salt in a one-way password hash.</td>
+</tr>
+<tr>
+<td>REF-6</td>
+<td><a href="https://pages.nist.gov/800-63-4/sp800-63b/authenticators/">NIST SP 800-63B-4, Authentication and Authenticator Management</a></td>
+<td>Current memorized-secret verifier guidance.</td>
+</tr>
+<tr>
+<td>REF-7</td>
+<td><a href="https://github.com/dwyl/english-words">dwyl <code>english-words</code> project</a></td>
+<td>Example broad English candidate list named in the challenge record; no claim that this page reran that exact list.</td>
+</tr>
+</tbody>
+</table>
+<p>I checked the technical references for this publication. The challenge outcome remains the source-reported solve and manual acceptance, with the original secrets withheld.</p>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
