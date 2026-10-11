@@ -1,0 +1,26 @@
+[
+  {
+    "event_id": "evt-03",
+    "timestamp": "2026-01-01T12:02:00Z",
+    "session_id": "session-b",
+    "subject_id": "bob",
+    "object_id": "record-b",
+    "finding": "release_after_denial"
+  },
+  {
+    "event_id": "evt-04",
+    "timestamp": "2026-01-01T12:03:00Z",
+    "session_id": "session-c",
+    "subject_id": "carol",
+    "object_id": "record-c",
+    "finding": "unapproved_state_change"
+  },
+  {
+    "event_id": "evt-05",
+    "timestamp": "2026-01-01T12:04:00Z",
+    "session_id": "session-d",
+    "subject_id": "dana",
+    "object_id": "record-other",
+    "finding": "released_outside_object_scope"
+  }
+]
