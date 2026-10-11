@@ -131,5 +131,30 @@
     ],
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/ai/clinician-note-triage/"
+  },
+  {
+    "title": "The Token Was in the Audit Record",
+    "category": "AI Security",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "LLM-agent security",
+      "tiered authorization",
+      "privilege elevation",
+      "break-glass / emergency access",
+      "audit logging",
+      "decoy discrimination",
+      "identifier hygiene",
+      "detection engineering"
+    ],
+    "summary": "I reached the custodian tier, chose a defensible emergency reason, and worked through two identifier mistakes. Completing the break-glass action produced the audit token the challenge asked for.",
+    "aliases": [
+      "records custodian",
+      "audit token",
+      "emergency access",
+      "medical record number"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/ai/audit-token-break-glass/"
   }
 ]
