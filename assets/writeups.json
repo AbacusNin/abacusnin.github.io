@@ -25,7 +25,7 @@
     "status": "Solved; seed-independent solver shipped; incremental cost optimizations applied"
   },
   {
-    "title": "Deanonymizing a Wi-Fi Device from a Probe-Request Capture",
+    "title": "A Wi-Fi Probe Log, One Persistent Address, and Four Airports",
     "url": "/cyber-ops/ctf-writeups/forensics/wifi-pnl-deanonymization/",
     "category": "Forensics",
     "difficulty": "Medium",
@@ -39,7 +39,7 @@
       "SQLite forensics",
       "OSINT itinerary"
     ],
-    "summary": "Found the one device in a 39,000-device Wi-Fi probe capture that never randomized its MAC, then read its leaked saved-network list back as a travel itinerary. The whole solve turned on a single bit.",
+    "summary": "I narrowed a large Wi-Fi probe log by address type, then used four airport network names and collection order to recover the accepted flag. The network names suggest a trip; the capture alone cannot prove one.",
     "aliases": [
       "Wi-Fi",
       "probe requests"
