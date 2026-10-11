@@ -379,5 +379,29 @@
     ],
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/forensics/invisible-unicode-source-tampering/"
+  },
+  {
+    "title": "The Voicemail That Read the Ciphertext",
+    "category": "Crypto",
+    "difficulty": "Hard",
+    "date": "2026-10",
+    "tags": [
+      "PGP Word List",
+      "OpenPGP",
+      "ASCII armor",
+      "PKESK",
+      "RSA",
+      "speech-to-text",
+      "CRC-24",
+      "integrity-oracle error correction"
+    ],
+    "summary": "I turned a long voicemail into 417 bytes of OpenPGP armor, repaired transcription errors with parity and checksum checks, and decrypted the message with its integrity check intact.",
+    "aliases": [
+      "spoken ciphertext",
+      "audio cryptography",
+      "voicemail decoding"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/crypto/spoken-pgp-word-list/"
   }
 ]
