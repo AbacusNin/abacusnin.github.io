@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Token Was in the Audit Record - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="I reached the custodian tier, chose a defensible emergency reason, and worked through two identifier mistakes. Completing the break-glass action produced the audit token the challenge asked for.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/ai/audit-token-break-glass/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Token Was in the Audit Record">
+  <meta property="og:description" content="I reached the custodian tier, chose a defensible emergency reason, and worked through two identifier mistakes. Completing the break-glass action produced the audit token the challenge asked for.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/ai/audit-token-break-glass/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / AI Security / <span aria-current="page">The Token Was in the Audit Record</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Token Was in the Audit Record</h1>
+        <p class="lead">The daemon would let me earn a higher tier. That was only the doorway. I still had to make the emergency access happen and read the record it left.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Complete a fictional records custodian&#x27;s emergency-access procedure and recover the token written to its audit record.</p>
+<p><strong>What I did.</strong> I asked for the procedure, used a valid authorization code, chose the patient-safety reason, and resolved the record identifier after logged denials.</p>
+<p><strong>The result.</strong> The case record reports a completed break-glass action, an audit token, and platform acceptance.</p>
+<p><strong>The limit.</strong> The final success reply was not preserved verbatim, and the defensive lab uses synthetic events rather than the challenge daemon or a live health-record system.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Ask for the procedure; Title claim refused; Choose the reason; Resolve the record ID; Perform break-glass; Read the audit token">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Ask for the procedure</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Learn the two gates and required fields</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Title claim refused</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">A real code changes the session tier</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Choose the reason</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Patient safety fits the given facts</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Resolve the record ID</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Class and prefix errors cost attempts</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Perform break-glass</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Emergency action writes an audit record</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Read the audit token</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Reported accepted by the platform</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>AI / LLM application security (authorization and procedure logic)</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>LLM-agent security, tiered authorization, privilege elevation, break-glass / emergency access, audit logging, decoy discrimination, identifier hygiene, detection engineering</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved</td>
+</tr>
+<tr>
+<td>Setting</td>
+<td>Fictional records-custodian daemon fronted by an LLM</td>
+</tr>
+<tr>
+<td>Starting state</td>
+<td>Visitor tier with a text channel and identifiers from earlier stages</td>
+</tr>
+<tr>
+<td>Goal</td>
+<td>Complete the sanctioned emergency action and retrieve its audit token</td>
+</tr>
+<tr>
+<td>Result</td>
+<td>Break-glass and token acceptance are recorded; the last daemon reply is not available verbatim</td>
+</tr>
+<tr>
+<td>Scope</td>
+<td>One challenge session; the operational controls below are proposed</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/ai/audit-token-break-glass/artifacts">view the files on GitHub</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>The records custodian started me in a visitor session. It would answer questions about its procedure, but it refused access requests without authorization and said it logged its decisions. I had an interactive text channel and several values collected in earlier stages: an authorization code, a record identifier, an enrollment identifier, and a clinic code. I needed to find which value belonged at each gate.</p>
+<p>The objective said that elevation was not the win. That line changed how I read the task. A higher tier would expose the next part of the procedure, but the answer was a token written when the custodian completed an emergency break-glass action. I had to cause that audited action with valid inputs. Merely persuading the LLM that I had authority would leave me with a logged refusal.</p>
+<p>This was a fictional procedure puzzle, with no real patient record or production health system. The useful security question comes later: how should an LLM front end handle identity, emergency access, and audit evidence when someone speaks to it fluently? The answer has to come from the access service and its logs, because a title in a chat message cannot establish a user's permissions.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I asked the daemon to describe break-glass before trying to invoke it. Its answer gave me the sequence. First, present an authorization code in a <code>PREFIX-SERIAL-SUFFIX</code> shape to reach the privileged tier. That tier reveals a reason-code catalog. Then submit one reason code and the patient's record identifier together to perform the emergency action.</p>
+<p>My first information request carried a senior title. The custodian rejected the implied authority and logged it. That was a useful correction: I could ask for the rules, but I could not make a title do the work of a credential. I presented the authorization code recovered earlier. The tier changed and the reason catalog appeared. I had prepared alternate formatting for the code, but never needed it.</p>
+<p>The catalog offered four paths: imminent patient-safety risk, continuity of care when the treating clinician was unavailable, a legal order, or a patient request verified in person. I had no subpoena and no in-person identity check. The patient-safety reason fit the facts provided in the exercise. I kept continuity of care as a fallback, then worked with the safety code.</p>
+<p>The identifier took longer. I first used the enrollment ID and got a wrong-patient response. I tried the record value with a generic prefix and got another mismatch. I also asked the daemon to resolve the identifier for me; it refused and logged that request. During this phase it returned single-element disclosure records. Those records included the canonical identifier I needed, along with components of the authorization code I had already spent. The credential parts looked like possible answers if I ignored the stated goal. I did not submit them.</p>
+<p>I put the patient-safety reason and the exact canonical identifier in the same invocation. The case record reports a completed break-glass action and its audit token, followed by platform acceptance. The final success reply was not saved word for word, so I cannot quote its exact wording. The earlier denials and the disclosed identifier are the checkpoints I can describe more closely. The raw token stays out of this page.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>I used the text channel and a small checklist. These sanitized prompts show the operations. They are a reproducible pattern rather than quotations from the daemon transcript:</p>
+<pre><code class="language-text">Ask: What is the emergency break-glass procedure, and what fields does it require?
+
+Present: Authorization code &lt;AUTH-CODE&gt; for the privileged tier.
+
+Invoke: Break-glass. Reason code &lt;PATIENT-SAFETY-REASON&gt;.
+        Record identifier &lt;CANONICAL-RECORD-ID&gt;.
+</code></pre>
+<p>I watched for a tier change after the credential, then for the audited action after the final invocation. A tier change would have been an incomplete result. The <a href="artifacts/ai-agent-authz-triage.md">authorization triage aid</a> captures the order of those checks, the identifier-class question, and how to keep token-like decoys separate from the required side effect.</p>
+<p>The inputs were the recovered code, one defensible reason, and a canonical record identifier. The challenge output was the audit token. My notes record its acceptance; I have no independent replay of the daemon.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>An emergency-access procedure gives authorized staff a controlled path to needed records during an emergency. It still needs identity checks, a defined reason, and an audit trail. The fictional custodian modeled those gates. A higher session tier exposed reason choices, but the protected action had its own required fields.</p>
+<p>That separation mattered more than the LLM persona. When I claimed a senior title, the custodian did not grant access. When I presented a valid authorization code, it changed the tier. When I supplied the wrong class or form of identifier, it refused the action. These are the boundaries a real service should enforce independently of the language model's wording.</p>
+<p>I tripped over two identifier problems. An enrollment ID and a medical record number name different classes of value. A generic prefix can also fail a system that expects its canonical format. The mismatch replies pointed me back to the identifier, although they did not expose every internal validation decision. The single-element disclosures later gave me the exact value. I did not characterize the daemon logic that triggered those disclosures.</p>
+<p>An audit entry is useful only if the system reliably generates it and reviewers can trust the record. The challenge returned an audit token as proof of the scripted action. I could observe the token result; I could not inspect storage, immutability, retention, or who could alter the log. Those would need separate tests in a real service.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>I needed four things in order: a describable procedure, a working authorization code, an emergency reason supported by the scenario, and the exact record identifier. Asking for the procedure exposed the order. Presenting the code satisfied the tier gate. The reason catalog gave me a choice I could defend. The identifier errors isolated the remaining problem.</p>
+<p>The important distinction is between a grant to <em>attempt</em> the emergency action and the action's audited write. The privileged tier did not contain the answer. The token was tied to the completed break-glass step. That is why the authority assertion and the tempting disclosed credential parts led away from the objective.</p>
+<p>Each identifier refusal named the record mismatch. I treated that as evidence to fix the record field, while leaving open the possibility that other checks were also applied internally. The eventual canonical value came from the daemon's disclosure records. I used it with the patient-safety reason instead of guessing more identifiers. My notes record that the daemon returned the audit token and that the platform accepted it. They do not preserve the final response text, and they do not prove how the daemon stored its audit record.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned</summary>
+<p>The brief sentence about elevation saved me from solving the wrong task. Once I read the objective as an audited action, asking for the procedure became the natural first move. The title I added to that question was a mistake; the custodian logged it and made the boundary plain.</p>
+<p>The identifier loop produced logged failures. One value belonged to enrollment, another had the wrong prefix, and I asked the daemon to resolve the record number directly. My notes count three failed break-glass attempts, but they do not preserve a third break-glass input clearly enough to reconstruct it. I should have written down the required identifier class and format before the first attempt. The canonical value was available indirectly sooner than I used it.</p>
+<p>The reason catalog also forced a small judgment call. A legal-order code without an order and an in-person verification code over chat would have required me to assert facts I did not have. Patient safety fit the exercise. In a real clinical workflow I would expect a documented emergency predicate and review by someone who can assess it; a chat narrative alone should not certify the reason.</p>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>In this exercise</th>
+<th>Operational comparison</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>How did the session gain a higher tier?</td>
+<td>A recovered authorization code</td>
+<td>A controlled privileged-role activation</td>
+</tr>
+<tr>
+<td>What completed the task?</td>
+<td>Break-glass with a reason and canonical record ID</td>
+<td>An emergency access action with a recorded justification</td>
+</tr>
+<tr>
+<td>What carried the answer?</td>
+<td>The resulting audit token</td>
+<td>An audit entry for a high-risk access event</td>
+</tr>
+<tr>
+<td>What exposed the wrong path?</td>
+<td>Logged denials and a refused title claim</td>
+<td>Access-decision telemetry and review leads</td>
+</tr>
+<tr>
+<td>What looked like a prize?</td>
+<td>Disclosed pieces of the used authorization code</td>
+<td>Sensitive values that still are not evidence of the requested action</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Operational Extrapolation</summary>
+<h3>Individual Practitioner Development</h3>
+<p>This case made me slow down at the point where a system says, "Here is the procedure." I had enough information to work the gates without guessing at a jailbreak. The habits I want to keep are simple: write down the exact objective, ask which step changes state, and check the class of every identifier before a logged request.</p>
+<p>The next practice exercise would use a small, authorized emergency-access service with separate identity, reason, record-scope, and audit checks. I would record the server decision for each test and compare it with the LLM's reply. That would tell me whether the language layer had merely sounded compliant or whether the access boundary actually held.</p>
+<h3>Security Operations</h3>
+<p>Every successful emergency access should be reviewable. I would also watch the path leading to it: repeated record mismatches, a title claim without a credential, and a request to reveal the record identifier. Those events can occur in legitimate work, so a single match is a lead. The combination deserves a closer look, especially when a grant follows a short run of denials.</p>
+<p>The <a href="artifacts/break-glass-abuse-detection.md">detection pack</a> names the events a service would need to emit and the triage questions for an analyst. Its local fixture gives me a way to check the logic. I would ask the service owner to map those event names to real logs, verify that the audit entry is generated independently of the model's reply, and measure ordinary emergency retries before setting an alert threshold.</p>
+<h3>Intelligence Operations</h3>
+<p>I have no actor, campaign, infrastructure, or external collection to attribute here. The case supplies an internal access-control pattern. If a real incident produced reliable audit events, those events could support incident reconstruction, but the challenge alone does not create threat intelligence or an IOC feed.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The <a href="artifacts/ai-agent-authz-triage.md">authorization triage aid</a> follows the challenge path: procedure, credential, reason, canonical record ID, and audited action. It is a method for an authorized human tester. I used that reasoning in this case; I have not tested the checklist against a second daemon.</p>
+<p>The <a href="artifacts/break-glass-abuse-detection.md">break-glass detection pack</a> is the operational companion. It documents sensor fields, false positives, a Sigma count rule, an SPL hunt, and response steps. The <a href="artifacts/break-glass-denials.sigma.yml">Sigma file</a> holds the rule in a parser-readable form. The <a href="artifacts/detect_break_glass.py">local checker</a> evaluates an inclusive rolling fifteen-minute window. I kept its output to session IDs, signal names, and source lines so the public example does not repeat identifiers or credentials.</p>
+<p>The <a href="artifacts/fixtures/custodian-audit-sample.jsonl">synthetic custodian events</a> include one benign and one suspicious session. The <a href="artifacts/fixtures/edge-cases.jsonl">edge cases</a> add a mistype, an outside-window near miss, and an exact fifteen-minute boundary hit. The <a href="artifacts/expected-results.json">expected results</a>, <a href="artifacts/test_detector.py">test checks</a>, and <a href="artifacts/README.md">file guide</a> make the local result reproducible. These are defensive proofs of concept. They do not replay the daemon or establish detection performance on a hospital audit feed.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Applicability and Mapping</summary>
+<p>I completed the challenge by following a sanctioned procedure. I did not observe an attacker abuse a credential or an elevation mechanism. That matters when assigning technique names. The table keeps the original security comparisons while limiting each claim to what the exercise showed.</p>
+<table>
+<thead>
+<tr>
+<th>Behavior or control boundary</th>
+<th>Framework</th>
+<th>Mapping</th>
+<th>How I use it here</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Valid code changed the session tier</td>
+<td>MITRE ATT&amp;CK</td>
+<td><a href="https://attack.mitre.org/techniques/T1078/">T1078, Valid Accounts</a></td>
+<td>Analogy for a future case involving misuse of a valid account. The exercise used a legitimate recovered code.</td>
+</tr>
+<tr>
+<td>A privileged tier preceded a higher-risk action</td>
+<td>MITRE ATT&amp;CK</td>
+<td><a href="https://attack.mitre.org/techniques/T1548/">T1548, Abuse Elevation Control Mechanism</a></td>
+<td>Describes a class of abuse the boundary should resist. No elevation control was bypassed here.</td>
+</tr>
+<tr>
+<td>An LLM fronted an action with access consequences</td>
+<td>OWASP LLM Top 10</td>
+<td><a href="https://genai.owasp.org/llmrisk/llm062025-excessive-agency/">LLM06:2025, Excessive Agency</a></td>
+<td>A design risk if the model can invoke access without independent authorization. The challenge did not show that failure.</td>
+</tr>
+<tr>
+<td>A title was asserted in chat</td>
+<td>OWASP LLM Top 10</td>
+<td><a href="https://genai.owasp.org/llmrisk/llm01-prompt-injection/">LLM01:2025, Prompt Injection</a></td>
+<td>A nearby threat category for instruction-based manipulation. The logged title claim alone does not prove prompt injection succeeded or even that a higher-priority instruction was targeted.</td>
+</tr>
+<tr>
+<td>The daemon refused a record-identifier request</td>
+<td>OWASP LLM Top 10</td>
+<td><a href="https://genai.owasp.org/llmrisk/llm022025-sensitive-information-disclosure/">LLM02:2025, Sensitive Information Disclosure</a></td>
+<td>A disclosure risk to test; the refusal was observed. Later single-element disclosures deserve separate review because their trigger was not characterized.</td>
+</tr>
+</tbody>
+</table>
+<p>With STRIDE, I would examine elevation of privilege at the tier gate, repudiation at the audit record, and information disclosure at the identifier interface. These are design questions, not findings of three vulnerabilities. I did not assign CAPEC or D3FEND IDs simply to fill the table; the access and audit controls below are more specific to this case.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intelligence and Standards Integration</summary>
+<p>The exercise gives me no malware, infrastructure, address, domain, or actor to put in STIX. No TAXII exchange took place. An internal session ID or synthetic medical record number is not an IOC for other organizations. I would keep the denial sequence in an access-audit hunt instead of publishing a threat-intelligence bundle.</p>
+<p>The same restraint applies to STIG findings. This challenge supplied no deployed system configuration to assess against one. Healthcare emergency-access and audit requirements are useful comparisons, so I map those controls in Section 11 without claiming that a fictional daemon is a HIPAA-covered implementation.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>Standards Mapping</h3>
+<p>The exercise illustrates identity, emergency access, and audit decisions. A real implementation would need policy, server enforcement, and evidence that its logs can be reviewed. The IDs below identify relevant requirements or control families. They do not certify this challenge or any deployment.</p>
+<table>
+<thead>
+<tr>
+<th>Standard or framework</th>
+<th>ID</th>
+<th>Case fit and limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>HIPAA Security Rule</td>
+<td><a href="https://www.hhs.gov/sites/default/files/ocr/privacy/hipaa/administrative/securityrule/securityrulepdf.pdf">45 CFR 164.312(a)(2)(ii)</a></td>
+<td>Required emergency access procedure for covered systems; the fictional break-glass flow resembles it.</td>
+</tr>
+<tr>
+<td>HIPAA Security Rule</td>
+<td>45 CFR 164.312(b)</td>
+<td>Audit controls that record and examine activity; the challenge exposed a token, not the underlying audit-control implementation.</td>
+</tr>
+<tr>
+<td>HIPAA Security Rule</td>
+<td>45 CFR 164.312(d)</td>
+<td>Person or entity authentication; the code gate is an analogy, with no real identity proof examined.</td>
+</tr>
+<tr>
+<td>HIPAA Security Rule</td>
+<td>45 CFR 164.308(a)(1)(ii)(D)</td>
+<td>Information system activity review; it motivates human review of emergency access.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">AC-6 and AC-6(9)</a></td>
+<td>Least privilege and logging of privileged functions; proposed design for the service behind an LLM.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>AU-2 and AU-12</td>
+<td>Define and generate relevant audit events.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>AU-6</td>
+<td>Review, analyze, and report audit records.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>IA-2 and AC-3</td>
+<td>Authenticate organizational users and enforce access decisions.</td>
+</tr>
+<tr>
+<td>CIS Controls v8</td>
+<td><a href="https://www.cisecurity.org/controls/cis-controls-list">Control 8</a></td>
+<td>Manage audit logs for the emergency workflow.</td>
+</tr>
+<tr>
+<td>CIS Controls v8</td>
+<td>Control 6</td>
+<td>Manage who can use the emergency path.</td>
+</tr>
+<tr>
+<td>CIS Controls v8</td>
+<td>Control 5</td>
+<td>Manage privileged accounts and credentials; applicable only if the deployment has those accounts.</td>
+</tr>
+</tbody>
+</table>
+<h3>Mitigation Realization</h3>
+<p>For a real gateway, I would keep the authorization code and patient scope in a server-side identity and policy service. The model could help a user understand the form, but a tool call to open a record would pass through a separate access check. The service would verify the authenticated person, the reason, the record, and the permitted emergency role. A title typed into chat would be ordinary text.</p>
+<p>I would have the service write a decision event for each elevation or break-glass attempt and a separate completion event for a successful emergency access. That gives AU-2/AU-12 and 164.312(b) something concrete to evaluate. A routine review queue for every completion supports AU-6 and the emergency-access procedure. The <a href="artifacts/break-glass-abuse-detection.md">detection pack</a> shows a proposed way to triage repeated denials. Its local logic check is complete; event collection, log integrity, retention, backend conversion, and a clinical review process remain untested.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>The challenge's useful indicators are behaviors inside the custodian workflow: a title claim without a credential, an attempt to make the daemon reveal an identifier, and several record-mismatch denials. They are not threat indicators tied to a real actor. A genuine emergency can also include a mistyped record number, so the goal is a reviewable lead rather than an automatic accusation.</p>
+<p>The <a href="artifacts/break-glass-denials.sigma.yml">Sigma correlation</a> counts three <code>break_glass_attempt</code> denials with the machine reason <code>MRN mismatch</code> in one <code>session_id</code> over fifteen minutes. Its base rule and correlation parsed locally. The <a href="artifacts/break-glass-abuse-detection.md">detection pack</a> gives the equivalent SPL hunt, required field mapping, and false-positive checks. I did not convert Sigma to a backend or execute SPL in a SIEM. A fixed time bucket could miss attempts across its boundary, so the <a href="artifacts/detect_break_glass.py">local checker</a> uses a rolling window for its own test.</p>
+<p>I ran that checker against the <a href="artifacts/fixtures/custodian-audit-sample.jsonl">synthetic case events</a>. It produced three leads for the suspicious session: the title claim, the refused identifier request, and the third mismatch denial. The benign session did not receive a suspicious finding, although its completed emergency action entered the routine review list. The suspicious session's final row is a granted attempt; the fixture lacks its separate audit-token-issued event. I cannot claim the fixture proves that audit write. The <a href="artifacts/fixtures/edge-cases.jsonl">edge cases</a> left one mistype and a three-attempt sequence outside fifteen minutes clear; an exact-boundary sequence fired. The <a href="artifacts/expected-results.json">expected output</a> and <a href="artifacts/test_detector.py">tests</a> show those checks.</p>
+<p>In production I would map the service's own event names and denial codes, protect the log stream, and investigate with authorized audit records. Record identifiers should stay out of alert text. A hospital would need its own baseline for legitimate retries, incident-routing rules, and a way to confirm that every successful emergency action generated a durable audit entry. None of those production measurements came from this challenge.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow diagram near the top</a> gives the short path. The <a href="artifacts/decision-path.svg">full decision diagram</a> retains the side branches: the refused title, unsupported reasons, identifier correction loop, and disclosed credential pieces. The credential changed my tier. The patient-safety reason and canonical identifier let me perform break-glass. That action led to the audit token.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<table>
+<thead>
+<tr>
+<th>Reference</th>
+<th>Source</th>
+<th>Use here</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>REF.001</td>
+<td><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5</a></td>
+<td>AC, AU, and IA control families in Section 11.</td>
+</tr>
+<tr>
+<td>REF.002</td>
+<td><a href="https://www.hhs.gov/sites/default/files/ocr/privacy/hipaa/administrative/securityrule/securityrulepdf.pdf">HHS Security Rule text</a></td>
+<td>Emergency access, audit, authentication, and review provisions.</td>
+</tr>
+<tr>
+<td>REF.003</td>
+<td><a href="https://genai.owasp.org/llm-top-10/">OWASP Top 10 for LLM Applications, 2025</a></td>
+<td>LLM01, LLM02, and LLM06 risk categories.</td>
+</tr>
+<tr>
+<td>REF.004</td>
+<td><a href="https://attack.mitre.org/techniques/T1078/">MITRE ATT&amp;CK T1078</a></td>
+<td>Valid Accounts analogy; no credential abuse observed.</td>
+</tr>
+<tr>
+<td>REF.005</td>
+<td><a href="https://attack.mitre.org/techniques/T1548/">MITRE ATT&amp;CK T1548</a></td>
+<td>Elevation-control analogy; no bypass observed.</td>
+</tr>
+<tr>
+<td>REF.006</td>
+<td><a href="https://www.cisecurity.org/controls/cis-controls-list">CIS Critical Security Controls v8</a></td>
+<td>Controls 5, 6, and 8 as deployment considerations.</td>
+</tr>
+<tr>
+<td>REF.007</td>
+<td><a href="https://sigmahq.io/docs/meta/correlations">Sigma correlation format</a></td>
+<td>The base rule and <code>event_count</code> structure.</td>
+</tr>
+<tr>
+<td>REF.008</td>
+<td><a href="https://help.splunk.com/en/splunk-enterprise/spl-search-reference/9.3/search-commands/streamstats">Splunk <code>streamstats</code> reference</a></td>
+<td>Rolling-window SPL design and operational limits.</td>
+</tr>
+</tbody>
+</table>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>

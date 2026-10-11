@@ -1,0 +1,20 @@
+{
+  "case_fixture": {
+    "findings": [
+      {"session_id": "sess-abuse-07", "signal": "authority_without_credential", "line": 6},
+      {"session_id": "sess-abuse-07", "signal": "identifier_disclosure_probe", "line": 9},
+      {"session_id": "sess-abuse-07", "signal": "three_identifier_denials_15m", "line": 11}
+    ],
+    "reviews": [
+      {"session_id": "sess-benign-01", "review": "emergency_access_record", "line": 4}
+    ]
+  },
+  "edge_fixture": {
+    "findings": [
+      {"session_id": "sess-boundary", "signal": "three_identifier_denials_15m", "line": 8}
+    ],
+    "reviews": [
+      {"session_id": "sess-benign-mistype", "review": "emergency_access_record", "line": 2}
+    ]
+  }
+}

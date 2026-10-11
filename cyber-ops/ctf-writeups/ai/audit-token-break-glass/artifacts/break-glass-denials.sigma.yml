@@ -1,0 +1,38 @@
+title: Repeated Record Identifier Denials During Emergency Access
+id: 23bcdd3f-8063-4e67-bfb5-819a9560335a
+name: emergency_access_identifier_denial
+status: experimental
+description: One emergency-access request was denied for a record identifier mismatch.
+logsource:
+  product: ehr
+  service: records-custodian
+detection:
+  selection:
+    event_type: break_glass_attempt
+    result: deny
+    deny_reason: MRN mismatch
+  condition: selection
+fields:
+  - session_id
+  - actor_tier
+  - deny_reason
+falsepositives:
+  - Mistyped identifier during a genuine emergency
+level: informational
+---
+title: Three Record Identifier Denials in Fifteen Minutes
+id: f291f2f2-579a-4951-a166-c3eb0392d618
+status: experimental
+description: Three identifier mismatch denials in one session within fifteen minutes.
+correlation:
+  type: event_count
+  rules:
+    - emergency_access_identifier_denial
+  group-by:
+    - session_id
+  timespan: 15m
+  condition:
+    gte: 3
+falsepositives:
+  - Repeated operator mistypes or retries with a stale identifier
+level: medium
