@@ -49,7 +49,7 @@
 <p><strong>The honest limit.</strong> It worked, but I spent event time learning WebAssembly and the protocol on the clock, and I left further cost optimizations unfinished when time ran out.</p>
 </div>
 
-<figure class="diagram"><svg viewBox="0 0 360 434" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Kill chain from adversary-in-the-middle position to key submission"><defs><marker id="ah" markerWidth="9" markerHeight="9" refX="4.5" refY="8" orient="auto"><path d="M0,0 L9,0 L4.5,8 Z" fill="#35e0d0"/></marker></defs><rect x="6" y="6" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="27" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">T1557</text><text x="20" y="45" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">AiTM position</text><line x1="180" y1="58" x2="180" y2="78" stroke="#35e0d0" stroke-width="1.6" marker-end="url(#ah)"/><rect x="6" y="80" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="101" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">T1565.002</text><text x="20" y="119" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">Modify key-rotation traffic</text><line x1="180" y1="132" x2="180" y2="152" stroke="#35e0d0" stroke-width="1.6" marker-end="url(#ah)"/><rect x="6" y="154" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="175" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">CWE-203</text><text x="20" y="193" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">Verification oracle</text><line x1="180" y1="206" x2="180" y2="226" stroke="#35e0d0" stroke-width="1.6" marker-end="url(#ah)"/><rect x="6" y="228" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="249" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">Recover</text><text x="20" y="267" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">Factor modulus, recover residues</text><line x1="180" y1="280" x2="180" y2="300" stroke="#35e0d0" stroke-width="1.6" marker-end="url(#ah)"/><rect x="6" y="302" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="323" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">CRT</text><text x="20" y="341" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">Reconstruct the 128-bit key</text><line x1="180" y1="354" x2="180" y2="374" stroke="#35e0d0" stroke-width="1.6" marker-end="url(#ah)"/><rect x="6" y="376" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="397" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">Outcome</text><text x="20" y="415" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">Submit recovered key</text></svg><figcaption>Kill chain, from position to key submission. The mitigation and detection mapped to each stage are in the controls and detection tables below.</figcaption></figure>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 434" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Kill chain from adversary-in-the-middle position to key submission"><defs><marker id="ah" markerWidth="9" markerHeight="9" refX="4.5" refY="8" orient="auto"><path d="M0,0 L9,0 L4.5,8 Z" fill="#35e0d0"/></marker></defs><rect x="6" y="6" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="27" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">T1557</text><text x="20" y="45" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">AiTM position</text><line x1="180" y1="58" x2="180" y2="78" stroke="#35e0d0" stroke-width="1.6" marker-end="url(#ah)"/><rect x="6" y="80" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="101" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">T1565.002</text><text x="20" y="119" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">Modify key-rotation traffic</text><line x1="180" y1="132" x2="180" y2="152" stroke="#35e0d0" stroke-width="1.6" marker-end="url(#ah)"/><rect x="6" y="154" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="175" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">CWE-203</text><text x="20" y="193" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">Verification oracle</text><line x1="180" y1="206" x2="180" y2="226" stroke="#35e0d0" stroke-width="1.6" marker-end="url(#ah)"/><rect x="6" y="228" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="249" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">Recover</text><text x="20" y="267" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">Factor modulus, recover residues</text><line x1="180" y1="280" x2="180" y2="300" stroke="#35e0d0" stroke-width="1.6" marker-end="url(#ah)"/><rect x="6" y="302" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="323" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">CRT</text><text x="20" y="341" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">Reconstruct the 128-bit key</text><line x1="180" y1="354" x2="180" y2="374" stroke="#35e0d0" stroke-width="1.6" marker-end="url(#ah)"/><rect x="6" y="376" width="348" height="52" rx="6" fill="#10141d" stroke="#23293a"/><text x="20" y="397" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#ff4d9d" letter-spacing="1">Outcome</text><text x="20" y="415" font-family="ui-monospace,Menlo,monospace" font-size="12.5" fill="#e6e9f0">Submit recovered key</text></svg><figcaption>Kill chain, from position to key submission. The mitigation and detection mapped to each stage are in the controls and detection tables below.</figcaption></figure>
 <div class="tablewrap"><table>
 <thead>
 <tr>
@@ -80,6 +80,7 @@
 </tr>
 </tbody>
 </table></div>
+<p class="artifact-note">Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/crypto/rotation-and-recovery/artifacts">GitHub artifacts folder</a>.</p>
 <h2>1. Problem Statement and Threat Scenario</h2>
 <p>I was the man in the middle. Three other participants were talking over a simulated protocol, and I sat on the wire between them. I could watch messages go by, grab one at a time and hold it, edit it as long as I didn't change its length, and drop it back into the channel. When I thought I had the target's 16-byte key, I handed it to a success function the host gave me. The catch was cost: every edit was billed in ink and whiteout, priced per nibble, and my score was the total.</p>
 <p>The whole thing worked because the endpoints trusted the channel. They assumed nobody could touch a message in transit, and underneath them, I could. A few kinds of messages flowed past: key-rotation commands, MAC-signed tokens that carried an epoch number, verification requests, and the acknowledgements and retries that kept the conversation alive. Two of those were the problem. The rotation commands changed state but weren't properly authenticated, and the MAC didn't cover everything it should have.</p>
@@ -485,9 +486,9 @@ D. For repeated-factor components, explicitly avoiding coefficients divisible by
 <h3>Gaps and/or Inefficiencies</h3>
 <p>My biggest mistake was assuming that a mathematically clean payload was also a cheap one. Once the solver worked, live scoring made donor choice and edit cost matter as much as the cryptography. Realizing the problem had turned into a cost problem cost me cycles, a lot of them spent waiting for the next seed to post, and every optimization meant real-time R&amp;D plus deploy time that came straight out of my scoring window.</p>
 <p>The second gap was how fragile the scheduler got under the host's timing. Several optimizations looked clean in my editor and then failed in practice and burned cycles, because every host call advanced simulator time and I could only ever hold one message at once.</p>
-<p>In my post-mortem/AAR; big takeaway was on timing and queue state, that they are part of the attack surface for active protocol exploitation, not implementation considerations.</p>
+<p>My after-action takeaway was that timing and queue state were part of the attack surface. I had treated them as implementation details until the live scheduler proved otherwise.</p>
 <p>The third, honestly, was tooling. My first solver proved the ABI but left me scrambling for a real solve, and I was slow to admit it had hit its ceiling. Knowing when to stop forcing an approach and pivot is its own discipline, and this exercise made me feel it. The live R&amp;D was a rush. It was also where my unfamiliarity with the problem and with WebAssembly cost me the most: time spent learning on the clock was time off the scoreboard, and it was frustrating. </p>
-<p>FWIW, I was able to pivot to the live-solve mechanism, but at the cost of team scoring and performance optimization.</p>
+<p>I did pivot to the live solver. Learning and rebuilding under the clock cost us scoring time and left less room for the optimization I wanted to do.</p>
 <h3>Transferable Principles</h3>
 <div class="tablewrap"><table>
 <thead>
@@ -541,29 +542,30 @@ D. For repeated-factor components, explicitly avoiding coefficients divisible by
 <li>Applying quotient-ring arithmetic, CRT, and two-stage residue lifting to a practical key-recovery workflow.</li>
 <li>Benchmarking variants in a live fire environment, with cost-objective scoring, live performance optimization.</li>
 </ol>
-<p>Adjacent skills I identified as deficient were protocol reverse engineering, state-machine fuzzing, test harness design, and exploit engineering. 
-I've committed myself to whiteboarding and upskilling on these skill opportunities. </p>
-<p>This isn't a typical writeup, and that's on purpose. I need to take what I learn and push it into the security work I actually do. Roughly, solving the challenge was a third of the effort. Turning it into blue and purple-team material, the detections, Sigma, and framework mapping, was another third. Writing this up and distilling what I took from it was the last third.</p>
+<p>I came away with a short list to practice: protocol reverse engineering, state-machine fuzzing, test harness design, and exploit engineering. I want to whiteboard the transitions before I build the next solver.</p>
+<p>I wanted the protocol lesson to carry into the security work I do. Roughly a third of the effort went into the solve, another third into the blue and purple team material, and the last third into writing down what held up and what still needed testing.</p>
 <h3>SecOps, IR, and Threat Hunting</h3>
-<p>IRL, security practitioners would most reliably see this behavior through abnormal application-protocol state transitions: repeated validation failures, unusual key-rotation sequences, and retry storms. 
-1. Directly detecting in-flight message mutation would require specialized visibility, such as captures on both sides of an intermediary, instrumented relays, or endpoint pre-send and post-receive hashes. 
-2. My defensive extrapolation is that application behavior would likely produce the first useful detection before a known signature for cryptographic misuse popped off.</p>
-<p>These are my Threat Hunting hypotheses:</p>
-<p>A. Repeated verification attempts against the same MAC-authenticated object across multiple key epochs.
-B. Key-rotation messages with unusual frequency, sender, or recipient paths.
-C. Acknowledgement suppression followed by retransmission storms with stable content.
-D. Same-length message mutations with preserved framing, but only where instrumented transport, paired captures, or endpoint hashing provides before-and-after visibility.
-E. Verification failure bursts that eventually succeed after many candidates.</p>
-<p>Which then give way to these Incident Response implications:</p>
-<p>F. Preserve application-layer protocol logs, not just packet metadata.
-G. Log key-rotation identifiers and verification rotation indices.
-H. Alert on repeated use of older tokens against newer epochs.
-I. Treat retry behavior as a security signal when paired with validation anomalies.</p>
+<p>In an operational setting, I would look first for abnormal application-protocol state transitions: repeated validation failures, unusual key-rotation sequences, and retry storms. Directly detecting an in-flight edit would take specialized visibility, such as paired captures, an instrumented relay, or endpoint hashes from both sides of the exchange. Application behavior may give a defender an earlier lead than a known signature for cryptographic misuse.</p>
+<p>These are the hunting hypotheses I would start with:</p>
+<ol type="A">
+<li>Repeated verification attempts against the same MAC-authenticated object across multiple key epochs.</li>
+<li>Key-rotation messages with unusual frequency, sender, or recipient paths.</li>
+<li>Acknowledgement suppression followed by retransmission storms with stable content.</li>
+<li>Same-length message mutations with preserved framing, where paired captures or endpoint hashing can show both versions.</li>
+<li>Verification failure bursts that eventually succeed after many candidates.</li>
+</ol>
+<p>Those leads would also shape the response:</p>
+<ol type="A" start="6">
+<li>Preserve application-layer protocol logs alongside packet metadata.</li>
+<li>Log key-rotation identifiers and verification rotation indices.</li>
+<li>Review repeated use of older tokens against newer epochs.</li>
+<li>Treat retry behavior as a security signal when paired with validation anomalies.</li>
+</ol>
 <h3>Detection Engineering Theory</h3>
-<p>These are detection theories I want validate. </p>
+<p>These are detection ideas I would validate against real application logs. </p>
 <ol>
 <li>Verification endpoints that leak success or failure across an attacker-controlled context selector should be treated as oracle surfaces and instrumented for repeated-query detection.</li>
-<li>Protocols whose MAC scope excludes attacker-controlled selectors such as rotation, epoch, or version should bind those fields—along with sender, recipient, message type, and freshness data—into a canonical authenticated context.</li>
+<li>Protocols whose MAC scope excludes attacker-controlled selectors such as rotation, epoch, or version should bind those fields, along with sender, recipient, message type, and freshness data, into a canonical authenticated context.</li>
 </ol>
 <p>Fidelity expectations:</p>
 <ol start="3">
@@ -622,6 +624,7 @@ I. Treat retry behavior as a security signal when paired with validation anomali
 </tr>
 </tbody>
 </table></div>
+<p>To make one of those hunting ideas concrete, I put together a small defensive lab using normalized application audit events. The <a href="artifacts/README.md">lab guide</a> explains the sensor and field assumptions; the <a href="artifacts/protocol_oracle_hunt.py">oracle-pattern detector</a> uses a trailing ten-minute window. The <a href="artifacts/make_fixture.py">fixture generator</a> produces <a href="artifacts/fixture_events.jsonl">synthetic audit events</a>, and <a href="artifacts/expected_findings.json">the expected finding</a> records the check. The <a href="artifacts/test_protocol_oracle_hunt.py">case checks</a> cover the positive, benign, near-miss, and window boundary. This is a local logic test; a live protocol sensor still needs field mapping and validation.</p>
 
 </details>
 <details class="fold section-fold">
@@ -897,7 +900,7 @@ I used ATT&amp;CK as the baseline, and where I could and it was accurate, I incl
 <p>The following STIX bundle is my attempt to link indicators, attack patterns, and a CoA through typed relationships to give threat teams a minimum useful structure. 
 1. It is intentionally illustrative rather than fully interoperable.
 2. The indicator pattern assumes a pre-aggregated custom protocol-event summary. 
-3. In production this SCO needs to be ran through a STIX 2.1 Extension Definition with a published schema, and calculate the counts and observation window in an external analytics pipeline.</p>
+3. For interoperable STIX use, the custom object would need a published STIX 2.1 extension schema, while an external analytics pipeline calculates the counts and observation window.</p>
 <pre><code class="language-json">{
   &quot;type&quot;: &quot;bundle&quot;,
   &quot;id&quot;: &quot;bundle--00000000-0000-4000-8000-000000000001&quot;,
@@ -1201,8 +1204,9 @@ In production, I would need to consider the scheduled lookback and suppression b
 </code></pre>
 <p>The two behaviors are separated because: 
 1. Verification events and rotation/ACK events do not necessarily share <code>TokenHash</code>. 
-2. The retry analytic correlates ACKs through a stable rotation identifier or message hash; schemas in prod should normalize sender and recipient direction before calculating the ratio. 
+2. The retry analytic correlates ACKs through a stable rotation identifier or message hash; a production schema would need to normalize sender and recipient direction before calculating the ratio.
 3. A threshold below 0.2 tolerates some background loss while still surfacing sustained retry behavior.</p>
+<p>The <a href="artifacts/protocol_oracle_hunt.py">local oracle-pattern detector</a> tests the combined failure-count and epoch-diversity condition over a sliding window. The KQL and SPL above remain illustrative until their fields, scheduling, and behavior are checked against a real backend.</p>
 </details>
 
 </details>
@@ -1224,32 +1228,32 @@ In production, I would need to consider the scheduled lookback and suppression b
 <tr>
 <td>Repeated INVALID verification results for the same MAC-authenticated token across multiple rotation epochs</td>
 <td>Application audit behavior</td>
-<td>High — direct behavioral signature of oracle probing under this protocol model</td>
+<td>Proposed high-value signal for oracle probing under this protocol model; fidelity needs measurement</td>
 </tr>
 <tr>
 <td>Verification attempts against the same token spanning unusually many epochs in a short window</td>
 <td>Application audit behavior</td>
-<td>High — narrows oracle probing from generic failure noise</td>
+<td>Proposed high-value discriminator from generic failure noise; fidelity needs measurement</td>
 </tr>
 <tr>
 <td>Abnormally frequent key-rotation messages from a single source-recipient pair</td>
 <td>Protocol behavior</td>
-<td>Medium — possible attacker-controlled state manipulation</td>
+<td>Review lead for possible attacker-controlled state manipulation; rotation volume alone is noisy</td>
 </tr>
 <tr>
 <td>ACK suppression followed by sustained retransmissions with stable content</td>
 <td>Protocol behavior</td>
-<td>Medium — possible retry abuse or transport tampering</td>
+<td>Review lead for possible retry abuse or transport tampering; outages can look similar</td>
 </tr>
 <tr>
 <td>Same-length message rewrites with changed sender or recipient fields</td>
 <td>Specialized transport or endpoint telemetry</td>
-<td>Medium — requires paired captures, an instrumented relay, or pre-send/post-receive hashing; flow logs alone cannot establish mutation</td>
+<td>Specialized lead requiring paired captures, an instrumented relay, or pre-send/post-receive hashing; flow logs alone cannot establish mutation</td>
 </tr>
 <tr>
 <td>Bursts of validation failures followed by an eventual success against many candidates</td>
 <td>Application audit behavior</td>
-<td>High when combined with epoch diversity</td>
+<td>Proposed review lead when combined with epoch diversity; fidelity needs measurement</td>
 </tr>
 </tbody>
 </table></div>
@@ -1370,11 +1374,24 @@ correlation:
     gte: 10
 level: low
 </code></pre>
+<p>The Sigma examples select and count suspicious events separately. They do not, by themselves, prove the combined count-and-diversity condition or successful key recovery. The <a href="artifacts/fixture_events.jsonl">synthetic event set</a> and <a href="artifacts/expected_findings.json">expected output</a> show one combined lead, a one-epoch retry burst that stays clear, and a near miss. See the <a href="artifacts/README.md">lab guide</a> for field mapping, false positives, and validation limits.</p>
 </details>
 
 </details>
 <details class="fold section-fold">
-<summary>13. References</summary>
+<summary>13. Visual Artifact</summary>
+<p>I use the <a href="#analysis-flow">flow diagram above</a> to keep the exploit sequence in view: the intercept position, edited rotation traffic, verification oracle, residue recovery, CRT reconstruction, and key submission. I map proposed controls and telemetry to those stages below. I did not test them against the challenge service.</p>
+<div class="tablewrap"><table>
+<thead><tr><th>Stage</th><th>Proposed mitigation</th><th>Observable or prerequisite</th></tr></thead>
+<tbody>
+<tr><td>Message interception and rotation edits</td><td>Authenticate channel and message context; NIST SC-8 is a transmission-protection lens.</td><td>Protocol-aware traffic analysis, where instrumented visibility exists; D3-NTSA.</td></tr>
+<tr><td>Verification oracle</td><td>Bind epoch, sender, recipient, type, and freshness to the MAC; NIST SC-23 is a session-authenticity lens.</td><td>Repeated invalid verification across epochs. The local <a href="artifacts/protocol_oracle_hunt.py">detector</a> tests this pattern on synthetic logs.</td></tr>
+<tr><td>Residue recovery from the weak key transition</td><td>Replace the custom key schedule with reviewed cryptographic key management; NIST SC-13 is a cryptographic-protection lens.</td><td>The recovery math is not directly visible in ordinary flow logs.</td></tr>
+<tr><td>Detection prerequisites</td><td>Preserve application audit and network-flow records.</td><td>CIS 8.2 and 13.6 offer logging and flow-visibility lenses; actual field collection and retention would need local design.</td></tr>
+</tbody></table></div>
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
 <details class="fold">
 <summary>Show the references</summary>
 <ol>
