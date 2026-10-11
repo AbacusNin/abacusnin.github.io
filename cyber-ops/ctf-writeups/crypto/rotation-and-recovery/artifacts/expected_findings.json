@@ -1,0 +1,12 @@
+[
+  {
+    "type": "repeated_invalid_verification_across_epochs",
+    "TokenHash": "synthetic-oracle-token",
+    "SrcEntity": "client-a",
+    "DstEntity": "verifier-a",
+    "FirstSeen": "2026-01-01T00:00:10Z",
+    "LastSeen": "2026-01-01T00:06:30Z",
+    "Failures": 20,
+    "EpochDiversity": 5
+  }
+]
