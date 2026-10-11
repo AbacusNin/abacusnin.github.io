@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Message Packed Eight Bytes at a Time - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="I treated eight large integers as fixed-width byte blocks, checked both byte orders, and recovered the place-and-time message that led to an accepted flag.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/reversing/packed-integer-ascii/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Message Packed Eight Bytes at a Time">
+  <meta property="og:description" content="I treated eight large integers as fixed-width byte blocks, checked both byte orders, and recovered the place-and-time message that led to an accepted flag.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/reversing/packed-integer-ascii/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Reversing / <span aria-current="page">The Message Packed Eight Bytes at a Time</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Message Packed Eight Bytes at a Time</h1>
+        <p class="lead">The numbers looked imposing until I stopped reading them as numbers. Eight bytes at a time, they were a sentence.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Recover a location-and-time message from eight decimal integers and submit its words in the required flag format.</p>
+<p><strong>What I did.</strong> I checked integer widths and hex bytes, unpacked each value as an eight-byte block, compared byte orders, and stopped at the null terminator.</p>
+<p><strong>The result.</strong> The recovered words produced an accepted flag, as recorded in the challenge result.</p>
+<p><strong>The limit.</strong> The eight challenge integers and answer are withheld; the linked decoder and triage lab run on a separate synthetic sample.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Eight large integers; Eight bytes each; Join the blocks; Stop at zero; Read the message">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Eight large integers</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Inspect widths and hexadecimal bytes</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Eight bytes each</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Unpack blocks in big-endian order</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Join the blocks</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Compare with the little-endian view</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Stop at zero</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Discard final-block padding</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Read the message</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Format the words and submit</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Reverse engineering of a data representation</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Easy</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>integer byte-packing, big-endian, ASCII decoding, data representation, encoding reversal</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved</td>
+</tr>
+<tr>
+<td>Input</td>
+<td>Eight decimal integers, each used as one eight-byte block</td>
+</tr>
+<tr>
+<td>Goal</td>
+<td>Recover a place and time and join its words in a flag wrapper</td>
+</tr>
+<tr>
+<td>Result</td>
+<td>The formatted answer was accepted</td>
+</tr>
+<tr>
+<td>Defensive scope</td>
+<td>Proposed static artifact triage on synthetic Python files; no incident evidence</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/reversing/packed-integer-ascii/artifacts">view the artifacts on GitHub</a> and <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/reversing/packed-integer-ascii/fixtures">their fixtures</a>. The <a href="fixtures/sample_packed_ints.txt">sample input</a> and source-file fixtures below contain placeholder text only.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I was given eight large decimal integers and a flag format. The task was to recover a short message naming a place and a time, then join its content words with underscores inside the flag wrapper. There was no service to interrogate and no binary to reverse. The integers were the whole puzzle.</p>
+<p>The values sat around <code>10^18</code>, which made them look more like cryptographic material than text at first glance. Their size was the clue. An unsigned 64-bit word can hold eight bytes, and eight bytes can hold eight ASCII characters. If the puzzle had packed a sentence into those words, I could reverse it without guessing a key.</p>
+<p>The challenge was offline and non-adversarial. It showed no attacker, vulnerable service, or event stream. Later sections describe how I would reuse the decoding habit when examining an acquired suspicious file. That is a proposed analyst workflow, not an event that occurred in this challenge. I leave the actual place, time, integers, and flag out of this public page.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I began with width, using Python's <code>bit_length()</code> on the eight values. My notes put each at 63 bits. An ASCII character uses at most seven bits, so the first byte of a big-endian eight-character block keeps its high bit clear. That puts the packed value below <code>2^63</code>. The width did not prove the interpretation, but it gave me a cheap test to run next.</p>
+<p>I printed the numbers as hexadecimal and looked at the bytes rather than the decimal spellings. The leading byte in one block was <code>0x4D</code>, or <code>M</code> in ASCII, and the others looked like printable text. I then converted every value to exactly eight bytes in big-endian order and joined the blocks. The result read as an English message.</p>
+<p>I checked little-endian too. That version reversed the characters within each eight-byte block and gave me garbled text. It was an instructive dead end: the same numbers can become very different byte streams when I choose the wrong order. I kept the byte-order check in the method because a readable output is much better evidence than the width alone.</p>
+<p>At the end of the big-endian buffer I found a null byte followed by two padding bytes. I cut the message at the first null, kept the content words, and placed them in the required underscore-separated flag format. The platform accepted the submission. The case can be understood and retested with a placeholder sample without publishing that answer.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>This short Python example uses five <strong>synthetic</strong> integers. They decode to a placeholder sentence with the same kind of final block:</p>
+<pre><code class="language-python">sample = [
+    6008203707511283821, 7306373966651138160, 7809632514823253604,
+    2338610025081104239, 2335227948786798938,
+]
+raw = b&quot;&quot;.join(value.to_bytes(8, &quot;big&quot;) for value in sample)
+message = raw.split(b&quot;\x00&quot;, 1)[0].decode(&quot;ascii&quot;)
+print(message)  # Sample meeting place and time go here
+</code></pre>
+<p>The <a href="fixtures/sample_packed_ints.txt">sample integer file</a> holds those same five values. The <a href="artifacts/int_unpack_decode.py">generalized decoder</a> accepts a file or positional integers, checks the selected unsigned width, and prints both byte orders with <code>--auto</code>:</p>
+<pre><code class="language-sh">python -B artifacts/int_unpack_decode.py --file fixtures/sample_packed_ints.txt --auto
+</code></pre>
+<p>Its big-endian view reads <code>Sample meeting place and time go here</code>. The little-endian view begins <code>m elpmaS</code> and stays readable as individual characters but makes no coherent sentence. The synthetic final block contains <code>0x00</code> followed by <code>QZ</code>; those are filler bytes, not part of the message. In the challenge, my notes describe a null followed by two non-text padding bytes. The two sets of values serve different purposes.</p>
+<p>The decoder uses Python's standard library. It can keep bytes after the null for inspection, change the block width, and emit the raw hex view. The <a href="artifacts/README.md">run guide</a> describes the bounds and output. I did not need an automated submission tool for this offline task.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>Each integer is a base-256 number. Its eight bytes are eight base-256 digits. In big-endian order, the first byte carries the most weight:</p>
+<pre><code class="language-text">value = b0*256^7 + b1*256^6 + ... + b6*256 + b7
+</code></pre>
+<p><code>int.to_bytes(8, "big")</code> performs the inverse conversion. The explicit width matters. An integer can begin with a zero byte, and a minimal-length conversion would silently drop that byte and shift every following character out of place. I used eight bytes for every value, then concatenated the results in their given order.</p>
+<p>ASCII fits in seven bits, so an eight-byte block of ASCII has a leading byte below <code>0x80</code>. Its big-endian integer is therefore <strong>at most</strong> 63 bits. It need not be exactly 63. The synthetic sample's five integers have bit lengths <code>63, 63, 63, 62, 62</code>; blocks beginning with a space use fewer. This is why I treated the 63-bit observation as a clue and checked the actual bytes.</p>
+<p>The null byte marks the end of this particular string. Fixed-width packing still fills the last eight-byte block, so bytes after the null are padding for this exercise. I discarded them only after identifying the terminator. In a different format, a null may be valid data, and truncating there would be a mistake. The producer's format decides that boundary.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>The transformation was reversible because the producer had preserved the byte values in order. For each integer, I used an unsigned eight-byte big-endian conversion. I joined the blocks, stopped at the first <code>0x00</code>, and decoded the prefix as ASCII. I had no cipher key to recover and no search space to explore.</p>
+<p>The sample gives me a useful round trip. <code>int.from_bytes(block, "big")</code> on each of its five original blocks returns the exact integers shown in Section 3. The same sample read in little-endian order produces garbled blockwise reversals. Those checks validate the conversion and make the byte-order choice visible. Grammatical text and the challenge's accepted submission are the independent checks on the original result.</p>
+<p>The method assumes a consistent block width, byte order, and character encoding. An out-of-range integer should be rejected instead of being truncated. I also need to keep the null and the trailing bytes visible during triage before deciding what counts as padding. The <a href="artifacts/int_unpack_decode.py">decoder</a> exposes a <code>--keep-null</code> option for that inspection.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned</summary>
+<p>I nearly gave the numbers more mystery than they deserved. Printing a few hex bytes took less effort than testing a homemade cipher idea, and <code>0x4D</code> gave me a letter I could recognize. Once I saw printable bytes across the blocks, I had a concrete hypothesis to test.</p>
+<p>Width helped, but it was a fingerprint with limits. All-ASCII eight-byte blocks stay below <code>2^63</code>; they do not all have a 63-bit length. The little-endian view reminded me that printable characters alone are weak evidence too. Both views of the sample are printable. Only one reads as the kind of phrase the challenge asked for.</p>
+<p>The last few bytes were easy to overlook. Keeping the whole padded block would have polluted the flag. Cutting at the null matched this format and gave me the clean place-and-time phrase.</p>
+<table>
+<thead>
+<tr>
+<th>Exercise behavior</th>
+<th>Useful transfer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Large integers unpack to ASCII</td>
+<td>Inspect packed fields in a file, protocol, or collected script</td>
+</tr>
+<tr>
+<td>Width suggests eight-byte blocks</td>
+<td>Use size and high-byte values to form a testable format hypothesis</td>
+</tr>
+<tr>
+<td>Big and little order differ</td>
+<td>Check byte order before calling decoded text meaningful</td>
+</tr>
+<tr>
+<td>Null and padding end the message</td>
+<td>Bound a string using the actual format, then preserve the remaining bytes as evidence</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Operational Extrapolation</summary>
+<h3>Individual Practitioner Development</h3>
+<p>I can reuse this small sequence of checks whenever data has been stored as words instead of bytes: count the width, inspect hex, unpack both orders, and round-trip the conversion. The next useful practice case would use another block width or UTF-16, where zeros appear inside the text and this null-trimming shortcut fails.</p>
+<h3>Security Operations</h3>
+<p>The puzzle itself produced no host or network activity for a SOC to detect. A related real-world job begins only after an analyst has collected a suspicious Python file. Literal arrays of large integers can hide readable strings from a quick source review. I built a <a href="artifacts/packed_ascii_triage.py">static triage script</a> that parses a Python file without executing it and flags arrays whose eight-byte views are mostly printable. It gives the analyst a line number and both plausible byte orders, then leaves the meaning and risk decision to human review.</p>
+<p>I would use that result as one lead in a file investigation, alongside the file's origin, hash, execution evidence, and the code that consumes the array. A readable string might be a harmless label, test data, or something operationally important. The array alone does not tell me which. The <a href="artifacts/README.md">triage guide</a> lists the input limits, false positives, and collection fields I would need in a real case.</p>
+<h3>Intelligence Operations</h3>
+<p>No source, infrastructure, or actor in this challenge supports an intelligence finding. Representation fluency could help decode a collected artifact in a future investigation, but that investigation would need its own provenance and corroboration. I would not attach an attribution or campaign label to these integers.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The challenge primitive is the <a href="artifacts/int_unpack_decode.py">fixed-width integer decoder</a>. It accepts decimal values or the <a href="fixtures/sample_packed_ints.txt">synthetic integer fixture</a>, a block width of 1-16 bytes, a selected byte order, and an option to show both orders. It returns JSON with ASCII text when valid and the raw hex bytes. It bounds the file to 1 MB and the list to 4096 values. The <a href="artifacts/README.md">guide</a> gives the command and expected sample output.</p>
+<p>For defensive reuse I added a separate <a href="artifacts/packed_ascii_triage.py">read-only Python source triage tool</a>. It examines literal lists and tuples in a collected <code>.py</code> file through the syntax tree. It does not import or execute the file. The <a href="fixtures/synthetic_packed_source.py">positive source fixture</a> contains the placeholder integers; <a href="fixtures/benign_numeric_source.py">benign numeric metrics</a> and a <a href="fixtures/near_miss_utf16_source.py">UTF-16 near miss</a> give it two negative cases. The <a href="artifacts/test_packed_ascii.py">local tests</a> check the decoded phrase, round trip, byte-order contrast, positive detection, both negatives, and malformed or out-of-range inputs.</p>
+<p>This scanner deliberately misses computed arrays, changed widths, compressed material, and non-Python carriers. Both orders of the positive sample pass its printable test, so it reports both for analyst review. No production file set or endpoint sensor has been tested. The decoder is a working analyst aid; the scanner is a synthetic triage proof of concept.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Applicability and Mapping</summary>
+<p>I do not assign an ATT&amp;CK, CAPEC, D3FEND, STRIDE, or OWASP technique to the challenge. It was an offline representation puzzle with no adversary behavior or vulnerable application to classify.</p>
+<p>The proposed file-triage use has a conditional ATT&amp;CK connection. If a malicious script intentionally packs strings into integers to hide its content, <a href="https://attack.mitre.org/techniques/T1027/">T1027 Obfuscated Files or Information</a> may describe that <strong>separate observed behavior</strong>. A matching array alone does not establish malice or an ATT&amp;CK technique. I would first inspect how the file uses the data and what execution or delivery evidence exists. I do not assign a finer subtechnique to the synthetic fixtures.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intelligence and Standards Integration</summary>
+<p>The challenge has no IOC, actor, malware, infrastructure, or victim. A STIX Indicator, TAXII exchange, or threat report would have nothing evidence-backed to say about it. The placeholder phrase is a test string, not an indicator.</p>
+<p>If a real investigation surfaced an encoded array, I would preserve the file hash, acquisition time, source system, exact array bytes, decoding parameters, and the code path that consumes them. Those fields let another analyst reproduce the decode and judge whether the content belongs in a larger case. Any structured intelligence object would follow from that case's evidence, not from the packing method by itself.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<p>I found no vulnerability or misconfiguration in the challenge, so I do not claim a NIST, CIS, STIG, CMMC, PCI DSS, or HIPAA control failure. There is no challenge system to patch.</p>
+<p>For the proposed static-analysis use, the practical control is an intake process: collect suspect source without running it, keep the original bytes and hash, analyze in an isolated workspace, and review decoded strings in their code context. That process is a handling recommendation, not a tested mitigation for a known incident. A numeric-array match should start examination; it should not trigger automatic blocking.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>The challenge supplied no runtime telemetry and no IOC. A Sigma or SIEM rule would need an event source that this offline puzzle never produced. I chose a file-level triage proof of concept instead of inventing one.</p>
+<p>The <a href="artifacts/packed_ascii_triage.py">static scanner</a> requires a collected UTF-8 Python source file. It reports literal arrays of 3-4096 unsigned 64-bit integers when an eight-byte interpretation yields at least 16 bytes with a printable ratio of 0.95 or more and at least one letter. It records file name, line, array size, candidate byte orders, ratio, and null presence. It omits decoded text by default. Those are leads for an analyst, not IOCs. The required sensor is access to the file itself, with origin and case metadata maintained outside the tool.</p>
+<p>The <a href="fixtures/synthetic_packed_source.py">positive fixture</a> produces one candidate. The <a href="fixtures/benign_numeric_source.py">benign</a> and <a href="fixtures/near_miss_utf16_source.py">near-miss</a> fixtures produce none; the <a href="artifacts/test_packed_ascii.py">test file</a> checks these expectations. Benign packed text can still match, and an actual malicious file may use a form the scanner misses. There is no precision or recall estimate and no deployed rule. If I found a candidate in a real case, I would decode it with the <a href="artifacts/int_unpack_decode.py">separate decoder</a>, check the consuming code, and correlate it with acquisition and execution evidence before calling it security relevant.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow diagram above</a> follows the actual analysis: inspect the eight integers, unpack fixed-width blocks, compare orders, stop at the null, and format the message. It shows the validation choices that kept me from treating a plausible byte sequence as a finished answer. The diagram contains no challenge values.</p>
+<p>The static triage extension starts earlier, with a collected file and a candidate array. It can point me to bytes worth unpacking, but the decision between a garbled and a meaningful message remains with the analyst.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<table>
+<thead>
+<tr>
+<th>Ref</th>
+<th>Source</th>
+<th>Use in this writeup</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>REF.001</td>
+<td><a href="https://www.rfc-editor.org/info/rfc20/">RFC 20 / STD 80, ASCII format for Network Interchange</a></td>
+<td>Seven-bit ASCII in an eight-bit byte with the high bit clear.</td>
+</tr>
+<tr>
+<td>REF.002</td>
+<td><a href="https://ftp.nic.ad.jp/rfc/ien/scanned/ien137.pdf">Danny Cohen, IEN 137, On Holy Wars and a Plea for Peace</a></td>
+<td>Historical discussion of big- and little-endian byte order.</td>
+</tr>
+<tr>
+<td>REF.003</td>
+<td><a href="https://docs.python.org/3/library/stdtypes.html#int.to_bytes">Python documentation, <code>int.to_bytes</code> and <code>int.from_bytes</code></a></td>
+<td>Fixed-width byte conversion used in the decoder.</td>
+</tr>
+<tr>
+<td>REF.004</td>
+<td><a href="https://attack.mitre.org/techniques/T1027/">MITRE ATT&amp;CK T1027, Obfuscated Files or Information</a></td>
+<td>Conditional analogy for a future malicious script that hides content in integer arrays; no technique assigned to this challenge.</td>
+</tr>
+</tbody>
+</table>
+<p>The three representation references came from the technical explanation and were checked on 2026-10-11. The ATT&amp;CK reference applies only to the proposed defensive extension.</p>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>

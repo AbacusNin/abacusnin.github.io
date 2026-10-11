@@ -335,5 +335,26 @@
     ],
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/ai/comparison-oracle-record-lookup/"
+  },
+  {
+    "title": "The Message Packed Eight Bytes at a Time",
+    "category": "Reversing",
+    "difficulty": "Easy",
+    "date": "2026-10",
+    "tags": [
+      "integer byte-packing",
+      "big-endian",
+      "ASCII decoding",
+      "data representation",
+      "encoding reversal"
+    ],
+    "summary": "I treated eight large integers as fixed-width byte blocks, checked both byte orders, and recovered the place-and-time message that led to an accepted flag.",
+    "aliases": [
+      "64-bit integers",
+      "byte order",
+      "fixed-width records"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/reversing/packed-integer-ascii/"
   }
 ]
