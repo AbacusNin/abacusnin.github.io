@@ -1,0 +1,25 @@
+{
+  "batchcomplete": "",
+  "query": {
+    "pages": {
+      "12": {
+        "pageid": 12,
+        "ns": 6,
+        "title": "File:Example portrait base.jpg",
+        "imagerepository": "local",
+        "imageinfo": [
+          {
+            "timestamp": "2026-02-02T10:00:00Z",
+            "user": "LaterEditor",
+            "comment": "replaced file"
+          },
+          {
+            "timestamp": "2026-01-01T09:00:00Z",
+            "user": "FirstUploader",
+            "comment": "initial upload"
+          }
+        ]
+      }
+    }
+  }
+}

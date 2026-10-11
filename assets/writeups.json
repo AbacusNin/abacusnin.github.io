@@ -426,5 +426,29 @@
     ],
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/forensics/png-xmp-hash-recovery/"
+  },
+  {
+    "title": "The Portrait Was a Crop of a Crop",
+    "category": "OSINT",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "Wikimedia Commons",
+      "file-history analysis",
+      "image provenance",
+      "crop-derivation tracing",
+      "MediaWiki API",
+      "conflict-of-interest editing",
+      "attribution"
+    ],
+    "summary": "I followed a disputed biography portrait through two Commons crops to the base file, then used its upload history to identify the account the puzzle asked for.",
+    "aliases": [
+      "Wikipedia portrait",
+      "Wikimedia uploader",
+      "Commons file history",
+      "media attribution"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/osint/commons-portrait-provenance/"
   }
 ]

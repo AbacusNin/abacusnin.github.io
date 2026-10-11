@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Portrait Was a Crop of a Crop - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="I followed a disputed biography portrait through two Commons crops to the base file, then used its upload history to identify the account the puzzle asked for.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/osint/commons-portrait-provenance/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Portrait Was a Crop of a Crop">
+  <meta property="og:description" content="I followed a disputed biography portrait through two Commons crops to the base file, then used its upload history to identify the account the puzzle asked for.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/osint/commons-portrait-provenance/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / OSINT / <span aria-current="page">The Portrait Was a Crop of a Crop</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Portrait Was a Crop of a Crop</h1>
+        <p class="lead">The face in the infobox was easy to find. The account behind the photograph took a few more clicks.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Identify the platform account that uploaded a new portrait connected to a public figure&#x27;s biography.</p>
+<p><strong>What I did.</strong> I disambiguated the subject, set aside an older portrait, followed two crop links to a base file, and read its upload history.</p>
+<p><strong>The result.</strong> The challenge record reports that the account from the base file&#x27;s upload history was accepted in the required flag format.</p>
+<p><strong>The limit.</strong> The subject, file titles, account, and submission transcript are not retained here. I cannot independently replay the case attribution or verify the claimed family relationship.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Riddle; Biography; Commons; File history; Talk page; Answer">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Riddle</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Select the right namesake</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Biography</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Check the newer lead portrait</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Commons</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Follow crop to crop to base file</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">File history</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Read the oldest visible uploader</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Talk page</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Check the relationship claim separately</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Answer</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Account accepted in the puzzle</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>OSINT (Wikimedia media-provenance attribution)</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>Wikimedia Commons, file-history analysis, image provenance, crop-derivation tracing, MediaWiki API, conflict-of-interest editing, attribution</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved</td>
+</tr>
+<tr>
+<td>Available material</td>
+<td>Public biography, Commons file pages, article talk and revision history</td>
+</tr>
+<tr>
+<td>Goal</td>
+<td>Return the uploader's platform account in the event's flag syntax</td>
+</tr>
+<tr>
+<td>Reported result</td>
+<td>The account from the base file's upload history was accepted</td>
+</tr>
+<tr>
+<td>Verification boundary</td>
+<td>The subject, file chain, account, and submission transcript are not available for an independent replay</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for checking public media provenance: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/osint/commons-portrait-provenance/artifacts">browse the tools on GitHub</a> and <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/osint/commons-portrait-provenance/fixtures">the synthetic API fixture</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>The prompt was a riddle about a public figure's portrait. It said a relative had uploaded a more flattering photograph for the figure's encyclopedia biography, and the change had caused an editorial misunderstanding. My job was to find the platform account used for that upload and wrap it in the event's flag format. The answer was an account name, not a person's legal name.</p>
+<p>Everything I needed was public: the biography, Wikimedia Commons, the article's revision and talk pages, and the media files' upload histories. I did not need to log in or touch a private system. The puzzle itself showed no intruder or protected network. A real investigator might use the same public records to attribute a posted image to an account, but that would be a separate case with its own evidence.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I began by sorting out the subject. The name in the riddle fit more than one notable person. One namesake, though, had a long-running argument over the photograph at the top of the biography. That lead-image dispute was the clue that picked the right article.</p>
+<p>Then I made the obvious wrong turn. The older, familiar portrait seemed like the photograph everyone had argued about. Its Commons page credited a third-party photographer, so it did not fit the relative in the prompt. I went back to the biography and looked at the more recently added lead image. That was the useful pivot.</p>
+<p>The newer displayed file was a crop of a crop. I followed the first Commons source link to its parent, then the next source link to the base file. On that base file's <strong>File history</strong>, the oldest visible upload named the account that had introduced that file to Commons. The intermediate crop accounts described edits to the image; using either of them as the answer would have answered a different question.</p>
+<p>I also looked at the article's talk and conflict-of-interest discussion for context around the claimed relationship. Those discussions can provide a second source when they contain a specific disclosure. A general COI notice alone cannot prove who controls a Commons account. My case notes report that the base-file account, put in the required flag syntax, was accepted by the scoring platform. I do not have the file titles, a retained talk-page citation, or a submission transcript to replay that result now. The account and flag remain withheld.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>I solved the case in a browser. The useful sequence was to open the lead image from the biography, choose its Commons file page, follow each recorded parent link, and read the base file's upload history. I used a general web search to disambiguate the subject and the article's public discussion to check the story around the image. No exploit or custom code was part of the original solve.</p>
+<pre><code class="language-text">Biography at the relevant revision
+  -&gt; displayed lead image
+  -&gt; Commons derivative file
+  -&gt; parent crop
+  -&gt; base file
+  -&gt; File history: oldest visible upload account
+</code></pre>
+<p>The <a href="https://www.mediawiki.org/wiki/API:Imageinfo">MediaWiki Imageinfo API</a> offers an auditable way to repeat the last step. <code>iiprop=user|timestamp|comment</code> requests the uploader, upload time, and comment for each visible version. <code>iilimit=max</code> requests the largest page of results; it does not guarantee that a long history fits in one response. A continuation token means more versions remain. The <a href="https://www.mediawiki.org/wiki/API:Parsing_wikitext">Parse API's <code>wikitext</code> property</a> can show source links recorded in a derivative's description. I did not execute those API calls in the challenge solve.</p>
+<p>For a reusable check, I made <a href="artifacts/commons_history_audit.py">an offline upload-history reviewer</a>. It reads one saved <code>imageinfo</code> JSON response for a base file, refuses a continuation token, sorts timestamps, and reports the oldest visible account. The <a href="artifacts/README.md">guide</a> shows a <code>curl</code> request that URL-encodes a file title and saves the response. I tested the reviewer against <a href="fixtures/sample_history.json">invented upload history</a>, not the withheld challenge chain. The <a href="artifacts/test_history_audit.py">synthetic tests</a> cover a newer replacement, shuffled API order, a hidden oldest account, missing and nonlocal files, and incomplete pagination.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>Commons keeps visible upload versions for a file name. Each version can have an uploader account, timestamp, and comment. That history answers a narrow question: who uploaded the oldest <strong>visible</strong> version of this Commons file name? It may not reveal the photographer, the real person behind the account, or the first appearance of the image elsewhere. <a href="https://www.mediawiki.org/wiki/API:Imageinfo">MediaWiki's Imageinfo documentation</a> also notes that a user field can be hidden and that a request can require continuation.</p>
+<p>A crop uploaded under a new file name has its own history. The person who made that crop can differ from the person who uploaded the image it came from. Commons descriptions can record a parent through a <a href="https://commons.wikimedia.org/wiki/Template:Derived_from/Machine-readable">Derived from</a> or <a href="https://commons.wikimedia.org/wiki/Template:Extracted_from">Extracted from</a> link. I followed the recorded links in this case. I would not infer a parent from a similar file name alone; a derivative description can be missing or wrong.</p>
+<p>The conflict-of-interest discussion was useful for the riddle's family claim, but it has a different evidentiary role. The base file's history attributes an upload to a platform account. A specific, preserved self-disclosure could support a relationship between that account and the subject. A broad policy page only explains why such discussions occur. It does not authenticate a person.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>I kept two chains separate. The media chain was the displayed portrait, the first crop's source, the second crop's source, and the base image. The account chain began only when I reached the base file's upload history. That distinction was the whole solve: the newest, visible portrait pointed me to the right file family, but the base upload identified the account the prompt wanted.</p>
+<p>The old portrait was a useful negative check. Its named photographer did not match the riddle's relative. It would have been easy to stop at the most famous photograph and invent a connection. The newer lead image and the two recorded crop links gave me a path I could inspect instead.</p>
+<p>On the base file, I read the earliest visible upload rather than the latest replacement. The public upload record supports the account attribution for that file name. The reported accepted flag supports that the account satisfied the puzzle. Neither proves that the account holder was a relative. The relationship claim needs a specific independent record, such as an identifiable disclosure in the article discussion, which I cannot cite here.</p>
+<p>This method has limits. A bot may import an image from another wiki, a revision may be suppressed, or the file description may omit its parent. A biography may point to media outside Commons. A lead portrait can change after the solve. Those cases call for a narrower conclusion or more digging; the <a href="artifacts/commons_provenance_checklist.md">checklist</a> records the article revision, every parent link, and any earlier source before naming an account.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned</summary>
+<p>I lost a little time on the old portrait because it was the famous one. Checking the file page stopped that line of thought quickly. The challenge asked who introduced the newer image, so I needed the image in the relevant article revision and the oldest visible upload of its base file.</p>
+<p>The two crops mattered. If I had read the uploader of the displayed crop, I would have credited the person who edited the framing. Following the parent links prevented that mistake. I would use the API earlier next time to save the visible history and timestamps in one record, while still checking the file descriptions by eye.</p>
+<table>
+<thead>
+<tr>
+<th>In the puzzle</th>
+<th>In an operational review</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>An older portrait led to a third-party photographer</td>
+<td>Check the exact media asset from the relevant page revision</td>
+</tr>
+<tr>
+<td>Two crop links led to the base file</td>
+<td>Preserve every derivative-to-parent hop</td>
+</tr>
+<tr>
+<td>Base-file history gave a platform account</td>
+<td>Report account provenance at the correct scope</td>
+</tr>
+<tr>
+<td>Talk and COI discussion gave context</td>
+<td>Preserve a specific disclosure before claiming a human relationship</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Operational Extrapolation</summary>
+<h3>Individual Practitioner Development</h3>
+<p>This case sharpened a habit I want in OSINT work: follow the object's history before making a story from its appearance. I practiced separating the biography, displayed crop, base media file, and uploader account. A useful follow-up is to run the <a href="artifacts/commons_history_audit.py">history reviewer</a> on several public multi-crop examples and compare the output with the Commons page. That would test the workflow across different import and revision patterns; I have not done that broader trial here.</p>
+<h3>Security Operations</h3>
+<p>The puzzle did not supply host logs, network events, or a compromised service. I cannot turn this browse path into a credible Sigma rule or SIEM query. For a public-facing organization, a narrower defensive use is possible: an editorial team can watch changes to its own biography or organizational pages, record the exact lead-image file at each revision, and review unexpected replacements through Commons provenance. That is a proposed media-integrity process. It would need a maintained page list, revision feed, expected-image baseline, and human review before it could become an alert.</p>
+<h3>Intelligence Operations</h3>
+<p>This is the strongest real-world fit. A collector tracing an image posted in a public corpus can find the account that introduced its visible base file, then compare that with other public records. I would keep the account-level finding separate from identity, intent, and affiliation. The case gave no SIGINT collection or information-operation campaign to map. A crop chain and a username can start an attribution lead; they cannot finish an actor assessment.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The <a href="artifacts/commons_provenance_checklist.md">provenance checklist</a> is the main reusable asset. It tells me to capture the article revision, each derivative link, the base-file upload history, any transfer or hidden revision, and the exact talk-page statement if I make a relationship claim. It is a proposed process for public-source review, not a record of an investigation run against a client.</p>
+<p>The <a href="artifacts/commons_history_audit.py">offline history reviewer</a> handles one narrow part of that process. It accepts a saved Commons <code>imageinfo</code> response and returns the oldest visible account, upload time, and version count with a scope warning. It refuses incomplete pagination rather than quietly calling a partial record complete. The <a href="artifacts/README.md">README</a> documents the API request, inputs, outputs, exit codes, and limits. The <a href="fixtures/sample_history.json">sample JSON</a> and <a href="artifacts/test_history_audit.py">five synthetic tests</a> exercise the tool without exposing the challenge account. The browser-led puzzle result was reported as accepted; these new files do not independently replay it.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Applicability and Mapping</summary>
+<p>I checked ATT&amp;CK rather than treating every OSINT task as an adversary technique. <a href="https://attack.mitre.org/techniques/T1593/">T1593, Search Open Websites/Domains</a>, does model adversaries searching public sites during reconnaissance. The browsing here resembles that collection method, but the challenge had no adversary, victim-targeting objective, or later intrusion. I use T1593 only as an analogy for an operational case that might involve targeting. I do not label my puzzle solve as observed ATT&amp;CK behavior.</p>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>Fit</th>
+<th>Limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MITRE ATT&amp;CK T1593</td>
+<td>Possible analogy for public-site reconnaissance</td>
+<td>No adversary or victim targeting was observed</td>
+</tr>
+<tr>
+<td>D3FEND, CAPEC, STRIDE, OWASP</td>
+<td>No direct case mapping</td>
+<td>No defended system, exploit pattern, or application weakness was tested</td>
+</tr>
+</tbody>
+</table>
+<p>I also considered NIST SP 800-series controls, CACAO, and OpenC2. This file-history read supplied no control implementation or automated response action for those formats. The proposed page-monitoring idea in Section 7 would need its own design and test before receiving a control mapping.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intelligence and Standards Integration</summary>
+<p>The account was the puzzle answer. I have no indicator of compromise, attack pattern, malware, infrastructure, or vulnerability to express as STIX, and no TAXII exchange to report. Treating a public username as a threat indicator would imply malicious conduct that the evidence does not show. I would preserve it privately in an authorized case record if it were relevant to a real investigation, with its source URL, timestamp, and account-level scope.</p>
+<p>The useful standard interface is MediaWiki's public API. The <a href="https://www.mediawiki.org/wiki/API:Imageinfo">Imageinfo endpoint</a> returns visible upload history; <a href="https://www.mediawiki.org/wiki/API:Parsing_wikitext">the Parse endpoint</a> can return the derivative page's wikitext. Both support repeatable collection. Neither verifies a claimed family relationship for me.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<p>Commons publishes upload history as part of its normal transparency model. Reading that history did not expose a vulnerability or misconfiguration. I therefore cannot claim a failed NIST or CIS security control, nor a mitigation deployed for the challenge.</p>
+<p>The practical privacy and publishing lesson is simpler. Anyone contributing media through a public account should expect the account and revision trail to be visible. An organization managing its public biography can review proposed image changes, preserve the relevant revision IDs, and understand who uploaded each file before accepting a portrait. I would propose and test that editorial practice with the organization's actual workflow. This puzzle provides no validation of a product control.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>The case artifacts were public article revisions, derivative file descriptions, the base file's history, and talk-page discussion. They are provenance evidence, not IOCs. No host or network telemetry came with the puzzle, so I have no honest KQL, SPL, Sigma, or YARA detection to publish for it.</p>
+<p>If a team needs to watch its own public page, the behavior to notice is a changed lead-image file. A monitoring process would need page revision IDs, edit timestamps and accounts, the prior and new image titles, and a baseline of approved images. It could then route an unexpected change to an editor who follows the <a href="artifacts/commons_provenance_checklist.md">provenance checklist</a>. I have not built a revision-feed collector, connected a backend, measured false positives, or run this against production pages. Ordinary editorial improvements would be expected review cases, not incidents by default.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow diagram above</a> puts the two easy mistakes in view. The subject had a namesake, and the visible portrait had two crop layers. The account question is answered at the base file's oldest visible upload, after both pivots. The talk-page step sits beside that account finding because a relationship claim needs separate support. The graphic ends at the reported puzzle answer; it does not turn the platform account into a verified person.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<table>
+<thead>
+<tr>
+<th>Ref</th>
+<th>Source</th>
+<th>Use and limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R1</td>
+<td><a href="https://commons.wikimedia.org/wiki/Help:Files">Commons Help:Files</a></td>
+<td>Commons file pages and their visible version history.</td>
+</tr>
+<tr>
+<td>R2</td>
+<td><a href="https://www.mediawiki.org/wiki/API:Imageinfo">MediaWiki API:Imageinfo</a></td>
+<td><code>user</code>, <code>timestamp</code>, <code>comment</code>, limits, hidden fields, and continuation.</td>
+</tr>
+<tr>
+<td>R3</td>
+<td><a href="https://www.mediawiki.org/wiki/API:Parsing_wikitext">MediaWiki API:Parsing wikitext</a></td>
+<td>Optional retrieval of a derivative file's description source; not run in the puzzle.</td>
+</tr>
+<tr>
+<td>R4</td>
+<td><a href="https://en.wikipedia.org/wiki/Wikipedia:Conflict_of_interest">Wikipedia:Conflict of interest</a></td>
+<td>Editorial context; a policy page cannot corroborate one account's identity.</td>
+</tr>
+<tr>
+<td>R5</td>
+<td><a href="https://commons.wikimedia.org/wiki/Commons:Derivative_works">Commons:Derivative works</a></td>
+<td>General derivative-work context; a recorded parent link must be checked on the file itself.</td>
+</tr>
+<tr>
+<td>R6</td>
+<td><a href="https://commons.wikimedia.org/wiki/Template:Derived_from/Machine-readable">Commons:Derived from template</a></td>
+<td>Example of a machine-readable parent link on a Commons derivative.</td>
+</tr>
+<tr>
+<td>R7</td>
+<td><a href="https://attack.mitre.org/techniques/T1593/">MITRE ATT&amp;CK T1593</a></td>
+<td>Analogy for public-site reconnaissance in an adversarial case; no such case was observed here.</td>
+</tr>
+</tbody>
+</table>
+<p>These references document the method and its limits. The reported accepted answer remains a challenge-record outcome that I cannot independently replay from the retained case identifiers.</p>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
