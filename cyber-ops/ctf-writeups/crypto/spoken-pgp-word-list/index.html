@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Voicemail That Read the Ciphertext - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="I turned a long voicemail into 417 bytes of OpenPGP armor, repaired transcription errors with parity and checksum checks, and decrypted the message with its integrity check intact.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/spoken-pgp-word-list/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Voicemail That Read the Ciphertext">
+  <meta property="og:description" content="I turned a long voicemail into 417 bytes of OpenPGP armor, repaired transcription errors with parity and checksum checks, and decrypted the message with its integrity check intact.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/spoken-pgp-word-list/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Crypto / <span aria-current="page">The Voicemail That Read the Ciphertext</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Voicemail That Read the Ciphertext</h1>
+        <p class="lead">The caller did not read a secret aloud. They read the encrypted message one word at a time.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Recover a PGP-encrypted flag from a voicemail, an armored private key, and a passphrase.</p>
+<p><strong>What I did.</strong> I identified the alternating PGP Word List, rebuilt the armor, corrected uncertain words against its format and CRC-24, then tested the remaining candidates with GnuPG.</p>
+<p><strong>The result.</strong> One of 17 checksum-matching repairs decrypted successfully and yielded the expected flag-format value.</p>
+<p><strong>The limit.</strong> No platform submission or sender signature was observed. The linked tools validate decoding and armor structure, not a production voice channel.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Voicemail; Word-list parity; OpenPGP armor; Candidate repair; Plaintext">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Voicemail</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">About eleven minutes of spoken words</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Word-list parity</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">One ordered word maps to each byte</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">OpenPGP armor</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">417 bytes; Base64 and CRC-24 checks</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Candidate repair</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">17 CRC matches; one valid decryption</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Plaintext</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">GnuPG integrity check passed</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Cryptography / Audio / OSINT</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Hard</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>PGP Word List, OpenPGP, ASCII armor, PKESK, RSA, speech-to-text, CRC-24, integrity-oracle error correction</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved</td>
+</tr>
+<tr>
+<td>Material</td>
+<td>Voicemail recording, armored private key, and passphrase</td>
+</tr>
+<tr>
+<td>Goal</td>
+<td>Reconstruct the encrypted message and recover the flag-format value</td>
+</tr>
+<tr>
+<td>Observed result</td>
+<td>417 spoken bytes reconstructed; 253-byte encrypted packet passed CRC-24; GnuPG reported successful decryption and a good MDC</td>
+</tr>
+<tr>
+<td>Boundary</td>
+<td>No platform acceptance or sender authentication was observed</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for validating an authorized voice-carried ciphertext: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/crypto/spoken-pgp-word-list/artifacts">view the tools on GitHub</a> and <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/crypto/spoken-pgp-word-list/fixtures">their synthetic fixtures</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>The challenge gave me an automated voicemail a little over eleven minutes long, an ASCII-armored private key, and the passphrase to unlock it. The caller was supposed to send a PGP-encrypted message but left a voicemail instead. I needed to get the ciphertext back out of the recording and decrypt it. No service was waiting for input, and the puzzle did not require a network target.</p>
+<p>The audio was the carrier. The key was there to finish the job once I had rebuilt the message. I treated the passphrase as key material and kept it out of commands and notes. The exercise itself did not describe an attacker or a compromised production system. A voice channel could carry data covertly in another setting, but that would be a separate investigation.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I first confirmed that the private key imported into an isolated keyring and could be unlocked. That mattered later. A failed decrypt would then point me back toward the reconstructed ciphertext before I blamed the passphrase.</p>
+<p>The recording ran for about 660.79 seconds. Short words arrived at a steady pace. Offline transcription gave me entries such as <code>button</code>, <code>clergyman</code>, <code>crusade</code>, and <code>determine</code>. The first alignment was the breakthrough: the leading hyphens of <code>-----BEGIN PGP MESSAGE-----</code> appeared as alternating words from two PGP lists. Five identical hyphen bytes still alternate because word choice depends on byte position.</p>
+<p>I converted the ordered words to bytes using even and odd offsets. The first pass did not decrypt. Some recognized words were truncated, merged, dropped, or confused with a near homophone. I went back to short audio crops and kept the corrections tied to their positions. The repaired sequence produced 417 bytes of CRLF-formatted armor, with five 64-character Base64 lines, one 20-character line, and a CRC-24 value of <code>B90860</code> over a 253-byte packet.</p>
+<p>Early ideas included NATO phonetics and Base64 characters spoken literally. Their token patterns offered no repeatable fit to the opening armor. A synthesized voice was also a poor match for labeling this recording. Parity and the packet format gave me testable constraints, so I stayed with those. I used faster-whisper for offline transcription and targeted crops; its output still needed manual audio review and cryptographic checks.</p>
+<p>The checksum narrowed the last errors but did not settle them. A bounded two-character repair search found 17 CRC-matching candidates. Candidate 004 alone decrypted successfully with the supplied key. GnuPG reported <code>DECRYPTION_OKAY</code> and <code>GOODMDC</code>. I recovered the flag-format plaintext from that result. I did not submit it to a platform in this record.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>I used local audio inspection, offline speech recognition, Python for the word mapping and CRC work, and GnuPG for the final decryption. The original recording was measured and converted to mono PCM for the recognizer. A direct file path into the speech library failed because of a PyAV argument mismatch; feeding FFmpeg-produced PCM let the transcription continue. That is a tool-path fix, not evidence about which words were spoken.</p>
+<p>The reusable <a href="artifacts/pgp_word_decoder.py">word decoder</a> takes one ordered word per line plus a complete <code>hex/even/odd</code> table. It stops at an unknown or wrong-parity word. The <a href="artifacts/armor_crc_check.py">armor checker</a> then checks the wrapper, strict Base64, and CRC-24. They are deliberately separate: a plausible transcript should not become accepted ciphertext simply because it looks like English.</p>
+<pre><code class="language-sh">python -B artifacts/pgp_word_decoder.py --wordlist wordlist.tsv --tokens words.txt --format ascii &gt; message.asc
+python -B artifacts/armor_crc_check.py message.asc
+</code></pre>
+<p>For the real message I also inspected the OpenPGP packet header, matched its recipient to the supplied subkey, and decrypted in an isolated GnuPG home. The key unlock was entered through a protected prompt. I did not put the passphrase on a command line. The <a href="artifacts/README.md">tool guide</a> covers the inputs, output, and limits of the public lab.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>The <a href="https://philzimmermann.com/docs/PGP_word_list.pdf">PGP Word List</a> has an even and an odd word for each byte from <code>00</code> to <code>FF</code>. Offset zero uses the even word. Offset one uses the odd word, and the pattern continues. The two lists were made easy to distinguish by ear. They help expose a skipped, repeated, or transposed word because the following parity will be wrong.</p>
+<p>The known vectors are small enough to check by hand: <code>topmost Istanbul</code> maps to <code>E5 82</code>, while <code>miser travesty</code> maps to <code>82 E5</code>. The first word in each pair comes from the even list. The spoken words in this case encoded the <strong>ASCII armor text</strong>, including hyphens, line breaks, Base64 characters, and checksum. They did not directly encode the encrypted packet bytes.</p>
+<p>Under <a href="https://www.rfc-editor.org/rfc/rfc4880">RFC 4880</a>, the legacy message armor wraps Base64 data in <code>BEGIN</code> and <code>END</code> lines and can include a CRC-24 line. The binary data inside contains OpenPGP packets. The first packet in this message was a Public-Key Encrypted Session Key, or PKESK, addressed to the supplied key. Its visible header gave me a useful alignment check for this packet form. The encrypted data packet carried a Modification Detection Code, or MDC.</p>
+<p>These checks answer different questions. Parity checks whether a word fits its position. Armor syntax and Base64 check text structure. CRC-24 detects many transcription mistakes in the binary body. GnuPG's successful decryption and good MDC check that the selected ciphertext was usable and intact. None of those steps identifies who left the voicemail. That would need separate trusted identity evidence or a verified signature.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>The first 27 spoken positions mapped to <code>-----BEGIN PGP MESSAGE-----</code>. I could then hold the expected line structure against the rest of the transcript. After targeted corrections, the 417 spoken words became 417 armor bytes. Five full Base64 lines and a final 20-character line decoded to 253 packet bytes. Their computed CRC-24 matched the spoken checksum, <code>B90860</code>.</p>
+<p>I initially had a structurally plausible candidate with a different CRC. A wrong-key-style RSA error from an early decryption did not prove the supplied key was wrong; corruption in the encrypted session-key bytes can produce the same symptom. I searched the uncertain Base64 positions within the parity and format limits. The bounded search tried 21,294 single substitutions, found none with the target CRC, and produced 17 two-change CRC matches. This is why I did not stop at the checksum.</p>
+<p>I tested those 17 candidates with the supplied key. Sixteen failed. Candidate 004 returned a 42-byte plaintext, and GnuPG emitted <code>DECRYPTION_OKAY</code> and <code>GOODMDC</code>. Its recovered armor also matched the independently reconstructed word sequence after line-ending normalization. The plaintext contained the expected flag-format value. The actual value stays out of this public record.</p>
+<p>The proof is local decryption and integrity, with two explicit limits. CRC-24 is an error detector, not authentication. The MDC on this legacy packet detects modification after decryption; no sender signature or platform acceptance was observed.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned</summary>
+<p>The recording became manageable when I stopped treating it as ordinary speech. Its timing suggested one symbol per word, and the alternating words for repeated hyphens gave me a byte-level hypothesis. The first 25 positions tested it immediately.</p>
+<p>The recognizer was useful for collecting candidates, especially across eleven minutes of audio. It also made errors that looked like reasonable English. I kept the raw guesses, replayed uncertain spans, and let parity, line length, CRC, packet header, and decryption each do a different part of the verification. The early RSA error was a reminder that a corrupt ciphertext can look like a key problem.</p>
+<p>I would wire those checks together sooner on another recording. Automatic corrections still need an audit trail: which spoken segment changed, what the candidates were, and which invariant rejected each one. A matching CRC alone would not let me skip the final integrity check.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Operational Extrapolation</summary>
+<h3>Individual Practitioner Development</h3>
+<p>This exercise made me work across audio processing and OpenPGP internals without treating either as a black box. I can now explain how the word-list parity detects a shifted transcript, how the armored body reaches packet bytes, and why the key-assisted result settles an ambiguity that speech recognition cannot. The next skill to build is an automated candidate review that preserves every correction and its reason.</p>
+<h3>Security Operations</h3>
+<p>The challenge supplied no endpoint logs, exfiltration, or malicious actor. I would not attach an ATT&amp;CK detection rule to it. If a real team encountered an unusual spoken data channel, the first job would be to preserve the recording and establish authorization and context. The <a href="artifacts/voice_transmission_review.md">voice-transmission review checklist</a> covers that human work and the separation between checksum, message integrity, and sender identity. Audio collection and speech analytics would be required before a production detection claim could even be tested.</p>
+<h3>Intelligence Operations</h3>
+<p>A spoken word list is useful for cooperative fingerprint comparison, and the same encoding could carry arbitrary bytes. This case demonstrates the mechanics, not an intelligence lead. I have no actor, destination, campaign, or infrastructure IOC to share. A real collection assessment would need the source of the recording, consent or authority to analyze it, and independent corroboration of any suspected covert transfer.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The <a href="artifacts/pgp_word_decoder.py">decoder</a> checks a complete external word table and strict even/odd position before returning bytes. The <a href="artifacts/armor_crc_check.py">armor checker</a> reads those bytes as legacy <code>PGP MESSAGE</code> armor, validates Base64 and CRC-24, and reports packet size and hash. Both are standard-library Python and cap input size. The <a href="artifacts/README.md">README</a> documents their inputs, outputs, usage, and boundaries. The <a href="artifacts/voice_transmission_review.md">review checklist</a> adds a safe process for a real authorized voice transmission.</p>
+<p>The <a href="artifacts/test_tools.py">tests</a> use a full but <a href="fixtures/synthetic_wordlist.tsv">synthetic word table</a> and a two-word <a href="fixtures/synthetic_words.txt">synthetic transcript</a>. The <a href="fixtures/sample_armor.asc">valid armor-shaped fixture</a> and <a href="fixtures/bad_crc_armor.asc">altered-CRC fixture</a> exercise the checksum path. Their decoded body is <code>REVIEW ONLY</code>, not an OpenPGP packet. They must never be presented as decryptable ciphertext.</p>
+<p>Six tests passed: ordinary decoding, wrong parity, two published word vectors, a duplicate-table rejection, a matching and mismatching CRC, and malformed armor. I also ran the decoder against the retained 417-word corrected sequence. It reproduced the recovered armor byte for byte after line-ending normalization. The armor checker reported 253 packet bytes and CRC-24 <code>B90860</code>. That verifies the tool logic against this case's retained data. It does not validate the original speech recognizer or a production audio pipeline.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Applicability and Mapping</summary>
+<p>I assessed ATT&amp;CK applicability and left it unmapped. The challenge was a cooperative decoding puzzle; no adversary action was observed. Labeling the voicemail as exfiltration or command and control would turn an analogy into a finding. D3FEND, CAPEC, STRIDE, and OWASP technique mappings would have the same problem here.</p>
+<p>The useful technical reference is <a href="https://www.rfc-editor.org/rfc/rfc4880">RFC 4880</a>, which describes the armor, packet structure, CRC-24, and legacy MDC used in the recovered message. The <a href="https://www.rfc-editor.org/rfc/rfc9580">current OpenPGP specification, RFC 9580</a>, exists for modern protocol work; I describe the packet form this exercise actually used.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intelligence and Standards Integration</summary>
+<p>I have no case-supported IOC, infrastructure, attack pattern, or actor. A STIX bundle would have nothing honest to encode, and there is no TAXII exchange. The protocol standard still matters because its format invariants made error correction possible. The <a href="artifacts/armor_crc_check.py">armor checker</a> implements only the wrapper and checksum checks needed for that step; a maintained OpenPGP implementation handled packet parsing and decryption.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<p>No production system or adversarial control failure was in scope. The exercise key was supplied for the solve, so its passphrase is not evidence of a real organization's key-management practice. In a real use of a voice-carried encrypted message, I would protect the private key, keep passphrases out of logs, and verify a sender signature separately if sender identity matters. <a href="https://pages.nist.gov/800-63-4/sp800-63b/authenticators/">NIST SP 800-63B</a> discusses locally used activation secrets in a different digital-identity context; I do not claim this puzzle was an implementation of that standard.</p>
+<p>The <a href="artifacts/voice_transmission_review.md">review checklist</a> is a proposed process, not a deployed control. The decoder and armor checker passed local tests, but neither enforces organizational policy or protects a private key.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>The challenge's artifacts were the recording, reconstructed armored text, packet, and decrypted plaintext. They are evidence of a decoding chain, not IOCs. No YARA rule, Sigma rule, KQL query, or SPL search follows from the exercise alone.</p>
+<p>If I had to assess a suspected voice channel in the wild, I would need an authorized audio source and a way to compare recordings with known benign calls. A candidate detector might count long runs of alternating PGP-list words, but it would need an audio model, transcript confidence, expected-use context, and measured false positives. I did not build or test such a detector. The practical local validation here is narrower: wrong-parity words stop the decoder, bad CRC exits with a mismatch, and a good CRC still needs packet and cryptographic checks.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow diagram above</a> shows where noisy speech ended and exact validation began. It moves from the recording through parity, armor, checksum-constrained repairs, and the one integrity-checked decryption. It does not include a platform acceptance step because none was observed.</p>
+<p>The fork at the checksum matters more than it looks. Seventeen candidate messages matched CRC-24. Only the key-assisted decryption resolved that ambiguity. A clean-looking transcript or one matching checksum could not have done it alone.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<table>
+<thead>
+<tr>
+<th>Ref</th>
+<th>Source</th>
+<th>Use and limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>REF.001</td>
+<td><a href="https://en.wikipedia.org/wiki/PGP_word_list">PGP Word List overview</a></td>
+<td>Historical context and published vectors; the author-hosted table below supplies the exact mapping.</td>
+</tr>
+<tr>
+<td>REF.002</td>
+<td><a href="https://github.com/thblt/pgp-words">thblt pgp-words implementation</a></td>
+<td>Independent byte-indexed even/odd implementation.</td>
+</tr>
+<tr>
+<td>REF.003</td>
+<td><a href="https://www.rfc-editor.org/rfc/rfc4880">IETF RFC 4880, OpenPGP Message Format</a></td>
+<td>Armor, PKESK, CRC-24, and legacy MDC.</td>
+</tr>
+<tr>
+<td>REF.004</td>
+<td><a href="https://doi.org/10.1109/ICSLP.1996.607046">Juola and Zimmermann, Whole-Word Phonetic Distances and the PGPfone Alphabet</a></td>
+<td>Design of the spoken word-list scheme.</td>
+</tr>
+<tr>
+<td>REF.005</td>
+<td><a href="https://alphacephei.com/vosk/">Vosk offline speech recognition</a></td>
+<td>An alternative offline front end; I used faster-whisper for this solve.</td>
+</tr>
+<tr>
+<td>REF.006</td>
+<td><a href="https://philzimmermann.com/docs/PGP_word_list.pdf">Published PGP Word List table</a></td>
+<td>Exact even/odd byte words and known vectors.</td>
+</tr>
+<tr>
+<td>REF.007</td>
+<td><a href="https://github.com/SYSTRAN/faster-whisper">faster-whisper project</a></td>
+<td>Offline recognizer used for the recorded transcription path; its guesses required correction.</td>
+</tr>
+<tr>
+<td>REF.008</td>
+<td><a href="https://www.rfc-editor.org/rfc/rfc9580">IETF RFC 9580, OpenPGP</a></td>
+<td>Current protocol context, separate from the legacy packet form in this exercise.</td>
+</tr>
+</tbody>
+</table>
+<p>I checked the protocol and word-list references on 2026-10-11. The result reported here is a local integrity-checked decryption. Sender identity and platform acceptance remain unverified.</p>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
