@@ -472,5 +472,28 @@
     ],
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/crypto/two-symbol-cryptogram/"
+  },
+  {
+    "title": "The Gate That Stored Its Own Answer",
+    "category": "Reversing",
+    "difficulty": "Easy",
+    "date": "2026-10",
+    "tags": [
+      "static analysis",
+      "ELF",
+      "x86-64",
+      "single-byte XOR",
+      "known-key recovery",
+      "hard-coded secret",
+      "binary reversing"
+    ],
+    "summary": "I read an intact ELF main function, inverted its hard-coded one-byte XOR check, and confirmed the recovered response reached the local success branch.",
+    "aliases": [
+      "authentication gate",
+      "embedded password",
+      "XOR constant table"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/reversing/xor-auth-gate/"
   }
 ]

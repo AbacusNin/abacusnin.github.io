@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Gate That Stored Its Own Answer - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="I read an intact ELF main function, inverted its hard-coded one-byte XOR check, and confirmed the recovered response reached the local success branch.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/reversing/xor-auth-gate/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Gate That Stored Its Own Answer">
+  <meta property="og:description" content="I read an intact ELF main function, inverted its hard-coded one-byte XOR check, and confirmed the recovered response reached the local success branch.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/reversing/xor-auth-gate/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Reversing / <span aria-current="page">The Gate That Stored Its Own Answer</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Gate That Stored Its Own Answer</h1>
+        <p class="lead">The program asked for a secret response. It also carried every value I needed to recover that response.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Recover the exact phrase accepted by a local x86-64 ELF authentication gate and place it in the event&#x27;s flag wrapper.</p>
+<p><strong>What I did.</strong> I located main, read the input and comparison loop, inverted the literal XOR value and table, and checked the length before one local confirmation run.</p>
+<p><strong>The result.</strong> The case record reports that the recovered phrase produced the welcome banner and ASCII art locally.</p>
+<p><strong>The limit.</strong> The raw phrase, flag, and event submission transcript are withheld. Static inspection of the retained ELF confirms the inversion but does not replay the reported run.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Input; Length; Loop; Compare; Inverse; Confirm">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Input</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Read a line, strip trailing newline</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Length</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Require 46 characters</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Loop</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">XOR each byte with one fixed value</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Compare</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Match the inline expected table</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Inverse</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">XOR the table with the same value</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Confirm</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Reported local success branch</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Reverse Engineering / Cryptography</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Easy</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>static analysis, ELF, x86-64, single-byte XOR, known-key recovery, hard-coded secret, binary reversing</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved</td>
+</tr>
+<tr>
+<td>Available material</td>
+<td>One statically linked, non-stripped x86-64 ELF with an intact <code>main</code> symbol</td>
+</tr>
+<tr>
+<td>Goal</td>
+<td>Recover the exact accepted response for the event's flag wrapper</td>
+</tr>
+<tr>
+<td>Reported result</td>
+<td>Recovered response took the binary's local success branch</td>
+</tr>
+<tr>
+<td>Verification boundary</td>
+<td>The ELF supports static recovery; no event acceptance transcript is retained</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for reviewing an embedded authentication gate: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/reversing/xor-auth-gate/artifacts">browse the recovery helper, review guide, and synthetic fixture on GitHub</a> and <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/reversing/xor-auth-gate/fixtures">the fixture folder</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>The challenge gave me one Linux executable and a short question on standard input. A correct line brought up a welcome banner and ASCII art. A wrong line was rejected. I needed the exact response so I could put it inside the event's flag wrapper.</p>
+<p>The executable was an x86-64 ELF, statically linked and non-stripped. I could inspect it and run it locally, but there was no source code or network service. This was a puzzle, with no observed attacker or defended deployment. The same design in shipped software would raise a real question about an embedded credential. I treat that as an operational use of the technique, separate from what happened in the challenge.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I started with <code>file</code>, <code>nm</code>, and <code>readelf</code>. The intact <code>main</code> symbol gave me a direct place to look. I disassembled that function with <code>objdump</code> in Intel syntax and followed the input path: read a line, strip a trailing newline if present, check its length, and compare one transformed byte at a time against a table built on the stack.</p>
+<p>The length comparison fixes the accepted response at 46 characters. The loop applies the same literal one-byte XOR value at each position and checks it against 46 literal table entries. Both sides of that comparison were visible in <code>main</code>. I transcribed the values, XORed the table with the same byte, and got a printable phrase of the required length. The case record says I fed that phrase to the executable once and saw the success banner and ASCII art. It does not retain an event submission or acceptance transcript.</p>
+<p>This solve had no useful dead end to disguise as a lesson. Static analysis gave me the answer directly. The only manual step likely to cause trouble was copying a long table from disassembly; one wrong value would spoil a character even though the algebra was sound.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>These are the triage commands from the solve. They keep the scope at the binary and its <code>main</code> function:</p>
+<pre><code class="language-sh">file ./authenticator
+nm ./authenticator | awk '$3==&quot;main&quot;'
+readelf -h ./authenticator
+objdump -d -M intel ./authenticator | sed -n '/&lt;main&gt;:/,/ret/p'
+</code></pre>
+<p>In the disassembly, I looked for the line read, a test for the final <code>0x0a</code> newline, the <code>strlen</code> comparison, stack assignments for the expected table, and the loop's <code>xor</code> followed by <code>cmp</code>. The length gate in the retained binary is <code>cmp rax, 0x2e</code>, which is 46 in decimal. The success and failure branches follow the comparison loop. I kept the literal XOR byte and table out of this public page because together they disclose the response.</p>
+<p>The inverse itself is small: for each expected byte, <code>input_byte = expected_byte ^ key</code>. I reconstructed a <a href="artifacts/xor_recover.py">standard-library recovery helper</a> around that equation. It takes a JSON table and a one-byte key, checks the claimed length, and reports the output length and hash by default. The <code>--reveal</code> option prints the recovered text when an authorized analyst needs it. The <a href="artifacts/README.md">guide</a> has the exact commands and limits. The <a href="fixtures/example_expected.json">invented fixture</a> contains a different 19-byte phrase, so the public files do not disclose the challenge response.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>XOR is its own inverse. If a program checks <code>input[i] ^ key == expected[i]</code>, I can recover that input byte as <code>expected[i] ^ key</code>. Applying XOR again returns the original table value. The program's mask was one byte reused at every position and stored as a literal. The comparison table was stored as literals too. There was no key search to perform.</p>
+<p>The non-stripped symbol made the check easy to find; static linking made the executable large but did not hide <code>main</code>. Stripping symbols would slow the first step without making an embedded secret safe. The length check matters because it tells me how many table entries the program intends to compare. The retained ELF has 46 entries and a 46-character gate. The recovered bytes are printable ASCII, so the signed extension of an input byte in the comparison loop does not change this case's result. High-bit bytes would require a closer look at C integer promotion and the comparison width.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>The gate has two conditions after it removes one trailing newline. First, <code>strlen(input)</code> must equal 46. Then, at every position, the signed input byte is XORed with a fixed integer and compared with one dword table entry. A mismatch clears the success state and exits the loop. If the length and every comparison pass, the program prints the success material.</p>
+<p>I did not have to guess the phrase. The key and table are literal assignments in the same function. Inverting each entry gives a candidate byte; 46 such bytes form the response. Static inspection of the retained ELF independently confirms the 46 entries, the one-byte literal, the <code>strlen</code> gate, and a printable 46-byte inverse that round trips to every table entry. That verifies the recovery computation. The source reports one local success run, which I did not repeat while preparing this page. I have no scoreboard record to claim an accepted flag.</p>
+<p>The trust boundary explains why this design would fail in a deployed client. A caller who controls the executable can read the values that the client uses to decide whether to grant access. Encoding those values with a reversible transform changes their appearance in a string search, but the client still carries the entire decision. The challenge demonstrates that local recoverability; it does not establish any product vulnerability or exposed account outside the puzzle.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned</summary>
+<p>I saved time by reading the obvious pieces in order. <code>file</code> and symbol lookup told me what kind of object I had. The disassembly then gave me the complete check. I did not need a debugger or 256-key brute force after finding the literal byte.</p>
+<p>The length gate was my quick sanity check. If the inverse had produced 45 or 47 bytes, I would have gone back to the table transcription before trying candidates. A small <a href="artifacts/xor_recover.py">offline helper</a> now handles the inverse and length check, leaving the human work where it belongs: proving that the constants feed an authentication branch rather than an unrelated lookup table.</p>
+<table>
+<thead>
+<tr>
+<th>In this puzzle</th>
+<th>In a software review</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>main</code> and the compare loop were visible</td>
+<td>Trace the input, transform, table, and access decision together</td>
+</tr>
+<tr>
+<td>One fixed byte masked every character</td>
+<td>Treat reversible local masks as recoverable by a binary holder</td>
+</tr>
+<tr>
+<td>A 46-character length gate fixed the table size</td>
+<td>Check loop bounds and input handling before extracting a credential</td>
+</tr>
+<tr>
+<td>A local run reportedly reached the success branch</td>
+<td>Validate the actual product boundary and rotate exposed secrets if needed</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Operational Extrapolation</summary>
+<h3>Individual Practitioner Development</h3>
+<p>This was good practice in reading an ELF without overcomplicating it. I traced a line from input to branch, recognized the stack table, and used a small algebraic inverse. A more demanding next case would derive the byte at runtime or scatter table construction across functions. That would make dynamic observation useful, but this binary never required it.</p>
+<h3>Security Operations</h3>
+<p>The puzzle had no host logs or network activity to hunt. In a real malware or application triage, the same static-first habit could recover embedded configuration or an authentication value before an analyst decides whether execution is necessary. I would preserve the binary, its hash, instruction addresses, and the exact input-to-branch path. A recovered string alone cannot tell me whether it protects a product feature, serves as a test fixture, or is merely data. The <a href="artifacts/static_gate_review.md">review checklist</a> makes those questions explicit.</p>
+<h3>Intelligence Operations</h3>
+<p>A captured tool with a similar local check might reveal how an operator unlocks it or how it guards stored material. That is a possible application of the method, not a finding from this challenge. I would still need provenance for the binary and evidence that the recovered value was used by an actor. The puzzle gives me neither.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The <a href="artifacts/xor_recover.py">XOR recovery helper</a> handles the narrow, reusable part of the solve. It accepts a bounded JSON file with <code>key</code>, <code>length</code>, and <code>expected</code> bytes. It validates the byte ranges and table length before inversion. By default it prints length, printable-ASCII status, and SHA-256, keeping any recovered credential out of routine terminal output. <code>--reveal</code> is an explicit private-session choice.</p>
+<p>The <a href="artifacts/README.md">README</a> documents the format, invocation, and limits. The <a href="fixtures/example_expected.json">19-byte synthetic fixture</a> gives a safe positive case. The <a href="artifacts/test_xor_recover.py">four local tests</a> cover recovery and round trip, a benign two-byte table that the tool does not classify as authentication, a length near miss, and malformed byte/key input. The <a href="artifacts/static_gate_review.md">static review checklist</a> tells an analyst what to prove before calling a real binary vulnerable and how to handle a recovered credential. These files were built for this page. They do not contain the challenge's literal table or response, and their synthetic checks do not replay its reported run.</p>
+<p>I would use the helper after locating a true comparison loop. It cannot discover one. That distinction prevents a common analytical mistake: a sequence of XORs and constants somewhere in a binary does not by itself establish an authentication weakness.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Applicability and Mapping</summary>
+<p>The challenge showed no adversary action against a live system, so I cannot assign an observed MITRE ATT&amp;CK technique. I also have no defended deployment for D3FEND, no attack pattern for CAPEC, and no application data flow for STRIDE or OWASP. Those frameworks might matter in a separate product review, but this file does not supply that case.</p>
+<p>The hard-coded gate does give a useful <strong>design analogy</strong> for real software. <a href="https://cwe.mitre.org/data/definitions/798.html">CWE-798</a> covers a product that checks input against embedded credentials. This binary has that shape; it is a purpose-built puzzle rather than a deployed authentication product. <a href="https://cwe.mitre.org/data/definitions/321.html">CWE-321</a> is a weaker fit here. The literal byte is an XOR mask for a comparison table. I did not observe a cryptographic key protecting data, so I would not report a separate CWE-321 finding from this challenge. The table below records both decisions without calling either a product vulnerability.</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Case fit</th>
+<th>Operational use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CWE-798</td>
+<td>The local gate compares against a recoverable embedded response</td>
+<td>Check a shipped product's real access boundary before making a finding</td>
+</tr>
+<tr>
+<td>CWE-321</td>
+<td>A literal XOR mask exists, but no encryption use was observed</td>
+<td>Revisit only if a separate case shows a hard-coded key used for cryptographic protection</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intelligence and Standards Integration</summary>
+<p>The binary supplies no command-and-control address, infrastructure, campaign, or observed adversary. The response is a puzzle answer. I have no IOC to express as STIX and no TAXII exchange to report. A real analysis of a captured binary could produce intelligence if the extracted value linked to other evidence. I would keep that evidence and confidence separate from the algebra that recovered the bytes.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<p>I cannot claim a failed NIST, CIS, or STIG control for a standalone challenge. If this exact pattern appeared in software used to protect a real resource, the owner would need to move the trusted access decision out of a client that the caller can inspect. Server-side verification, a rotatable credential, and limits on the account's privileges would address different parts of that risk. Per-installation values could limit how many copies one extracted response unlocks; they would still be recoverable from a client that holds and checks them locally.</p>
+<p>The <a href="artifacts/static_gate_review.md">review checklist</a> asks for the resource, shared-installation scope, and true authorization boundary before recommending a fix. Nothing here was deployed or measured against production software.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>The case artifact is the ELF. Its main function, stack table, literal XOR value, 46-byte length check, and grant branch are static analysis evidence. They are not IOCs. No realistic sensor event came with the puzzle, so a Sigma, KQL, or SPL rule would have no defined log source or test data.</p>
+<p>For a real release pipeline, I would review any client-side authentication gate that carries a fixed compare table and reversible transform. A credible static gate would have to prove data flow from user input through the transform to a privileged branch, then test benign lookup tables and changed loop bounds as negative cases. The <a href="artifacts/static_gate_review.md">checklist</a> is the manual version of that review; I have not built or validated an automatic binary scanner. The <a href="artifacts/test_xor_recover.py">recovery tests</a> show the inverse works on invented bytes. They cannot measure false positives for a detection rule.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow diagram above</a> shows the two checks in the order the executable applies them. Its inverse step goes backward from the fixed table and key to the response. The success box reflects the reported local run. The diagram leaves out the literal byte, table, and phrase.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<table>
+<thead>
+<tr>
+<th>Ref</th>
+<th>Source</th>
+<th>Use and limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>REF-1</td>
+<td><a href="https://cwe.mitre.org/data/definitions/798.html">MITRE CWE-798: Use of Hard-coded Credentials</a></td>
+<td>Design analogy for a real inbound authentication check with embedded credentials; no deployed product was tested here.</td>
+</tr>
+<tr>
+<td>REF-2</td>
+<td><a href="https://cwe.mitre.org/data/definitions/321.html">MITRE CWE-321: Use of Hard-coded Cryptographic Key</a></td>
+<td>Considered and not assigned as a separate finding because this byte acts as a comparison mask.</td>
+</tr>
+</tbody>
+</table>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
