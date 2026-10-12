@@ -1,0 +1,23 @@
+title: HTTP Method in SSH Protocol Version Error
+id: 1889c79f-6af6-4dfc-af47-1a41c93c1eb2
+status: experimental
+description: An SSH listener logged an HTTP-like banner during protocol exchange.
+logsource:
+  product: linux
+  service: sshd
+detection:
+  selection:
+    message|contains: 'Bad protocol version identification'
+  method:
+    message|contains:
+      - "'GET "
+      - "'POST "
+      - "'HEAD "
+      - "'CONNECT "
+      - "'PRI "
+  condition: selection and method
+falsepositives:
+  - Authorized network scanning or a misdirected health check
+level: informational
+tags:
+  - attack.t1595

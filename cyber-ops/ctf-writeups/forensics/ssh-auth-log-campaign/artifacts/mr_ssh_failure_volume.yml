@@ -1,0 +1,30 @@
+title: SSH Failed Password Event
+id: 8f80cf71-f0d6-4ebf-a305-4870e1363866
+name: ssh_failed_password
+logsource:
+  product: linux
+  service: sshd
+detection:
+  selection:
+    message|contains: 'Failed password for '
+  condition: selection
+---
+title: SSH Failure Volume by Source
+id: d8602c70-0377-4d88-87a7-a93fbd552546
+status: experimental
+description: More than 50 password failures from one source to one host in ten minutes.
+correlation:
+  type: event_count
+  rules:
+    - ssh_failed_password
+  group-by:
+    - src_ip
+    - host
+  timespan: 10m
+  condition:
+    gt: 50
+falsepositives:
+  - Stale automation credentials or an authorized test
+level: medium
+tags:
+  - attack.t1110.001

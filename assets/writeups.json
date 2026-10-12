@@ -1163,5 +1163,27 @@
     ],
     "status": "Solved - all flags captured",
     "url": "/cyber-ops/ctf-writeups/forensics/merchant-code-pivot/"
+  },
+  {
+    "title": "The 618 Lines My First Regex Missed",
+    "category": "Forensics",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "ssh-brute-force",
+      "auth-log",
+      "syslog-parsing",
+      "threat-hunting",
+      "multi-service-exposure",
+      "asn-attribution"
+    ],
+    "summary": "I counted nearly 1.8 million Linux authentication-log lines, then found that my clean-looking service query had silently skipped an FTP daemon. The correction changed the inventory and the way I would monitor it.",
+    "aliases": [
+      "Linux secure log",
+      "SSH password guessing",
+      "FTP log coverage"
+    ],
+    "status": "Solved-Verified",
+    "url": "/cyber-ops/ctf-writeups/forensics/ssh-auth-log-campaign/"
   }
 ]

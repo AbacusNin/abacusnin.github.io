@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The 618 Lines My First Regex Missed - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="I counted nearly 1.8 million Linux authentication-log lines, then found that my clean-looking service query had silently skipped an FTP daemon. The correction changed the inventory and the way I would monitor it.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/ssh-auth-log-campaign/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The 618 Lines My First Regex Missed">
+  <meta property="og:description" content="I counted nearly 1.8 million Linux authentication-log lines, then found that my clean-looking service query had silently skipped an FTP daemon. The correction changed the inventory and the way I would monitor it.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/ssh-auth-log-campaign/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Forensics / <span aria-current="page">The 618 Lines My First Regex Missed</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The 618 Lines My First Regex Missed</h1>
+        <p class="lead">My first service count looked tidy: one daemon, 1,782,247 lines. The file had 1,782,865 lines. Those missing 618 were the important part.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Triage one month of Linux authentication logs for exposed services, targeted accounts, unusual protocol traffic, dominant sources, and infrastructure ownership.</p>
+<p><strong>What I did.</strong> I counted the file, tested the service parser against that total, ranked password failures and connection closures, examined HTTP-like SSH banners, and traced the dominant address to a published prefix listing.</p>
+<p><strong>The result.</strong> The corrected service inventory included sshd and an FTP daemon. Root led password failures; one address led closure volume. The ASN finding remained secondary-source enrichment.</p>
+<p><strong>The limit.</strong> The recorded solve did not test accepted logins, cross-service source overlap, or hourly behavior. The linked defensive tools are tested on synthetic records only.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bound the log; Check service coverage; Rank authentication failures; Read the SSH mismatch; Fix source extraction; Qualify network ownership">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Bound the log</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">1,782,865 lines across about 30 days</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Check service coverage</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">First parser misses 618 FTP lines</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Rank authentication failures</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Root leads with 184,393 failures</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Read the SSH mismatch</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">HTTP-like request at the SSH listener</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Fix source extraction</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Closure template says by, not from</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Qualify network ownership</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Published prefix listings suggest an AS</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Forensics - Linux authentication logs</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>ssh-brute-force, auth-log, syslog-parsing, threat-hunting, multi-service-exposure, asn-attribution</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved-Verified</td>
+</tr>
+<tr>
+<td>Recorded result</td>
+<td>1,782,865 lines; 1,782,247 <code>sshd</code> lines and 618 FTP-daemon lines; 184,393 failed passwords for <code>root</code>; top closure source 150,314, next 32,174.</td>
+</tr>
+<tr>
+<td>Evidence boundary</td>
+<td>The counts are recorded case results. The later defensive examples use synthetic records and do not rerun the full challenge log.</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/ssh-auth-log-campaign/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>Analytical Attack Chain (Overview)</h2>
+<pre><code class="language-mermaid">flowchart LR
+    A[Bound the auth log] --&gt; B[Count every service]
+    B --&gt; C[Catch 618 skipped FTP lines]
+    C --&gt; D[Rank failed users and sources]
+    D --&gt; E[Read HTTP-like SSH errors]
+    E --&gt; F[Check closure template]
+    F --&gt; G[Qualify ASN source]
+    G --&gt; H[Hunt for success and overlap]
+</code></pre>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I had one artifact: a roughly 180 MB <code>/var/log/secure</code> file from an internet-facing, RHEL-like Linux host. It covered about 30 days and contained 1,782,865 lines. There was no SIEM view, packet capture, host configuration, or live target. The questions were practical: which services wrote to this file, which accounts were hit hardest, what odd traffic reached SSH, which address dominated, and whose network that address belonged to.</p>
+<p>The shape of the traffic suggested automated password guessing from outside the host. That is a working hypothesis, not a claim that an actor got in. A log of failed attempts can tell me who tried; it takes success records and more context to establish whether the authentication boundary was crossed. The FTP daemon mattered for the same reason. Its presence was observed, but this record did not determine whether it was authorized, whether its users were attacked, or whether its source addresses overlapped the SSH activity.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I worked offline. The one outbound step was the later ASN lookup. I kept each attempted route because the two failed regular expressions explain how an ordinary triage query can turn into a confident wrong answer.</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>What I did</th>
+<th>What came back</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ST.1</td>
+<td>Extracted <code>secure_log.zip</code>, counted lines, checked the ends of the file.</td>
+<td>1,782,865 lines over about 30 days.</td>
+</tr>
+<tr>
+<td>ST.2a</td>
+<td>Extracted a service only when its name was followed by <code>[pid]</code>.</td>
+<td><code>sshd</code> looked like the only service, but the count was 618 short. Rejected.</td>
+</tr>
+<tr>
+<td>ST.2</td>
+<td>Ended the service name at either <code>[</code> or <code>:</code>.</td>
+<td><code>sshd</code> 1,782,247 plus FTP daemon 618, exactly the file total.</td>
+</tr>
+<tr>
+<td>ST.3</td>
+<td>Captured names after both <code>for user</code> and <code>for invalid user</code>.</td>
+<td><code>root</code> had 184,393 failed-password lines; the leading non-root name had 4,208.</td>
+</tr>
+<tr>
+<td>ST.4</td>
+<td>Searched for <code>http</code>, then read the actual SSH diagnostic and request bytes.</td>
+<td>HTTP-like methods appeared in a protocol-version error.</td>
+</tr>
+<tr>
+<td>ST.5a</td>
+<td>Looked for closure addresses after <code>from</code>.</td>
+<td>Empty result. Wrong message template. Rejected.</td>
+</tr>
+<tr>
+<td>ST.5</td>
+<td>Read addresses after <code>Connection closed by</code>.</td>
+<td>Top address 150,314 closures; second 32,174, about 4.67 times lower.</td>
+</tr>
+<tr>
+<td>ST.6a/b</td>
+<td>Tried local <code>whois</code>, then an HTTP lookup service.</td>
+<td><code>whois</code> was absent; egress policy blocked the API.</td>
+</tr>
+<tr>
+<td>ST.6</td>
+<td>Compared published prefix listings for the redacted address.</td>
+<td>A covering <code>/16</code> was attributed to the same redacted AS in several listings. This was secondary-source enrichment.</td>
+</tr>
+</tbody>
+</table>
+<p>The closure count is a count of log messages, not 150,314 distinct attempts. I never saw a transcript establishing successful authentication for the address. The AS identifies infrastructure associated with a prefix at a point in time; it cannot identify the person operating a cloud instance.</p>
+<h3>Methodology note: ST.2a, the failure that looked like a success</h3>
+<p>The first service expression required a process name immediately followed by a PID bracket. It ran without error and produced <code>1,782,247 sshd</code>. That result looked reasonable in an SSH-heavy log. I only caught the omission because I had already counted every line. The subtraction was simple: 1,782,865 minus 1,782,247 equals 618. The FTP daemon used a bare colon after its process name, so the lookahead never matched it.</p>
+<p>I changed the terminator to accept <code>[</code> or <code>:</code> and recounted. This time the service buckets summed to the file total. That check made the negative claim, "nothing else is here," defensible. The separate ST.5a error was easier to spot because it returned nothing at all. A parser that returns plausible but incomplete output is the more dangerous failure.</p>
+<h3>Methodology note: enumerate before you query</h3>
+<p>I needed to learn which services were present. Grepping for <code>sshd</code> would only confirm the service I already knew to ask about. Extracting the process token from each line let an unknown service appear in the result. The coverage sum then tested whether the extractor was complete. A third service, if present, could have surfaced without a new guess.</p>
+<h3>Methodology note: know your enrichment provenance</h3>
+<p>I would have preferred a direct, current routing or registry source for the AS answer. My local environment lacked <code>whois</code>; the lookup API was beyond its egress allowlist. Published prefix tables agreed on a <code>/16</code>, but their update time and routing view were not established in this record. The containment calculation was straightforward. The underlying source was the weak point, so I kept the ASN conclusion qualified. A provider AS is also a poor stand-in for an attacker identity.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>The solve used shell pipelines. I did not run a purpose-built parser during the challenge. These are the decisive commands, with the case's host and addresses withheld:</p>
+<pre><code class="language-bash">unzip -p secure_log.zip &gt; secure.log
+wc -l secure.log
+head -1 secure.log; tail -1 secure.log
+
+# ST.2a, rejected: loses a service whose name ends at a colon.
+grep -oP '&lt;target-host&gt; \K\S+(?=\[)' secure.log | sort | uniq -c | sort -rn
+
+# ST.2: capture the process token before either delimiter.
+grep -oP '&lt;target-host&gt; \K[^\[:]+' secure.log | sort | uniq -c | sort -rn
+
+# ST.3: valid and invalid-user SSH templates.
+grep 'Failed password' secure.log \
+  | grep -oP 'for (invalid user )?\K\S+(?= from)' \
+  | sort | uniq -c | sort -rn | head -20
+
+# ST.4: inspect the messages before naming the invariant text.
+grep -i 'http' secure.log | head -20
+
+# ST.5: sshd says 'Connection closed by', not 'from'.
+grep 'Connection closed by' secure.log \
+  | grep -oP 'by \K[\d.]+' | sort | uniq -c | sort -rn | head -10
+</code></pre>
+<p>The first ST.5a query had used <code>from \K[\d.]+</code> after filtering closure lines and returned no address. I retained that miss because <code>Failed password ... from &lt;IP&gt;</code> and <code>Connection closed by &lt;IP&gt;</code> are different templates. For the ASN fallback, the attempted paths were <code>whois &lt;address&gt;</code>, an HTTPS lookup, and then the published prefix listings. The first two did not complete here:</p>
+<pre><code class="language-bash">whois &lt;REDACTED_IP&gt; | grep -iE '^(origin|aut-num)'
+curl -s 'https://api.hackertarget.com/aslookup/?q=&lt;REDACTED_IP&gt;'
+</code></pre>
+<p>A Team Cymru reverse-octet DNS query or current BGP route view would be useful independent follow-up, but neither was performed in this solve. For an address <code>a.b.c.d</code>, the proposed DNS form was <code>dig +short d.c.b.a.origin.asn.cymru.com TXT</code>. The returned route and observation time would still need interpretation before I called the AS confirmed.</p>
+<p>The offline <a href="artifacts/auth_log_triage.py">auth-log triage script</a>, <a href="artifacts/synthetic_secure.log">invented log fixture</a>, and <a href="artifacts/test_auth_log_triage.py">tests</a> are later defensive examples. Their <a href="artifacts/README.md">usage notes</a> state the input, output, and limits. They were not used to produce the counts above.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p><code>/var/log/secure</code> is a shared authentication log on this RHEL-like host. Its familiar header looks like <code>&lt;time&gt; &lt;host&gt; &lt;process&gt;[pid]: &lt;message&gt;</code>, but the FTP service showed that a PID bracket is not universal. The message body is free text emitted by each process. That is why I first counted process tokens and only then parsed event-specific wording.</p>
+<p>A single SSH session can emit multiple lines: a reverse-name warning, a PAM failure, a <code>Failed password</code> result, and a closure. Total lines therefore are neither unique sessions nor unique guesses. They are still useful as a coverage denominator, provided I do not turn them into attempt counts. The username parser has to handle both <code>Failed password for root from ...</code> and <code>Failed password for invalid user guest from ...</code>; the optional phrase changes the location of the account token.</p>
+<p>The HTTP-looking traffic has a different boundary. <a href="https://www.rfc-editor.org/rfc/rfc4253">RFC 4253, Section 4.2</a> describes the SSH identification string beginning <code>SSH-</code>. A request starting <code>GET</code>, <code>POST</code>, <code>HEAD</code>, <code>CONNECT</code>, or the HTTP/2 <code>PRI</code> preface does not satisfy that exchange. In this log, sshd wrote a <code>Bad protocol version identification</code> message and included the quoted bytes it received. That is evidence of protocol mismatch at an SSH listener. It does not, from this one host, establish a scan of whole IP blocks or the scanner's intent.</p>
+<p>For the network lookup, an IP-to-AS answer depends on routing data and time. A more-specific BGP route can supersede a broad covering prefix, and a prefix may have multiple origins. A published <code>/16</code> match is therefore a lead to check against a current routing view. Even a confirmed origin AS would identify a network, not the user of a rented server.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Analysis Mechanics</summary>
+<p>The strongest measurement in the case is the service-coverage invariant: the first extraction accounted for 1,782,247 of 1,782,865 lines; the corrected extraction accounted for all of them, including 618 from an FTP daemon. In a real ingest pipeline I would keep an explicit unparsed bucket rather than silently drop messages and call the remaining sum complete. The <a href="artifacts/auth_log_triage.py">triage script</a> does exactly that for classic syslog headers.</p>
+<p>For ST.3, the optional <code>invalid user</code> group captures both SSH failure templates without removing <code>root</code>. I ranked all names first. Root's 184,393 failures are part of the evidence; excluding it before counting would hide how strongly generic scanners target it. The top non-root name had 4,208 failures. Neither number alone tells me how many passwords were tried, because passwords are absent from the log.</p>
+<p>ST.4 required reading across several matching messages. The fixed leading words were <code>Bad protocol version identification</code>; the quoted request and trailing address varied. I separated that diagnostic from its argument instead of treating a request path as the error text. ST.5 required the same care with one preposition. The top closure source's 150,314 messages compared with 32,174 for second place give me a clear investigative priority. A misconfigured authorized client could also be noisy, so I would review account names, timing, successes, and asset ownership before calling that address malicious. A distributed, low-rate campaign could evade a top-IP sort entirely.</p>
+<p>The enrichment step was weaker than the log parsing. Agreement among republished prefix listings made the redacted AS plausible. I did not obtain a time-specific RIR or BGP confirmation. That uncertainty stays with the conclusion.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned</summary>
+<p>The 618-line discrepancy is the result I would remember from this exercise. An empty query asks for a fix. A nearly complete query can end an investigation too early. Counting the source file gave me a cheap way to challenge the service parser before I used its answer.</p>
+<p>The solve also stopped short of the most consequential host question. I did not check <code>Accepted</code> messages. A failure-to-success sequence from the same address would raise the priority sharply, but even an <code>Accepted</code> line would need account, timing, and session context before I called it a compromise. I did not correlate the FTP source addresses with SSH, bucket the traffic by hour, or establish whether the FTP service was intended. Those are open investigative steps, not findings.</p>
+<p>One other lesson is about names on a framework chart. A technique ID can look as polished and as wrong as my first regex. I checked the ATT&amp;CK and D3FEND definitions before using them below. I left the narrow Scanning IP Blocks claim out because a few HTTP-like requests to one host do not show an address-range scan.</p>
+<table>
+<thead>
+<tr>
+<th>What failed or worked here</th>
+<th>What I would carry into operations</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Service counts reconciled to raw lines.</td>
+<td>Compare normalized event coverage with raw ingest and retain an unparsed bucket.</td>
+</tr>
+<tr>
+<td>Enumerating all process names exposed FTP.</td>
+<td>Inventory every authentication-bearing service before scoping collection or rules.</td>
+</tr>
+<tr>
+<td>The closure parser assumed <code>from</code> and found nothing.</td>
+<td>Test each daemon template with positive and near-miss samples.</td>
+</tr>
+<tr>
+<td>The AS lookup fell back to republished data.</td>
+<td>Record source, timestamp, prefix, and whether routing was verified.</td>
+</tr>
+<tr>
+<td>No success or time correlation was run.</td>
+<td>Hunt for success after failure, cross-service overlap, and rate changes.</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<p>For a host-response team, I would start with the auth log, then join any successful SSH authentications to the ranked failure sources and affected accounts. I would inspect whether those accounts received sessions and what they did next. I would review the FTP records separately and compare their source set with the SSH set. A shared IP would be a lead, not proof of one operator. Hourly rates, source-to-account cardinality, and authorized scanner inventories would help distinguish bursts, stale automation, and deliberate guessing.</p>
+<p>For a security-operations pipeline, the important design choice is to collect all authentication services and measure parser coverage. A rule that sees only <code>sshd</code> can look healthy while missing the 618 FTP records. Success correlation and an unmapped-event alert belong beside the volume detector. The HTTP-to-SSH diagnostic is useful for service-discovery context, but I would not page an analyst on a single HTTP banner.</p>
+<p>For intelligence work, an origin AS can group infrastructure and suggest which provider to contact. It cannot attribute the campaign. I would preserve the lookup date and source and check a current route view before using the AS in a report or block decision. Broad cloud-AS blocking would need its own impact review.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Artifacts</summary>
+<h3>Triage checklist: internet-exposed Linux host, auth log only</h3>
+<pre><code class="language-text">[ ] Preserve the log and record size, total lines, and time window.
+[ ] Enumerate all process names, including services without PID brackets.
+[ ] Reconcile service counts plus unparsed headers to the raw line count.
+[ ] Rank failed passwords by account and source; retain root in the count.
+[ ] Count connection closures separately; do not call them unique attempts.
+[ ] Read quoted protocol-mismatch bytes for scanner context.
+[ ] Check Accepted events and join by source, account, host, and time.
+[ ] Review FTP failures and compare FTP and SSH source sets.
+[ ] Bucket rates over time and check authorized automation or scanners.
+[ ] Record the route/ASN source, timestamp, prefix, and uncertainty.
+</code></pre>
+<h3>Reusable primitive: sshd template patterns + the coverage assertion</h3>
+<p>The reusable part is a small template map plus an accounting rule. A service parser must accept either <code>[pid]:</code> or a bare <code>:</code>. A failed-password parser must allow <code>invalid user</code>; closure extraction must look after <code>by</code>. For each line, either assign a service or increment an explicit unparsed count. Check <code>sum(service_counts) + unparsed == total_lines</code> before trusting the ranking.</p>
+<p>I put those checks in the <a href="artifacts/auth_log_triage.py">offline parser</a> with an <a href="artifacts/synthetic_secure.log">invented nine-line fixture</a>, an <a href="artifacts/synthetic_malformed.log">unparsed-header fixture</a>, and <a href="artifacts/test_auth_log_triage.py">three parser tests</a>. The tests cover a non-PID FTP header, two failed-password forms, a closure, an HTTP-like SSH banner, a failure followed by success, a benign success without a preceding failure, a bad address, an unparsed header, and a line-length rejection. These results test the example logic. They do not reproduce this case's 1,782,865-line analysis or establish detection accuracy on a real environment. The <a href="artifacts/README.md">artifact guide</a> describes field assumptions and sensitive output.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<h3>Tier 1 - completeness checklist</h3>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>Case fit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MITRE ATT&amp;CK</td>
+<td><a href="https://attack.mitre.org/techniques/T1110/001/">T1110.001</a> fits repeated password guessing; <a href="https://attack.mitre.org/techniques/T1595/">T1595</a> fits the HTTP-like probe as a broad reconnaissance possibility; <a href="https://attack.mitre.org/techniques/T1133/">T1133</a> describes the exposed remote-service access route, with access unproven.</td>
+</tr>
+<tr>
+<td>MITRE ATLAS</td>
+<td>No ML system appears in this host-authentication case.</td>
+</tr>
+<tr>
+<td>OWASP Top 10 / LLM Top 10</td>
+<td>An HTTP request reached an SSH listener, not a web or LLM application.</td>
+</tr>
+<tr>
+<td>CVSS, EPSS, CISA KEV</td>
+<td>No software flaw or CVE was identified. These scoring and catalog tools have no demonstrated vulnerability to attach to.</td>
+</tr>
+<tr>
+<td>Cloud CIS Benchmark / CSA CCM</td>
+<td>The defended host's cloud context is unknown. The cloud ASN concerns a source address, not the defended estate.</td>
+</tr>
+</tbody>
+</table>
+<h3>ATT&amp;CK detail</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Evidence and limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://attack.mitre.org/techniques/T1110/001/">T1110.001, Password Guessing</a></td>
+<td>Repeated <code>Failed password</code> records across accounts support attempted guessing. Password values were not logged.</td>
+</tr>
+<tr>
+<td><a href="https://attack.mitre.org/techniques/T1595/">T1595, Active Scanning</a></td>
+<td>HTTP-like input to SSH supports a probe against this listener. It does not show <a href="https://attack.mitre.org/techniques/T1595/001/">T1595.001, Scanning IP Blocks</a>, because one host's log does not reveal the full target range.</td>
+</tr>
+<tr>
+<td><a href="https://attack.mitre.org/techniques/T1133/">T1133, External Remote Services</a></td>
+<td>SSH and FTP were remotely reachable in the scenario. I use this as vector context; authenticated entry was not established.</td>
+</tr>
+</tbody>
+</table>
+<p>I did not label this <a href="https://attack.mitre.org/techniques/T1110/003/">T1110.003 Password Spraying</a> or T1110.004 Credential Stuffing. The log records usernames, not the passwords or reused credential pairs needed to tell those behaviors apart. T1021.004 would imply lateral movement after entry; T1078 Valid Accounts would require successful account use. Neither is demonstrated here.</p>
+<h3>Tier 2 - D3FEND</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Defensive use in this case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://d3fend.mitre.org/technique/d3f:InboundTrafficFiltering/">D3-ITF, Inbound Traffic Filtering</a></td>
+<td>Restrict or temporarily ban untrusted inbound source traffic after validation.</td>
+</tr>
+<tr>
+<td><a href="https://d3fend.mitre.org/technique/d3f:AccountLocking/">D3-AL, Account Locking</a></td>
+<td>Consider controlled account-side lockout, with denial-of-service risk from deliberate failures.</td>
+</tr>
+<tr>
+<td><a href="https://d3fend.mitre.org/technique/d3f:OperatingSystemMonitoring/">D3-OSM, Operating System Monitoring</a></td>
+<td>Collect host auth events so failures, successes, and parse gaps can be reviewed.</td>
+</tr>
+</tbody>
+</table>
+<p>CAPEC-112 describes brute force but adds little to the investigation. I do not assign a CWE to a software defect this log did not reveal.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<p>The source IP, prefix, ASN, and reverse-mapping domain are withheld here. The useful intelligence is behavioral: repeated SSH password failures, unusually high closure volume, and HTTP-like bytes at an SSH listener. An ASN is infrastructure context that can age as routing changes. The domain in a reverse-mapping warning can be a failed lookup or untrusted client-controlled string; I would verify it before treating it as an indicator.</p>
+<p>I did not create a shareable STIX indicator from a redacted placeholder or claim a TAXII feed received one. In a live case I would package a verified address with <code>valid_from</code>, confidence, source, and expiry appropriate to the indicator's lifetime; I would keep the behavior and analytic context alongside it. The exercise did not supply that verified, current IOC set.</p>
+<p>I also do not assign a STIG finding. The log shows that <code>root</code> was targeted, not that root login was permitted. It shows FTP records, not that FTP was unauthorized. Those are configuration questions to inspect on the host. The concrete hardening and logging intent appears in Section 11.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization (abbreviated)</summary>
+<h3>11a. Standards mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>How it applies</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 AC-7</a></td>
+<td>Limit repeated unsuccessful logons, balancing attack resistance with deliberate lockout risk.</td>
+</tr>
+<tr>
+<td><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST IA-5(1)</a></td>
+<td>Manage password-based authenticators if that mode is used; prefer approved stronger authentication paths where feasible.</td>
+</tr>
+<tr>
+<td><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST AU-12</a></td>
+<td>Generate the host auth records that make this investigation possible.</td>
+</tr>
+<tr>
+<td><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST CM-7</a></td>
+<td>Review whether the FTP daemon is needed before leaving it exposed.</td>
+</tr>
+<tr>
+<td><a href="https://www.cisecurity.org/controls/v8">CIS Controls v8 4.1 and 8.2</a></td>
+<td>Maintain a secure service configuration and collect audit logs.</td>
+</tr>
+</tbody>
+</table>
+<h3>11b. Mitigation realization</h3>
+<p>I would first confirm how SSH is really configured, which auth methods are active, and whether keys or another approved method work for every authorized user. For a host that can safely require keys, <code>PasswordAuthentication no</code>, <code>KbdInteractiveAuthentication no</code>, and <code>PermitRootLogin no</code> are candidate settings. Check effective settings with <code>sshd -T</code>, test a second live session, and reload only after that check. Disabling one password path while PAM or another interactive path remains active does not prove password guessing has been eliminated. <code>MaxAuthTries 3</code> limits attempts per connection, not across new connections.</p>
+<p>A fail2ban SSH jail can use <code>maxretry = 5</code>, <code>findtime = 600</code>, and <code>bantime = 3600</code> as starting values if the daemon, filter, log path, and firewall action are verified on the actual distribution. Test the parser and a permitted recovery path before enforcement. A short ban slows a high-rate source; it can also be abused to lock out legitimate users. For the FTP service, inspect ownership and business need before disabling it or removing its firewall exposure. The 618 records alone do not warrant a production shutdown.</p>
+<pre><code class="language-ini"># Candidate /etc/fail2ban/jail.d/sshd-custom.conf; verify log path and action.
+[sshd]
+enabled = true
+port = ssh
+filter = sshd
+logpath = /var/log/secure
+maxretry = 5
+findtime = 600
+bantime = 3600
+</code></pre>
+<p>The SSH settings below express the intended authentication posture, not a drop-in change for an uninspected host. <code>ChallengeResponseAuthentication no</code> appears in older configurations; check the installed OpenSSH version and effective <code>KbdInteractiveAuthentication</code> setting before relying on either name.</p>
+<pre><code class="language-text">PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin no
+MaxAuthTries 3
+</code></pre>
+<p>If the FTP daemon is unneeded, the recorded response pattern was <code>systemctl disable &lt;ftp-daemon&gt; --now</code> followed by <code>firewall-cmd --remove-service=ftp --permanent</code> and <code>firewall-cmd --reload</code>. Check the actual unit and firewall zone first. Disabling a service merely because its log appeared would be an unjustified outage.</p>
+<p>Centralize auth logs off-host with authenticated, protected transport and retention controls suited to the environment. Include SSH and FTP events and watch the unparsed count. A forwarder selecting only <code>sshd</code> would recreate the 618-line blind spot. A simple unencrypted TCP 514 rule is not a sufficient production design.</p>
+<p>The minimal selection idea in the case used an rsyslog rule for both <code>$programname == 'sshd'</code> and <code>$programname == '&lt;ftp-daemon&gt;'</code>, forwarded with <code>@@&lt;siem-host&gt;:514</code>. That <code>@@</code> example is plain TCP and leaves transport protection unspecified. In a real deployment I would configure a supported authenticated TLS forwarding action, validate both program names against actual records, and compare received counts with the source log. The second process is the point of this control.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>The case supports detection designs, not a measured production detector. The linked parser passed synthetic local checks. The Sigma files below have not been converted for a SIEM backend or exercised on live telemetry. Any threshold needs a baseline and an authorized-scanner inventory.</p>
+<h3>IOCs (sanitized / illustrative)</h3>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>What the case actually establishes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Source address</td>
+<td>Withheld; top address appeared in 150,314 closure lines. Treat as a triage lead.</td>
+</tr>
+<tr>
+<td>Prefix and AS</td>
+<td>Withheld; published <code>/16</code> listings agreed, but no time-specific route verification was recorded.</td>
+</tr>
+<tr>
+<td>Reverse-mapping domain</td>
+<td>Withheld; its relationship to an operator was not established.</td>
+</tr>
+<tr>
+<td>Portable behavior</td>
+<td>SSH failures by source and account, closure volume, HTTP-like protocol errors, and possible SSH/FTP source overlap. The last overlap was proposed, not tested.</td>
+</tr>
+</tbody>
+</table>
+<p>The original 1,000-failures-per-day and 10,000-closures-per-day examples are candidate hunt thresholds, not baselines. The 50-failures-in-ten-minutes detector below is also a starting value. Closure counts can include benign or repetitive session handling, so I would pair them with failure, account, and success evidence.</p>
+<h3>Sigma - SSH brute force by volume</h3>
+<p>The <a href="artifacts/mr_ssh_failure_volume.yml">Sigma event and correlation rule</a> separates a single <code>Failed password</code> selection from <code>event_count</code> by <code>src_ip</code> and <code>host</code> over ten minutes. The threshold is greater than 50. The older pipe-aggregation form is obsolete in the <a href="https://sigmahq.io/sigma-specification/specification/sigma-correlation-rules-specification.html">Sigma correlation specification</a>. The <a href="artifacts/test_detection_examples.py">synthetic rule checks</a> cover the 50/51 boundary and an expected authorized-test false positive. The rule needs a backend that supports correlation and a normalizer that supplies <code>src_ip</code> and <code>host</code>; otherwise it must fail closed at deployment, not silently group on missing fields. Stale automation, an approved test, and a struggling user can produce false positives. A low-rate distributed campaign is a false negative for this threshold.</p>
+<h3>Sigma - HTTP to the SSH port</h3>
+<p>The <a href="artifacts/ssh_http_probe.yml">HTTP-to-SSH selection</a> looks for <code>Bad protocol version identification</code> plus a quoted HTTP-like method. A conforming SSH identification string starts <code>SSH-</code>; this event therefore marks a mismatch. The sender could still be an authorized network scanner or a misdirected health check. I keep the level informational. A different daemon message, truncation, or an unusual HTTP method could evade this selection.</p>
+<h3>Splunk SPL - failure counts by source and account</h3>
+<p>This hunt extracts both account forms and keeps the time, host, source, and account dimensions. <code>index</code> and <code>sourcetype</code> are deployment placeholders, and <code>_raw</code> must contain the intact SSH line.</p>
+<pre><code class="language-spl">index=linux_auth sourcetype=linux_secure &quot;Failed password for &quot;
+| rex field=_raw &quot;Failed password for (?:invalid user )?(?&lt;username&gt;\S+) from (?&lt;src_ip&gt;\S+)&quot;
+| where isnotnull(src_ip) AND isnotnull(username)
+| bin _time span=10m
+| stats count AS failures dc(username) AS account_count BY _time host src_ip
+| where failures &gt; 50
+| sort - failures
+</code></pre>
+<p>I would run a separate join or transaction review for <code>Accepted</code> from the same address and account. A shared IP without ordered timing does not prove a successful guess. The <a href="artifacts/auth_log_triage.py">offline parser</a> reports the address intersection for triage; it does not implement time-window or account-aware attribution.</p>
+<h3>Telemetry requirements</h3>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Minimum data</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Failure volume</td>
+<td>Raw SSH message, event time, host, parsed source address and account.</td>
+</tr>
+<tr>
+<td>HTTP at SSH</td>
+<td>Full protocol-error message, including quoted received bytes.</td>
+</tr>
+<tr>
+<td>Second-service coverage</td>
+<td>Process name for every auth-log record and an unparsed bucket.</td>
+</tr>
+<tr>
+<td>Success after failure</td>
+<td><code>Accepted</code> events with source, account, host, time, and session follow-up.</td>
+</tr>
+<tr>
+<td>Network corroboration</td>
+<td>Flow or connection logs if collected, with retention aligned to the host logs.</td>
+</tr>
+</tbody>
+</table>
+<h3>Detection engineering notes</h3>
+<p>My first operational test would be a parser-coverage assertion, because a perfect threshold on incomplete ingestion still misses the FTP service. Next I would replay an approved synthetic failure burst, a stale automation case, and an HTTP-like banner. I would verify the backend grouping fields and rule conversion before treating Sigma as deployed. The <a href="artifacts/README.md">artifact guide</a> records what the local examples do and what they have not proven. An ASN-level block needs current route evidence and an impact review; a broad cloud-provider block could cut legitimate traffic.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">diagram near the top</a> traces the investigation. The defensive view below connects the evidence to controls and checks. It deliberately keeps the open success question visible.</p>
+<pre><code class="language-mermaid">flowchart TB
+    A[Repeated SSH password failures] --&gt; B[Rate limit and auth review]
+    C[HTTP-like SSH banners] --&gt; D[Informational probe rule]
+    E[FTP lines missed by first parser] --&gt; F[All-service log collection]
+    F --&gt; G[Raw versus parsed coverage check]
+    B --&gt; H[Failure then success hunt]
+    G --&gt; H
+    H --&gt; I[Review account and session context]
+</code></pre>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://attack.mitre.org/techniques/T1110/001/">MITRE ATT&amp;CK T1110.001, Password Guessing</a>; <a href="https://attack.mitre.org/techniques/T1110/003/">T1110.003, Password Spraying</a> for the excluded distinction.</li>
+<li><a href="https://attack.mitre.org/techniques/T1595/">MITRE ATT&amp;CK T1595, Active Scanning</a>; <a href="https://attack.mitre.org/techniques/T1595/001/">T1595.001, Scanning IP Blocks</a> for the narrower claim not established here.</li>
+<li><a href="https://attack.mitre.org/techniques/T1133/">MITRE ATT&amp;CK T1133, External Remote Services</a>.</li>
+<li><a href="https://d3fend.mitre.org/technique/d3f:InboundTrafficFiltering/">MITRE D3FEND, Inbound Traffic Filtering</a>, <a href="https://d3fend.mitre.org/technique/d3f:AccountLocking/">Account Locking</a>, and <a href="https://d3fend.mitre.org/technique/d3f:OperatingSystemMonitoring/">Operating System Monitoring</a>.</li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5 Update 1</a> and <a href="https://www.cisecurity.org/controls/v8">CIS Controls v8</a>.</li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc4253">RFC 4253, SSH Transport Layer Protocol, Section 4.2</a>.</li>
+<li><a href="https://sigmahq.io/sigma-specification/specification/sigma-correlation-rules-specification.html">Sigma correlation rules specification</a>.</li>
+<li><a href="https://www.arin.net/resources/guide/asn/">ARIN ASN guide</a> and <a href="https://team-cymru.com/community-services/ip-asn-mapping/">Team Cymru IP-to-ASN service</a> for a stronger enrichment path.</li>
+<li><a href="https://fail2ban.readthedocs.io/">fail2ban documentation</a>.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
