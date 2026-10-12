@@ -1,0 +1,12 @@
+# Custom cipher review checklist
+
+Use this in an authorized source review when an application appears to implement its own reversible transform for secrets or protected data. Record the component, purpose, owner, deployed versions, data classification, key source, and an exact source revision before evaluating it. A CTF cipher is an example of the failure mode, not evidence of a deployed weakness.
+
+1. Identify the trust boundary. Is the transform being used for confidentiality, authentication, obfuscation, or a teaching fixture? Map callers, stored ciphertext, transmitted ciphertext, and key lifecycle. Do not classify a puzzle or test harness as a production finding.
+2. Reduce the code to a mathematical map. For each output symbol, test whether changing one plaintext symbol affects other positions. Record whether the multiplier, offset, or equivalent state depends on the key. Use a zero key and independent unit keys only in a local test environment; compare the resulting model against additional keys that were not used to construct it.
+3. Write the known-plaintext equations. State the field, alphabet, normalization, crib positions, rank, and nullspace dimension. Reject inconsistent cribs. Treat a low rank as candidate ambiguity, even if every candidate round-trips.
+4. Set an independent acceptance condition. Test against extra known plaintext, an authenticated tag, a separate oracle, or a legitimate platform outcome. English readability is a ranking heuristic; a candidate's own re-encryption is only a consistency check.
+5. If the transform protects real data, open a design review for migration to a vetted library and approved algorithm appropriate to the organization's requirements. Plan data re-encryption and key rotation with the application owner. A text search for `matrix` or `xor` is useful for triage but cannot prove use of a broken cipher; generated code and legitimate math will produce false positives.
+6. In CI, use test vectors and an architecture review gate for cryptographic changes. A synthetic positive should fail a custom-cipher prohibition only when the code is marked as a production protector; an ordinary math routine and a pedagogical fixture should stay out of that gate. Preserve the reviewer decision and exception rationale.
+
+The companion [probe](gl2_affine_probe.py), [synthetic fixture](../fixtures/synthetic_case.json), and [tests](test_gl2_affine_probe.py) demonstrate the structural check offline. They have not been run against a deployed service, a telemetry source, or a production CI policy.

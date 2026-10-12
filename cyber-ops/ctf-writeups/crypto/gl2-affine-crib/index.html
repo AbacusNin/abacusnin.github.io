@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Matrix Cipher That Became Linear - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="I reduced a Haskell matrix cipher to an affine equation, used a known flag wrapper to constrain its eleven-symbol key, and found where the remaining candidates still needed an independent answer check.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/gl2-affine-crib/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Matrix Cipher That Became Linear">
+  <meta property="og:description" content="I reduced a Haskell matrix cipher to an affine equation, used a known flag wrapper to constrain its eleven-symbol key, and found where the remaining candidates still needed an independent answer check.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/gl2-affine-crib/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Crypto / <span aria-current="page">The Matrix Cipher That Became Linear</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Matrix Cipher That Became Linear</h1>
+        <p class="lead">The code looked like a trip through a matrix group. I wrote down what happened to one character, and the elaborate part became a linear system.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Recover a plaintext flag from a custom GL2(F67) stream cipher using its readable Haskell implementation and a known flag wrapper.</p>
+<p><strong>What I did.</strong> I traced the matrix schedule, probed the zero and unit keys, solved crib equations over GF(67), and ranked the remaining candidates by language.</p>
+<p><strong>The result.</strong> The case record reports a readable flag and exact ciphertext re-encryption. The retained materials support the structural break, while the intended flag and platform acceptance cannot be independently checked here.</p>
+<p><strong>The limit.</strong> The target ciphertext, original solver and ranking data, flag, and submission transcript are unavailable. The local proof of concept uses invented values and does not replay the historical solve.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Haskell; Reduce; Probe; Crib; Search; Check">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Haskell</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Read matrix and character transforms</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Reduce</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Write one-symbol affine equation</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Probe</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Zero key and eleven unit keys</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Crib</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Seven known symbols, rank seven</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Search</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Four free symbols, rank by language</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Check</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Require independent answer evidence</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Reverse Engineering / Cryptography</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>stream cipher, GL2(Fp), matrix group, affine cipher, known-plaintext attack, GF(p) linear algebra, reverse engineering, Haskell</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved</td>
+</tr>
+<tr>
+<td>Access</td>
+<td>Readable Haskell cipher and one target ciphertext in the challenge</td>
+</tr>
+<tr>
+<td>Goal</td>
+<td>Recover the plaintext flag from the ciphertext</td>
+</tr>
+<tr>
+<td>Reported result</td>
+<td>A language-ranked plaintext was recovered and re-encrypted to the target ciphertext</td>
+</tr>
+<tr>
+<td>Verification boundary</td>
+<td>Structural reduction checked locally on a synthetic case; intended target plaintext and submission unavailable</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for reviewing this cipher design: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/crypto/gl2-affine-crib/artifacts">browse the probe, tests, and review guide on GitHub</a> and <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/crypto/gl2-affine-crib/fixtures">the synthetic fixture folder</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I had a Haskell file that called itself a symmetric stream cipher, a fixed ciphertext, and a familiar flag wrapper. I could read the implementation but had no secret key or live service to query. The task was to recover the plaintext. The matrix terminology initially made the cipher look more complicated than the input and output behavior it actually had.</p>
+<p>This was an offline cryptanalysis puzzle. There was no defender, adversary infrastructure, log stream, or protected deployment in the case. The operational question it raises is narrower and useful: what happens if someone ships a custom transform like this to protect real data? I treat that as a proposed code-review scenario, separate from the puzzle result.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I read the Haskell arithmetic first. The field prime is 67, the key has 11 symbols, and each character is mapped from the printable range <code>&lt;</code> through <code>~</code> into a field element. The seed matrices are upper triangular. The code enumerates group elements, extends the seed, and applies 12 rounds of adjacent matrix products before encrypting each character. The implementation's comment about its two generators commuting is misleading: the matrices do not commute, but that did not protect the cipher.</p>
+<p>The case record says I built a Python reference implementation, checked an encrypt/decrypt round trip, and compared keystreams for multiple keys. The diagonal multiplier stayed fixed. I then used a zero key and eleven unit keys to measure how the upper-right matrix entry changed with each key symbol. The known flag prefix and closing brace gave seven independent equations. I solved them modulo 67 and ranked the remaining candidate decryptions with an English character-trigram model.</p>
+<p>I first filtered for a lowercase body with underscores. That returned no readable answer. The reported flag contained mixed case and trailing punctuation, so I dropped the restrictive filter and let language ranking work over the wider candidate set. The case record reports an exact re-encryption of its selected plaintext. That is a useful check of the implementation, but Section 5 explains why it does not distinguish the intended plaintext from every other candidate under a different compatible key.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>The <a href="artifacts/gl2_affine_probe.py">bounded Python probe</a> is a defensive proof of concept for this construction. It implements the matrix schedule, zero and unit-key probes, finite-field elimination, and synthetic encrypt/decrypt. The <a href="fixtures/synthetic_case.json">invented fixture</a> contains an 11-symbol key and readable plaintext, and the <a href="artifacts/test_gl2_affine_probe.py">test suite</a> exercises full-rank recovery, seven-crib ambiguity, an inconsistent crib, and invalid inputs. The <a href="artifacts/README.md">run guide</a> gives the commands, input contract, and limits. These files do not contain the target ciphertext or the historical language-ranking solver.</p>
+<p>The core of the reduction is short enough to keep visible:</p>
+<pre><code class="language-text">K_i = ((d_i, a_i), (0, 1))
+c_i = d_i * p_i - a_i                    mod 67
+a_i = constant_i + sum_j M[i,j] * s_j   mod 67
+sum_j M[i,j] * s_j = d_i*p_i - constant_i - c_i   mod 67
+</code></pre>
+<p>Here <code>s_j</code> is key symbol <code>j</code>. The probe obtains <code>constant_i</code> from the zero key and column <code>j</code> of <code>M</code> by subtracting that zero-key output from the output for unit key <code>j</code>. A row of known plaintext and ciphertext then becomes one equation in the key. I can run the local demonstration with <code>python -B gl2_affine_probe.py</code> from the artifacts folder. It reports full recovery with eleven independent synthetic crib positions and 20,151,121 possible keys with seven. That is a test of the reduction on invented data, not a replay of the challenge.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p><code>GL2(Fp)</code> is the group of invertible two-by-two matrices over a prime field. This cipher uses a much smaller upper triangular form: <code>((d, a), (0, 1))</code>, with nonzero <code>d</code>. Multiplying <code>(d1, a1)</code> by <code>(d2, a2)</code> gives <code>(d1*d2, a1 + d1*a2)</code> modulo 67. The matrices can be noncommutative while the key dependence of the upper-right term remains affine. Those facts can coexist.</p>
+<p>The plaintext enters as <code>(p_i, -1)</code>, so the retained first coordinate is <code>d_i*p_i - a_i</code>. For a fixed key, every position is a separate bijection of one plaintext symbol. Changing one symbol does not spread into later positions. The matrix schedule mixes the seed state, but it does not give plaintext diffusion across positions. Shannon's confusion and diffusion vocabulary is useful here: the diagonal sequence is independent of the key, and known plaintext makes the key-dependent addend solvable by linear algebra. <a href="https://onlinelibrary.wiley.com/doi/10.1002/j.1538-7305.1949.tb00928.x">Shannon's paper</a> supplies the underlying vocabulary, not a security assessment of this puzzle.</p>
+<p>Gaussian elimination over <code>GF(67)</code> works like ordinary elimination with all arithmetic modulo 67. If eleven unknown key symbols produce a rank-seven system, four independent values remain free. The solutions form an affine space with <code>67^4 = 20,151,121</code> members. More independent known positions can raise the rank; repeating dependent positions cannot.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>The preconditions were white-box cipher access, the target ciphertext, and known plaintext at fixed positions from the flag format. My first simplification was to stop treating the keystream as an opaque matrix. Every keystream element remained upper triangular. Its diagonal <code>d_i</code> came from powers of the public generator and position in the schedule, not from the key. The upper-right value <code>a_i</code> was a constant plus a weighted sum of the eleven key symbols. A zero-key run and eleven unit-key runs exposed those weights.</p>
+<p>For each known position, I substituted the known <code>p_i</code> and observed <code>c_i</code> into the final equation shown in Section 3. The source account gives seven independent equations in eleven unknowns. That leaves four free symbols and about 20 million compatible keys. Direct search over all 67^11 keys would have been a different, much larger job. The linear reduction made candidate ranking plausible. The source reports that an English trigram model brought a readable, theme-related flag to the top after the lowercase-only filter failed.</p>
+<p>There is a crucial distinction in the final check. For any one candidate key, decryption inverts its own per-symbol transform. Re-encrypting that resulting plaintext must reproduce the ciphertext. The <a href="artifacts/test_gl2_affine_probe.py">synthetic ambiguity test</a> deliberately produces two different plaintexts under two compatible keys; both re-encrypt exactly. A round trip can catch a broken port or transcription error. It does not prove which of the 20,151,121 candidates is the intended answer. Independent crib characters, an authenticated check, or actual challenge acceptance would make that claim stronger. The reported flag and submission evidence are unavailable here, so I retain the reported solve without presenting the round trip as proof of uniqueness.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned</summary>
+<p>Writing down the one-symbol map saved me from attacking the full matrix machinery. The useful habit was to ask which outputs actually depended on the key, then measure that dependence. This is also why my initial lowercase-and-underscore filter was a mistake: it imposed a flag style that the math had never promised. I would keep crib constraints, language scoring, and acceptance evidence as three separate layers next time.</p>
+<p>The other lesson is about verification language. My algebra can establish a family of compatible keys exactly. A language model can make one candidate appealing. Re-encryption can show the candidate pair is internally consistent. None of those alone records what the event accepted. When the result matters outside a puzzle, I want an independent constraint before calling a secret recovered.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Operational Extrapolation</summary>
+<h3>Individual Practitioner Development</h3>
+<p>The exercise gave me a practical sequence for unfamiliar crypto code: reduce the representation, probe key dependence, build equations over the right field, record rank, and keep the remaining uncertainty visible. A useful next lab would expose only an authorized encrypt/decrypt oracle and ask whether controlled probes can recover the same affine model without readable source. That lab has not been run here.</p>
+<h3>Security Operations</h3>
+<p>There was no SOC telemetry in this offline case. For a real application, I would begin with a source and architecture inventory: find the component, its callers, what data it protects, and where keys come from. A custom cipher in production would become a design-review finding, followed by migration planning with the owner. A SIEM rule about <code>GL2</code> strings would have a weak connection to the actual risk and many benign matches. The <a href="artifacts/affine_cipher_review.md">review checklist</a> turns the algebra into a proposed review and CI gate with explicit exceptions for teaching code and ordinary math libraries.</p>
+<h3>Intelligence Operations</h3>
+<p>The case has no campaign, actor, collection target, or infrastructure to attribute. Its useful intelligence-style product would be an internal technical assessment of a deployed component, supported by source revision, test vectors, key handling, and data exposure. I would not turn this puzzle into an IOC feed.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The reusable proof of concept is the <a href="artifacts/gl2_affine_probe.py">affine probe</a>. It accepts printable-domain key and text values up to 256 symbols, builds the zero/unit-key model, and returns a particular solution, nullspace basis, and rank for integer-indexed crib positions. It uses only Python's standard library and makes no network calls. The <a href="fixtures/synthetic_case.json">synthetic case</a>, <a href="artifacts/test_gl2_affine_probe.py">tests</a>, <a href="artifacts/README.md">guide</a>, and <a href="artifacts/affine_cipher_review.md">custom-cipher review checklist</a> provide a reproducible local exercise and a proposed route into authorized code review.</p>
+<p>Eleven independent known positions recover the invented key exactly. Seven leave four free values, and the tests show two different candidates with matching round trips. A deliberately conflicting crib is rejected. No target ciphertext, original solver, wordlist, or full candidate ranking is packaged. A production review would need its own data classification, source revision, owner, policy, and independent acceptance test.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Applicability and Mapping</summary>
+<p>MITRE ATT&amp;CK does not describe the observed case: there was no intruder behavior on a defended system. <a href="https://capec.mitre.org/data/definitions/97.html">CAPEC-97 Cryptanalysis</a> is a useful method analogy for deriving information from a weak cipher, but this was my puzzle technique, not an observed adversary pattern. <a href="https://capec.mitre.org/data/definitions/20.html">CAPEC-20 Encryption Brute Forcing</a> describes the direct search I considered and set aside; I did not carry it out.</p>
+<p>If this design protected real data, <a href="https://cwe.mitre.org/data/definitions/327.html">CWE-327</a> would be a reasonable weakness lens for using a broken or risky cryptographic algorithm, and <a href="https://cwe.mitre.org/data/definitions/1240.html">CWE-1240</a> could guide review of its custom primitive. Those are deployment analogies, not vulnerability IDs assigned to an actual product here. STRIDE, D3FEND, and OWASP mappings need a specific system, boundary, and control to add value; this challenge supplies none.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intelligence and Standards Integration</summary>
+<p>There are no IP addresses, domains, hashes, malware, or actor behaviors to publish as indicators. STIX/TAXII would carry fabricated threat intelligence in this case. The useful portable output is a precise weakness description: a key-independent multiplier, a key-affine addend, and a rank-limited known-plaintext recovery. If a real product used the design, I would attach that assessment to its software inventory and review record, then connect any observed exploitation to separate evidence.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<p><a href="https://doi.org/10.6028/NIST.SP.800-53r5">NIST SP 800-53 Rev. 5 SC-13, Cryptographic Protection</a>, is an illustrative control lens for an organization using cryptography to protect information. No control was assessed in this puzzle. For a deployed system, my proposed realization is to require a vetted, approved algorithm and maintained library, a reviewed key lifecycle, and a documented exception path for nonsecurity test fixtures. The owner would need to plan any migration and re-encryption before replacing a live format.</p>
+<p>The <a href="artifacts/affine_cipher_review.md">review checklist</a> states the evidence a reviewer should collect and the positive and benign cases a CI gate should distinguish. Its local tests validate the structural math only. They do not prove that a real organization's policy gate, library selection, or migration works.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>The challenge leaves a Haskell implementation and ciphertext, with no runtime sensor or network trail. There is no defensible Sigma, KQL, SPL, YARA, or IOC rule to attach to this isolated solve. A code-search lead for custom encryption could be useful in a real repository, but a match would require human review of purpose and trust boundary. Ordinary linear algebra and training exercises are expected false positives. The <a href="artifacts/affine_cipher_review.md">checklist</a> gives a proposed source-review workflow rather than pretending to be a production detector.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow diagram above</a> follows the reduction from matrix schedule to affine equations, then to the rank-seven solution family. The last step is labeled as an independent answer check because language ranking and a candidate's own re-encryption do not establish uniqueness. The <a href="artifacts/gl2_affine_probe.py">synthetic probe</a> and <a href="artifacts/test_gl2_affine_probe.py">tests</a> make both sides of that distinction runnable.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://capec.mitre.org/data/definitions/97.html">MITRE CAPEC-97, Cryptanalysis</a>: method analogy in Section 9.</li>
+<li><a href="https://capec.mitre.org/data/definitions/20.html">MITRE CAPEC-20, Encryption Brute Forcing</a>: considered direct-search approach in Section 9.</li>
+<li><a href="https://cwe.mitre.org/data/definitions/327.html">MITRE CWE-327, Use of a Broken or Risky Cryptographic Algorithm</a>: potential deployed-design weakness in Section 9.</li>
+<li><a href="https://cwe.mitre.org/data/definitions/1240.html">MITRE CWE-1240, Use of a Cryptographic Primitive with a Risky Implementation</a>: potential custom-primitive weakness in Section 9.</li>
+<li><a href="https://doi.org/10.6028/NIST.SP.800-53r5">NIST SP 800-53 Rev. 5, SC-13 Cryptographic Protection</a>: illustrative organizational control in Section 11.</li>
+<li><a href="https://onlinelibrary.wiley.com/doi/10.1002/j.1538-7305.1949.tb00928.x">Claude E. Shannon, Communication Theory of Secrecy Systems</a>: confusion and diffusion vocabulary in Section 4.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>

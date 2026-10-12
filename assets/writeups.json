@@ -495,5 +495,29 @@
     ],
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/reversing/xor-auth-gate/"
+  },
+  {
+    "title": "The Matrix Cipher That Became Linear",
+    "category": "Crypto",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "stream cipher",
+      "GL2(Fp)",
+      "matrix group",
+      "affine cipher",
+      "known-plaintext attack",
+      "GF(p) linear algebra",
+      "reverse engineering",
+      "Haskell"
+    ],
+    "summary": "I reduced a Haskell matrix cipher to an affine equation, used a known flag wrapper to constrain its eleven-symbol key, and found where the remaining candidates still needed an independent answer check.",
+    "aliases": [
+      "custom cryptography",
+      "matrix stream cipher",
+      "finite field"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/crypto/gl2-affine-crib/"
   }
 ]
