@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Password Filter That Carried Its Own Answer - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="A password filter appeared to require 160 correctly ordered syscalls. I found its embedded BPF object, read five tables from rodata, and recovered the 40-character answer from the diagonal without running it.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/reversing/ebpf-diagonal-rodata/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Password Filter That Carried Its Own Answer">
+  <meta property="og:description" content="A password filter appeared to require 160 correctly ordered syscalls. I found its embedded BPF object, read five tables from rodata, and recovered the 40-character answer from the diagonal without running it.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/reversing/ebpf-diagonal-rodata/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Reverse Engineering / <span aria-current="page">The Password Filter That Carried Its Own Answer</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Password Filter That Carried Its Own Answer</h1>
+        <p class="lead">The program wanted me to perform a syscall ritual. Its own data gave me a shorter path.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Recover the flag gated by a userspace loader and an embedded eBPF syscall-tracepoint program.</p>
+<p><strong>What I did.</strong> I inspected the outer ELF, located the embedded EM_BPF object, reconstructed the counter and emit formula, parsed its rodata tables, and tested the diagonal layout with a forward calculation.</p>
+<p><strong>The result.</strong> The 40 diagonal bytes form a printable flag shape, and the inferred 4x4 grid regenerates all 160 value-table entries exactly.</p>
+<p><strong>The limit.</strong> The binary and tables were replayed offline. The BPF program was not loaded or run, and no challenge-platform acceptance receipt was available.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 560" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Inspect the loader; Find the inner object; Model the state; Read rodata; Test the layout; Recover the diagonal; Check the model">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Inspect the loader</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Stripped ELF and libbpf clues</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Find the inner object</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">EM_BPF ELF at offset 250,296</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Model the state</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Four rounds of 40 syscall positions</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Read rodata</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Five arrays of 40 u32 values</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Test the layout</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Ten-byte cells in a 4 by 4 grid</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Recover the diagonal</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Forty printable answer bytes</text>
+<line x1="180" y1="463" x2="180" y2="482" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="485" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="509" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Check the model</text><text x="18" y="529" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">All 160 value entries regenerated</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Binary Reverse Engineering / Kernel Tracing</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Advanced</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>eBPF, syscall tracepoints, ringbuf, libbpf, rodata reverse, diagonal steganography, side-channel analysis</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved. Full 40-character flag recovered statically without ever executing the BPF program. All 160 rodata entries reproduced byte-identically by a closed-form generator.</td>
+</tr>
+<tr>
+<td>Recorded result</td>
+<td>Forty diagonal bytes form a flag-shaped string; the 160 value entries regenerate exactly</td>
+</tr>
+<tr>
+<td>Evidence boundary</td>
+<td>Static recovery replayed on the binary; neither BPF execution nor platform acceptance was observed</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/reversing/ebpf-diagonal-rodata/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>Analytical Attack Chain (Overview)</h2>
+<p>The diagram above follows my route from the loader to the answer. It also shows the point where I stopped treating the syscall sequence as a necessary runtime task and started treating it as a description of how to read static data.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<h3>What was presented</h3>
+<p>I had a stripped, roughly 350 KB x86-64 PIE ELF and a prompt about writing a password with the whole system at my disposal. The loader imports libbpf, libelf, and libz, asks for a PID, attaches a BPF tracepoint program, and prints characters received through a ring buffer. There was no source, debug build for the outer userspace code, remote service, or required runtime proof. A single flag-shaped string was the deliverable.</p>
+<h3>Realistic scenario it simulates</h3>
+<p>The interesting design is a gate: a userspace process loads kernel-side BPF code that watches syscalls and releases output only after a particular sequence. A real investigation might encounter a custom observability agent, hidden trigger, or BPF-based implant with similar components. This supplied binary is a challenge artifact. Its structure alone does not establish a rootkit, exfiltration, or a compromised host.</p>
+<h3>Assets and access provided</h3>
+<p>The host ELF was readable offline. Its embedded BPF object kept enough section and BTF information to name maps, tables, and the tracepoint section, even though the outer loader was stripped. I did not need a privileged Linux host to answer the challenge. I kept execution out of the recovery path because static inspection exposed the data I needed.</p>
+<h3>Analytical objective</h3>
+<p>I needed to recover the flag and explain why the answer was correct. A syntactically plausible string alone would have been thin evidence. I wanted the table layout, emit formula, grid selection, and regeneration check to agree.</p>
+<h3>Threat model</h3>
+<p>From the challenge author's side, the target PID and 160 matching syscalls seem to protect the answer. From my side, I could read the file and its embedded object. The gate controls when the program emits bytes; it does not keep the bytes' derivation out of the shipped file. In a real product, embedding a sensitive static value behind an execution gate would expose it to anyone who can inspect the binary, regardless of how awkward the runtime ceremony is.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<h3>Recon</h3>
+<p>I began with <code>file</code>, dynamic imports, and <code>strings -n 8</code>. The outer file was an ELF64 PIE for x86-64. The recorded imports included <code>bpf_object__open_mem</code>, <code>bpf_program__attach_tracepoint</code>, <code>ring_buffer__poll</code>, and <code>bpf_map__update_elem</code>. Strings such as <code>Enter a PID to monitor</code>, <code>Received value number %d: %c</code>, <code>Failed to set whoami PID</code>, and <code>password_checker_bpf</code> connected the prompt, a loader-self marker, and bytewise output. The <code>%c</code> format made a four-byte ringbuf record worth examining: its low byte could be displayed as a character.</p>
+<h3>Embedded object discovery</h3>
+<p>I searched past the host ELF header for a second <code>7f 45 4c 46</code> signature. One valid inner ELF begins at file offset <strong>250,296</strong> (<code>0x3d1b8</code>), and its machine type is <strong>EM_BPF (247)</strong>. Its section table ends at <strong>9,464 bytes</strong> from that inner header. A simple carve-to-EOF method would also include later host-file bytes, so I used the inner ELF section bounds to describe its minimum structural length. The object has <code>tracepoint/raw_syscalls/sys_enter</code>, <code>.maps</code>, an eight-byte <code>.bss</code>, an <strong>800-byte <code>.rodata</code></strong>, <code>.BTF</code>, and <code>.BTF.ext</code>. The <a href="artifacts/embedded_bpf_inventory.py">offline inventory tool</a> checks this structure and reports it without executing the file.</p>
+<h3>BPF disassembly and state-machine reconstruction</h3>
+<p>My disassembly notes describe a 155-instruction tracepoint function called <code>track_syscalls</code>; the 1,240-byte section size is consistent with 155 eight-byte BPF instructions. The first stretch identifies the loader through <code>whoami</code> and latches <code>my_pid</code>, then checks <code>target_pid_map[0]</code>. The counter range check stops work after index 159. For each allowed event, <code>R = counter / 40</code> chooses one of four value tables and <code>idx = counter % 40</code> chooses the position. A <code>jitter_p[idx]</code> comparison gates emission. Depending on the ten-position sub-row, the program adds <code>+1, +2, -1,</code> or <code>-2</code>, XORs the syscall number, writes four bytes to the ring buffer, and advances the counter. The wrong-syscall branch resets the counter and emits the failing number.</p>
+<table>
+<thead>
+<tr>
+<th>Approximate instruction span</th>
+<th>Role in the recorded disassembly</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0-29</td>
+<td>Loader identity, <code>whoami</code>, and self-exclusion</td>
+</tr>
+<tr>
+<td>30-46</td>
+<td>Target PID, counter load, and 160-position bound</td>
+</tr>
+<tr>
+<td>47-66</td>
+<td>Round/position split and jitter equality</td>
+</tr>
+<tr>
+<td>67-139</td>
+<td>Value table, sub-row offset, and emit arithmetic</td>
+</tr>
+<tr>
+<td>140-152</td>
+<td>Ringbuf output and counter update</td>
+</tr>
+<tr>
+<td>80-93</td>
+<td>Alternate mismatch branch within that control-flow region</td>
+</tr>
+<tr>
+<td>153-154</td>
+<td>Shared exit</td>
+</tr>
+</tbody>
+</table>
+<p>I checked the ELF sections and replayed the table arithmetic against the binary. I did not reload or execute the BPF instructions during this check. The disassembly supports the control-flow account; runtime claims about races and side channels below remain hypotheses.</p>
+<h3>Rodata parsing</h3>
+<p>Five little-endian <code>u32[40]</code> arrays fill the 800-byte section. The first is <code>jitter_p</code> at <code>0x000</code>; <code>value_0</code>, <code>value_1</code>, <code>value_2</code>, and <code>value_3</code> begin at <code>0x0a0</code>, <code>0x140</code>, <code>0x1e0</code>, and <code>0x280</code>. The jitter schedule is the ten-number cycle <code>257, 0, 1, 262, 3, 8, 9, 5, 87, 88</code>, repeated four times. This gives <strong>200 rodata entries in total</strong>, of which 160 are value-table entries. I checked the section length and cycle directly.</p>
+<h3>First-pass static decode</h3>
+<p>My first calculation followed the reported emit formula across all four rounds and all 40 positions. It gave 160 output values: some were recognizable flag characters, while the others looked like clutter. That is where I nearly spent time chasing an arithmetic mistake. The better question was why 160 values had been arranged as four rounds of 40.</p>
+<p>The arithmetic has to stay 32-bit until after the XOR. Some jitter values are greater than <code>0xff</code>. Masking <code>value + row_off</code> down to one byte <strong>before</strong> XOR can invent a high byte. For the selected diagonal cells, I computed <code>((value + offset) &amp; 0xffffffff) ^ jitter</code>, then checked that the result fit a byte. All 40 selected values did.</p>
+<h3>The pivot that unlocked the layout</h3>
+<p>Four rounds times four ten-byte sub-rows suggested a <code>4 x 4</code> grid. I tried the same tables with zero offset away from the diagonal. The 12 off-diagonal cells yielded 120 bytes of recognizable cover text, including three line breaks. I do not need to reproduce the copyrighted text to show its role: a coherent alternate reading confirmed that the apparently noisy cells were deliberately arranged. The four diagonal cells each held ten characters of the answer.</p>
+<h3>Diagonal extraction</h3>
+<p>I selected cell <code>(R, R)</code> for rounds <code>R=0..3</code>, ten bytes per cell. The 40 resulting values were printable ASCII, had the recorded prefix shape and balanced braces, and ended at the expected closing brace. I keep the actual answer out of the public page. The cover-text reading under the alternate offset and the forward check below are stronger support than flag formatting alone. No grader receipt was available to confirm challenge-platform acceptance.</p>
+<h3>Dynamic verification considered, not needed</h3>
+<p>I considered driving the 40-syscall schedule four times and watching the ring buffer. I sketched a <code>ctypes</code> syscall harness with deliberately bad arguments, but did not run it. Those calls would require an isolated test environment; I cannot assume every argument template is free of side effects. The static calculation answered the question, so I did not load the BPF program. The disassembly suggests the counter stops after 160 matches; that runtime lockout remains untested.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<h3>Embedded ELF carve</h3>
+<p>A magic-byte search was enough to find a candidate at <code>0x3d1b8</code>, but I required a complete ELF64 little-endian section table and <code>e_machine=247</code> before calling it BPF. My first <code>blob.find(ELF_MAGIC, 4)</code> carve-to-EOF approach would have written all 112,624 bytes after the inner header. The <a href="artifacts/embedded_bpf_inventory.py">defensive inventory tool</a> reports the validated minimum object length of 9,464 bytes and leaves the host file untouched.</p>
+<h3>BPF disassembly driver</h3>
+<p>The instruction pass used <code>llvm-objdump -d -r --no-show-raw-insn</code> on the inner ELF, followed by <code>readelf -S</code> and <code>readelf -s</code> to connect code, relocations, maps, BTF, and rodata names. I later used a bounded ELF parser to verify the section structure and replayed the tables. I did not load or attach the program to validate its runtime behavior.</p>
+<h3>Rodata parser and static decoder</h3>
+<p>The useful compact form of the decoder is below. Each <code>value_R</code> is a 40-entry little-endian array; <code>jitter</code> is the neighboring 40-entry array. I keep the full-width XOR and check for a byte only afterward, because eight jitter values exceed <code>0xff</code>.</p>
+<pre><code class="language-python">row_offsets = (1, 2, -1, -2)
+answer = []
+for round_no in range(4):
+    for within_cell in range(10):
+        index = 10 * round_no + within_cell
+        value = value_tables[round_no][index]
+        output = ((value + row_offsets[round_no]) &amp; 0xffffffff) ^ jitter[index]
+        if not 0 &lt;= output &lt;= 255:
+            raise ValueError(&quot;diagonal value is not one byte&quot;)
+        answer.append(output)
+assert len(answer) == 40
+</code></pre>
+<h3>Forward generator (verification harness)</h3>
+<p>I also inverted that relationship. Put four ten-byte answer pieces on the grid diagonal, place 12 ten-byte cover pieces off diagonal, then calculate each value-table entry as <code>((jitter[idx] ^ intended_byte) - offset) &amp; 0xffffffff</code>. The offset is the sub-row value on the diagonal and zero elsewhere. The cover-order rule reads rounds 1 through 3; when a round reaches its own diagonal slot, it substitutes the matching off-diagonal cell from round 0. With that placement, all <strong>160 value-table entries</strong> regenerated exactly.</p>
+<p>This is an internal consistency check of the recovered layout and formula, not an independent grading result. I kept the answer and cover text out of the diagnostic output.</p>
+<h3>Optional dynamic harness (not needed for solve)</h3>
+<p>My unused <code>ctypes</code> sketch listed the ten jitter numbers and repeated them through four rounds. One entry is syscall 1, which is <code>exit</code> in i386 compat mode; a naive all-compat driver would terminate its own producer. The loader's permissions, kernel support, and effects of each argument template would need isolated testing. Nothing about the static answer required taking that risk.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<h3>eBPF tracepoint programs at a glance</h3>
+<p>The <code>raw_syscalls/sys_enter</code> tracepoint observes a syscall entry before dispatch. A BPF program attached there can inspect the raw syscall number and other context, subject to kernel verifier and helper restrictions. Raw numbering depends on ABI, which matters if someone tries to feed the sequence dynamically. The verifier's job is program safety and allowed access; a successful load would not mean the program's authentication design is secure. No verifier result was observed in this offline solve.</p>
+<h3>Maps used in this challenge</h3>
+<p>The map inventory names three maps: <code>whoami</code>, a hash-like bootstrap at key 0, gives the loader a way to identify itself; <code>target_pid_map</code>, an array, stores the monitored PID at key 0; and <code>event_map</code>, a ring buffer, carries output to the userspace poller. The <code>.bss</code> holds the four-byte <code>my_pid</code> and <code>counter</code> globals. The BPF object exposes these names for inspection. A map name is a useful local pivot but too generic to serve as a malicious indicator.</p>
+<h3>The challenge's emit formula</h3>
+<p>At position <code>counter</code>, the reported logic takes <code>R = counter // 40</code> and <code>idx = counter % 40</code>, checks <code>syscall_nr == jitter_p[idx]</code>, then emits</p>
+<pre><code class="language-text">out_u32 = ((value_R[idx] + row_off(idx)) mod 2^32) XOR syscall_nr
+row_off(idx) = [1, 2, -1, -2][idx // 10]
+</code></pre>
+<p>The four-byte ringbuf value is displayed as a character by the loader. For the diagonal positions, the full-width arithmetic yields one-byte values. The mismatch path reportedly emits the failing syscall number and resets the counter. I distinguish that described runtime path from the static arithmetic I replayed.</p>
+<h3>Why the four value tables are not independent</h3>
+<p>Each table entry is derived from an intended grid character, the jitter number at that position, and either a sub-row offset or zero. Inverting the XOR and addition recovers a character for every grid cell. There are four tables because there are four rounds, not four independent secrets. The 800-byte rodata still contains five distinct 40-entry arrays; the structural claim concerns how the 160 value entries were generated.</p>
+<h3>The diagonal/substitution selection rule</h3>
+<p>The answer occupies <code>(0,0), (1,1), (2,2), (3,3)</code>, ten characters in each cell. To read the 120-character cover message, I walk rounds 1, 2, and 3 across four cells. At each round's diagonal hole, I use <code>(0,j)</code> instead. That makes round 0's three off-diagonal cells useful rather than leftovers. One character appears to have been trimmed to fit the 120-byte budget. The cover text includes three line breaks, so "printable" means ordinary text controls as well as visible characters.</p>
+<h3>State machine summary</h3>
+<p>The disassembly describes one counter from 0 through 159, with a reset on a mismatch and an exit once it reaches 160. A correctly matched syscall produces a deterministic output from its position, the table, and the syscall number. This accounts for the apparent 160-event ritual. Shared mutable state could introduce races if multiple tasks drive it, but I did not run a concurrency experiment; one counter alone does not serialize multiple producers.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit/Analysis Mechanics</summary>
+<h3>The invariant the encoding violates</h3>
+<p>The intended gate asks the analyst to provide runtime observations before receiving bytes. But every input to the answer calculation is in the file: the 40 jitter numbers, 160 value entries, and four offsets in the program logic. Addition and XOR can be reversed. Anyone who can read the object can recover the answer without satisfying the gate. That is the design failure this puzzle demonstrates.</p>
+<h3>Operational steps to realize the recovery</h3>
+<p>I located the secondary ELF, verified its BPF machine type and sections, used the reported instruction flow to write the emit equation, parsed the five arrays, and tested two readings of the output. The all-position reading looked noisy. Grouping by ten-character cells exposed the diagonal. I selected those 40 bytes, checked the flag shape, then regenerated the value entries from the answer and cover grid. The <a href="artifacts/embedded_bpf_inventory.py">inventory tool</a> handles only the defensive first step: identifying a valid embedded object for review.</p>
+<h3>Why the diagonal layout works as a stego carrier</h3>
+<p>Each of four rounds visits 40 positions, but only one ten-position sub-row in that round is answer-bearing. The other 30 positions create a second readable layer when interpreted without the diagonal offset. Someone who watched only live ringbuf characters would see many non-answer characters and still need a layout hypothesis. Reading the static tables made that geometry visible.</p>
+<h3>Concurrency, ABI, side-channels - auxiliary findings</h3>
+<p>My static audit raised several runtime questions. The x32 ABI marks syscall numbers with bit 30, so its raw values would miss the small jitter numbers if the tracepoint sees them unchanged. An i386 compat stream shares some raw numbers, but syscall 1 is <code>exit</code>; switching modes after that slot was one possible workaround. The counter-at-160 check appears to prevent replay without reload. A failed syscall reportedly goes to the ring buffer, which could leak information to a reader with access to that channel. None of those routes was dynamically tested here, and I would not claim a three-to-five-byte leak without a trace.</p>
+<p>I found no familiar <code>ptrace</code>, <code>prctl</code>, <code>seccomp</code>, or common BPF anti-analysis helper clues in the inspected paths. That bounded search does not prove every form of anti-analysis is absent. The static route did not require bypassing a runtime check.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<h3>What the exercise validated</h3>
+<p>I was tempted to make the machine perform the syscall sequence because the binary offered that path so prominently. Looking at what was shipped paid off faster. The embedded object had the tables, the expected sequence, and the output arithmetic. Treating it as its own reverse target made the loader's prompt much less intimidating.</p>
+<h3>What the exercise surfaced as gaps</h3>
+<p>I spent too long thinking instruction by instruction before writing down the one-sentence state model: a counter advances on the expected syscall, chooses a round and position, and emits a table-derived value. I also tried to repair the noisy 160-byte output as if the formula were wrong. The four-by-forty shape should have pushed me toward a grid sooner.</p>
+<h3>Comparison: exercise vs. operational behavior</h3>
+<table>
+<thead>
+<tr>
+<th>In the exercise</th>
+<th>In a real investigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Inspect imports and strings before running</td>
+<td>Establish what the file contains and who supplied it</td>
+</tr>
+<tr>
+<td>Validate the inner ELF separately</td>
+<td>Preserve both outer and embedded layers with offsets and hashes</td>
+</tr>
+<tr>
+<td>Parse rodata and derive a static result</td>
+<td>Check whether protected material is actually outside the artifact</td>
+</tr>
+<tr>
+<td>Consider a runtime syscall driver</td>
+<td>Use an isolated, authorized test host only when static work leaves a question</td>
+</tr>
+<tr>
+<td>See a structural BPF hit</td>
+<td>Correlate with approved observability software before escalating</td>
+</tr>
+</tbody>
+</table>
+<h3>Transferable principles</h3>
+<p>I ask whether a gate contributes secret information or merely controls when already-shipped data is released. I also check layouts before assuming a flat byte stream. A failed first decode can be evidence of a second arrangement, particularly when the dimensions divide cleanly into meaningful cells.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<h3>Individual practitioner skill development</h3>
+<p>This case exercised nested ELF validation, BPF section reading, instruction-to-state-machine reasoning, and byte-grid recovery. The next useful practice is to compare static claims with an isolated <code>bpftool</code> inventory on a system I control. That would test loaded program identity and map behavior without confusing a challenge file with a real incident.</p>
+<h3>Security operations (SOC, IR, threat hunting)</h3>
+<p>A hunt can inventory loaded BPF programs, attach points, loader provenance, and map names. A second pass can scan binaries in approved collection scope for embedded <code>EM_BPF</code> objects. The <a href="artifacts/embedded_bpf_inventory.py">offline inventory proof of concept</a> and its <a href="artifacts/embedded_bpf_inventory.sigma.yml">Sigma selection</a> cover only that second pass. They do not observe a live <code>bpf()</code> call or attach operation. Legitimate libbpf, tracing, and network tools often embed BPF objects, so the structural hit is a review lead.</p>
+<p>For response, I would preserve the host binary, loader identity, loaded-program metadata, program instructions, and map state before detaching anything, subject to local authority and the kernel/tooling available. A <code>bpftool prog show -j</code> or <code>map show -j</code> snapshot is a starting point; names alone are insufficient, and runtime state can disappear when objects unload. I would not promise that <code>.bss</code> state survives a detach or that one snapshot captures every transient event.</p>
+<h3>Intelligence operations (SIGINT, IO/IW, OSINT, attribution)</h3>
+<p>The cover-text choice and table schedule are possible clustering features <strong>if</strong> multiple independently collected samples share them. One puzzle cannot attribute an operator. A real intelligence note would separate the observed file structure from a proposed BPF-gated-channel pattern and would avoid presenting the challenge's lyrics, map names, or hash as broad threat IOCs.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<h3>Decision flow: when to static-extract a BPF-gated secret</h3>
+<p>I first ask whether the host embeds a structurally valid BPF object. If it does, I inspect sections and the code path that uses rodata. A pure function of shipped tables is a static-recovery candidate; a function that genuinely depends on a runtime secret needs a different plan. I then test grid, permutation, and offset hypotheses before calling a noisy output random. The last check is to regenerate the parsed tables or compare with a truly independent observation.</p>
+<h3>Reusable primitives</h3>
+<p>The <a href="artifacts/embedded_bpf_inventory.py">Python inventory tool</a> validates both ELF section tables, checks the inner machine type, reports the minimum object length, and identifies <code>raw_syscalls</code> tracepoint sections. Its <a href="artifacts/test_embedded_bpf_inventory.py">tests</a> generate a synthetic positive host, benign host, wrong-architecture inner object, allowlisted positive, and truncated header. The <a href="artifacts/README.md">guide</a> gives the input limits, fields, sensor assumptions, and false-positive boundary. For static math, the reusable primitives are a bounds-checked <code>u32</code> table parser, the full-width emit equation, and diagonal-cell selection; the challenge answer is deliberately absent from the defensive tool.</p>
+<h3>Triage checklist for an unknown libbpf-based binary</h3>
+<p>I record file provenance and digest, inspect imports and strings, scan for a second ELF, validate <code>EM_BPF</code>, enumerate <code>.maps</code>, <code>.bss</code>, <code>.rodata</code>, BTF and attach sections, then disassemble the BPF function and trace the emit call. I write a state-machine summary before trying to drive it. If a static hypothesis works, I check the inverse and its limits. Only then do I consider a runtime experiment on an authorized host. A section name or libbpf import by itself does not make a file malicious.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<p>The closest ATT&amp;CK analogy is <a href="https://attack.mitre.org/techniques/T1027/009/">T1027.009, Embedded Payloads</a> when an adversary hides an operational payload inside another file. Here, embedding a BPF object is also a normal libbpf development pattern, and no adversary use was observed. T1027 more broadly describes obfuscation, but this CTF encoding is not evidence of a campaign. T1027.001 Binary Padding does not fit: the secondary ELF performs work rather than merely inflating file size. T1014 Rootkit, the legacy T1562.006 Indicator Blocking mapping, and T1480.001 Environmental Keying would each require behavior or a cryptographic environment-derived key not established here. The old T1562.006 URL now resolves to the newer <a href="https://attack.mitre.org/techniques/T1685/">T1685, Disable or Modify Tools</a>; the binary still does not show that behavior. T1140 describes adversary decoding, so my defensive reversal is not an observed T1140 act.</p>
+<p><a href="https://d3fend.mitre.org/technique/d3f:FileContentAnalysis/">D3-FCOA, File Content Analysis</a> fits the static scan. D3-FCA names File Creation Analysis, so I do not use it for this step. <a href="https://d3fend.mitre.org/technique/d3f:ProcessAnalysis/">D3-PA, Process Analysis</a> could support a separate live loader review. CAPEC-572 Artificially Inflate File Size and CAPEC-188 Reverse Engineering add little to this embedded-object case. I do not assign CWE-540 or CWE-311 to a challenge flag as if it were a deployed credential. A real software finding would require the actual asset and security requirement. OWASP ASVS and Top 10 do not describe this kernel tracing artifact; STRIDE would need a defined system boundary.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<h3>STIX/TAXII</h3>
+<p>The <a href="artifacts/stix-behavior-example.json">illustrative STIX 2.1 bundle</a> records a hypothetical attack pattern, a defensive course of action, and their relationship. It does not call the sample malware or identify an actor. Its JSON and internal references were checked locally; no full STIX schema validator or TAXII exchange was used. I used UUIDs and kept unsupported kill-chain claims out of the bundle. A production intelligence record would add collection provenance, confidence, markings, and a behaviorally valid indicator only after observing an actual campaign or deployment.</p>
+<h3>STIG references</h3>
+<p>An applicable Linux STIG may require audit configuration and restrict unprivileged BPF, depending on the distribution and release. I would check the exact current STIG item against the deployed kernel before citing a finding. <code>kernel.unprivileged_bpf_disabled</code> affects unprivileged <code>bpf()</code> calls; it does not make privileged or authorized BPF disappear. The challenge binary alone proves no STIG failure. I would verify any CCI and avoid treating BPF programs as kernel modules when writing a compliance claim.</p>
+<h3>CIS Benchmarks</h3>
+<p>The relevant benchmark is the one for the organization's Linux distribution and version. Audit policy, privileged access, and BPF settings are review topics, but "Section 1.5" and "Section 4" are not portable control identifiers across every benchmark. For broader planning, CIS Controls 8.5 (Collect Detailed Audit Logs) and 8.11 (Conduct Audit Log Reviews) can support the telemetry and review workflow. The current CIS 13.7 label is <a href="https://cas.docs.cisecurity.org/en/latest/source/Controls13/">Deploy a Host-Based Intrusion Prevention Solution</a>. That may support prevention where appropriate, but it does not itself inventory embedded BPF objects. Neither a benchmark heading nor a BPF sysctl by itself detects the static answer in this file.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>11a. Standards Mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Control family</th>
+<th>Useful application</th>
+<th>Evidence boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NIST SP 800-53 SI-4</td>
+<td>Monitor authorized and unexpected BPF program activity</td>
+<td>Needs a live sensor and inventory</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 AU-2 / AU-12</td>
+<td>Choose and generate BPF load/attach audit events</td>
+<td>Event coverage must be verified on the actual kernel</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 CM-7</td>
+<td>Limit unnecessary BPF capability</td>
+<td>Exceptions for approved observability tools matter</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 AC-3</td>
+<td>Keep real secrets behind enforceable access control</td>
+<td>A static table inside a readable binary cannot supply secrecy</td>
+</tr>
+<tr>
+<td>CIS Controls 8.5 / 8.11 / 13.7</td>
+<td>Detailed logs, log review, and host-based prevention where suitable</td>
+<td>General planning, not a compliance verdict</td>
+</tr>
+</tbody>
+</table>
+<p>SI-7, SC-39, and CMMC could matter in a deployed architecture. This artifact does not demonstrate those controls or a CMMC assessment, so I keep them as review questions rather than findings.</p>
+<h3>11b. Mitigation Realization</h3>
+<p>For a real BPF estate, I would inventory approved loaders and their object hashes, audit BPF-related syscalls where the host supports them, and capture loaded-program metadata with an owner and retention policy. The offline <a href="artifacts/embedded_bpf_inventory.py">inventory script</a> can review host files and suppress an exact approved digest; its output could feed the <a href="artifacts/embedded_bpf_inventory.sigma.yml">Sigma candidate</a>. That is a file-analysis workflow, separate from live BPF attach monitoring.</p>
+<p>I considered auditd rules for <code>bpf</code> and <code>perf_event_open</code>, a sysctl setting, and signed-BPF enforcement as deployment examples. A <code>bpf()</code> syscall event alone does not identify a successful tracepoint attach; the command, return value, program metadata, and sometimes <code>perf_event_open</code> or link operations must be correlated. A selector of <code>a0: 5</code> alone does not establish <code>BPF_PROG_ATTACH</code> and would be a poor production rule. Restricting unprivileged BPF is useful where compatible with the system, but it cannot protect a secret already shipped in the file.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<h3>IOCs (illustrative, sanitized)</h3>
+<p>For this case I recorded the outer ELF, second ELF at offset 250,296, <code>EM_BPF</code>, the <code>raw_syscalls/sys_enter</code> section, 800-byte rodata, four value tables, and the <code>whoami</code>, <code>target_pid_map</code>, and <code>event_map</code> names. These are <strong>case features</strong>, not general malicious IOCs. No public binary hash, flag, or cover text is needed for the defender pattern. An ordinary observability loader may have most of the same structural features.</p>
+<h3>YARA: detect host binary containing embedded BPF ELF</h3>
+<p>A YARA rule can find an ELF magic followed by an <code>EM_BPF</code> machine field, but a byte pattern does not prove the inner section table is valid or that the host loaded it. The <a href="artifacts/embedded_bpf_inventory.py">offline parser</a> performs that structural check and reports a review lead. I have not tested a benign corpus or compiled a YARA rule, so I do not call such a signature high fidelity.</p>
+<h3>Sigma: BPF program attached to raw syscall tracepoint by non-allowlisted loader</h3>
+<p>The linked <a href="artifacts/embedded_bpf_inventory.sigma.yml">Sigma rule</a> selects a normalized <strong>file inventory</strong> event when the companion tool says <code>review_lead=true</code>. It parsed with pySigma. It does not detect a live attachment; an auditd <code>a0</code> selector by itself cannot prove one. A live rule would need a validated sensor mapping for program load, attach point, loader identity, and success status. A process-name selector cannot measure ringbuf throughput, so I do not present it as a working throughput detector.</p>
+<h3>KQL: Microsoft Sentinel - alert on BPF syscall by non-allowlisted parent process</h3>
+<p><code>DeviceProcessEvents</code> records process activity, not arbitrary <code>bpf()</code> syscalls. A defensible Sentinel hunt would first ingest a custom BPF activity or offline-inventory table with explicit fields for host, loader, attach point, program hash, result, and approval state. For the latter, a scoped template is <code>BpfInventory_CL | where EventType == "embedded_bpf_inventory" and ReviewLead == true | project TimeGenerated, Host, HostSha256, EmbeddedBpfCount</code>. Field names and parser mapping must be checked on the actual table. This is a proposed query, not a run against Sentinel.</p>
+<h3>Splunk SPL: hunt for embedded ELF magic in non-observability binaries</h3>
+<p>For a normalized JSON inventory event, a starting query is <code>index=endpoint sourcetype=embedded_bpf_inventory event_type=embedded_bpf_inventory review_lead=true | table _time host host_sha256 embedded_bpf_count</code>. Searching a Base64 prefix with <code>strpos</code> on encoded inventory text, or filtering undefined import fields, would not reliably find an embedded ELF. The linked parser supplies the structural field; the SPL template still needs a real ingestion mapping.</p>
+<h3>Log source and data pipeline requirements</h3>
+<p>The offline scan needs the binary bytes and a trusted path from host or repository inventory to the analyst. Live load/attach hunting needs Linux audit or EDR telemetry that actually records <code>bpf()</code> operations, <code>perf_event_open</code> where relevant, return status, process lineage, and program identity. A periodic <code>bpftool</code> snapshot can supplement event telemetry but can miss short-lived objects. Binary-content collection must respect scope and privacy. The <a href="artifacts/README.md">artifact guide</a> documents this tool's fields, limits, and how a local allowlist affects output.</p>
+<h3>Detection engineering notes</h3>
+<p>Four synthetic tests passed: embedded BPF syscall tracepoint, benign single ELF, wrong-architecture nested ELF, approved hash, and malformed-header handling. The challenge binary produced one structural review lead with the expected offset and rodata size. The Sigma YAML parsed, and the illustrative STIX bundle passed JSON/reference checks. No YARA engine, Sigma backend conversion, Sentinel/Splunk execution, fleet sensor, or production false-positive study was performed. A legitimate libbpf loader is the obvious false-positive class; a packed object with no section table can be a miss.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">diagram above</a> shows the analytical path. The defensive reading runs alongside it:</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>What I can do</th>
+<th>What it does not prove</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>File structure</td>
+<td>Validate nested ELF and <code>EM_BPF</code></td>
+<td>That the object ever loaded</td>
+</tr>
+<tr>
+<td>Static content</td>
+<td>Inspect rodata and derive outputs</td>
+<td>That a real credential was exposed</td>
+</tr>
+<tr>
+<td>Host telemetry</td>
+<td>Correlate BPF load and attach events</td>
+<td>That a program is malicious by name alone</td>
+</tr>
+<tr>
+<td>Policy</td>
+<td>Compare loader and hash to an approved inventory</td>
+<td>That all unlisted files are adversarial</td>
+</tr>
+<tr>
+<td>Response</td>
+<td>Preserve program, maps, and binary before removal</td>
+<td>That one snapshot captures earlier state</td>
+</tr>
+</tbody>
+</table>
+<p>The article's code path and the defender's inventory path share the same first observation: a second ELF inside the host. They answer different questions after that. One recovers this challenge's answer; the other identifies files that deserve review in a real environment.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://docs.kernel.org/bpf/">Linux kernel BPF documentation</a> and <a href="https://docs.kernel.org/bpf/ringbuf.html">BPF ring buffer</a></li>
+<li><a href="https://docs.kernel.org/trace/events.html">Linux kernel tracepoint documentation</a></li>
+<li><a href="https://docs.kernel.org/admin-guide/sysctl/kernel.html">Linux kernel documentation for <code>kernel.unprivileged_bpf_disabled</code></a></li>
+<li><a href="https://man7.org/linux/man-pages/man2/bpf.2.html">Linux <code>bpf(2)</code> manual</a> and <a href="https://man7.org/linux/man-pages/man2/perf_event_open.2.html"><code>perf_event_open(2)</code></a></li>
+<li><a href="https://attack.mitre.org/techniques/T1027/009/">MITRE ATT&amp;CK T1027.009, Embedded Payloads</a> and <a href="https://attack.mitre.org/techniques/T1480/001/">T1480.001, Environmental Keying</a></li>
+<li><a href="https://d3fend.mitre.org/technique/d3f:FileContentAnalysis/">MITRE D3FEND File Content Analysis</a> and <a href="https://d3fend.mitre.org/technique/d3f:ProcessAnalysis/">Process Analysis</a></li>
+<li><a href="https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html">OASIS STIX 2.1</a></li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5</a></li>
+<li><a href="https://cas.docs.cisecurity.org/en/latest/source/Controls8/">CIS Control 8, Audit Log Management</a> and <a href="https://cas.docs.cisecurity.org/en/latest/source/Controls13/">Control 13, Network Monitoring and Defense</a></li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>

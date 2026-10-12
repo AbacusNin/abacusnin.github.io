@@ -1,0 +1,23 @@
+title: Embedded BPF Syscall Tracepoint Object in Unapproved Host ELF
+id: e6653ddd-caff-4f48-aaf2-905e4a14d4e8
+status: experimental
+description: Selects a review lead emitted by the companion offline ELF inventory tool.
+references:
+  - https://attack.mitre.org/techniques/T1027/009/
+logsource:
+  product: linux
+  service: custom_bpf_inventory
+detection:
+  selection:
+    event_type: embedded_bpf_inventory
+    review_lead: true
+  condition: selection
+fields:
+  - host_sha256
+  - embedded_bpf_count
+  - embedded_bpf_objects
+falsepositives:
+  - Authorized libbpf loaders not yet included in the local hash allowlist
+level: medium
+tags:
+  - attack.t1027.009

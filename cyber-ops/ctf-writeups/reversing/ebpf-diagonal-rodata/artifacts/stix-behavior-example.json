@@ -1,0 +1,41 @@
+{
+  "type": "bundle",
+  "id": "bundle--dd322446-77aa-41cf-874d-67b81ec2bee2",
+  "objects": [
+    {
+      "type": "attack-pattern",
+      "spec_version": "2.1",
+      "id": "attack-pattern--a58043d2-cc61-43ae-ba36-105fa398f8ec",
+      "created": "2026-10-12T00:00:00.000Z",
+      "modified": "2026-10-12T00:00:00.000Z",
+      "name": "Hypothetical BPF-gated output with an embedded object",
+      "description": "Illustrative behavior based on a reverse-engineering puzzle: a userspace ELF contains an EM_BPF object that gates output on a syscall sequence, while static tables suffice to reconstruct the output. This does not identify a real adversary or malicious deployment.",
+      "external_references": [
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1027.009",
+          "url": "https://attack.mitre.org/techniques/T1027/009/"
+        }
+      ]
+    },
+    {
+      "type": "course-of-action",
+      "spec_version": "2.1",
+      "id": "course-of-action--701c2c3e-9eaf-48b7-b359-458baeb00f7e",
+      "created": "2026-10-12T00:00:00.000Z",
+      "modified": "2026-10-12T00:00:00.000Z",
+      "name": "Inventory and review embedded BPF objects",
+      "description": "On approved host binaries, validate embedded ELF/BPF structure and tracepoint sections, compare file identity to an authorized loader inventory, and preserve any loaded program and map state before removal."
+    },
+    {
+      "type": "relationship",
+      "spec_version": "2.1",
+      "id": "relationship--aae1aab1-5fd0-413a-897a-5b584546c71f",
+      "created": "2026-10-12T00:00:00.000Z",
+      "modified": "2026-10-12T00:00:00.000Z",
+      "relationship_type": "mitigates",
+      "source_ref": "course-of-action--701c2c3e-9eaf-48b7-b359-458baeb00f7e",
+      "target_ref": "attack-pattern--a58043d2-cc61-43ae-ba36-105fa398f8ec"
+    }
+  ]
+}

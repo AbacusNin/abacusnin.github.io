@@ -1071,5 +1071,29 @@
     ],
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/network/rtp-pcmu-bitplane/"
+  },
+  {
+    "title": "The Password Filter That Carried Its Own Answer",
+    "category": "Reverse Engineering",
+    "difficulty": "Advanced",
+    "date": "2026-10",
+    "tags": [
+      "eBPF",
+      "syscall tracepoints",
+      "ringbuf",
+      "libbpf",
+      "rodata reverse",
+      "diagonal steganography",
+      "side-channel analysis"
+    ],
+    "summary": "A password filter appeared to require 160 correctly ordered syscalls. I found its embedded BPF object, read five tables from rodata, and recovered the 40-character answer from the diagonal without running it.",
+    "aliases": [
+      "ELF in ELF",
+      "embedded BPF",
+      "syscall sequence",
+      "static secret recovery"
+    ],
+    "status": "Solved. Full 40-character flag recovered statically without ever executing the BPF program. All 160 rodata entries reproduced byte-identically by a closed-form generator.",
+    "url": "/cyber-ops/ctf-writeups/reversing/ebpf-diagonal-rodata/"
   }
 ]
