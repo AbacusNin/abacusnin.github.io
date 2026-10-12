@@ -953,5 +953,27 @@
     ],
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/crypto/chebyshev-xor/"
+  },
+  {
+    "title": "Three Keys Were Already in the File",
+    "category": "Cryptography",
+    "difficulty": "Easy",
+    "date": "2026-10",
+    "tags": [
+      "XOR stream cipher",
+      "known-plaintext attack",
+      "keystream reconstruction",
+      "file-format masquerade",
+      "crib drag"
+    ],
+    "summary": "A small binary claimed to be an icon file. A crib at payload offset one revealed key bytes copied from its visible structure, and three regions made a repeating 16-byte XOR key.",
+    "aliases": [
+      "ICNS",
+      "file-derived XOR",
+      "icon masquerade",
+      "structural keystream"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/crypto/structural-xor/"
   }
 ]
