@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<hive><node name="ROOT"><node name="Microsoft">
+  <node name="SQMClient"><value key="MachineId" type="string" value="synthetic-id" /></node>
+  <node name="Wbem"><value key="BUILD" type="string" value="synthetic-build" /></node>
+</node><node name="Classes"><node name="Installer" /></node></node></hive>

@@ -273,5 +273,31 @@
     ],
     "status": "Solved-Verified",
     "url": "/cyber-ops/ctf-writeups/forensics/bitlocker-partial-recovery/"
+  },
+  {
+    "title": "The Implant Trail Through Three Registry Keys",
+    "category": "Forensics",
+    "difficulty": "Hard",
+    "date": "2026-10",
+    "tags": [
+      "Windows Forensics",
+      "Registry Hive Analysis",
+      "ChaCha20-Poly1305",
+      "AEAD",
+      "T1112",
+      "T1036.005",
+      "Registry-Resident Implant",
+      "Schema-Foreign Detection",
+      "Structured Uncertainty"
+    ],
+    "summary": "I started with the usual Windows autorun keys, found nothing useful, and followed a program path into SQMClient. Two more registry keys explained the encrypted configuration. The graded cipher answer was accepted; the C2 domain stayed closed to me.",
+    "aliases": [
+      "SQMClient",
+      "registry configuration",
+      "SOFTWARE hive",
+      "encrypted C2 configuration"
+    ],
+    "status": "Solved-Verified",
+    "url": "/cyber-ops/ctf-writeups/forensics/sqmclient-registry-config/"
   }
 ]

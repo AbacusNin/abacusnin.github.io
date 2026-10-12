@@ -1,0 +1,9 @@
+{"host":"LAB-CASE","event_id":13,"target_object":"HKLM\\SOFTWARE\\Microsoft\\SQMClient\\Token"}
+{"host":"LAB-CASE","event_id":13,"target_object":"HKLM\\SOFTWARE\\Microsoft\\SQMClient\\ConfigPath"}
+{"host":"LAB-CASE","event_id":13,"target_object":"HKLM\\SOFTWARE\\Microsoft\\SQMClient\\CacheMap"}
+{"host":"LAB-CASE","event_id":13,"target_object":"HKLM\\SOFTWARE\\Microsoft\\SQMClient\\SessionMap"}
+{"host":"LAB-CASE","event_id":13,"target_object":"HKLM\\SOFTWARE\\Microsoft\\Wbem\\SessionId"}
+{"host":"LAB-CASE","event_id":13,"target_object":"HKLM\\SOFTWARE\\Classes\\Installer\\Upload"}
+{"host":"LAB-BENIGN","event_id":13,"target_object":"HKLM\\SOFTWARE\\Microsoft\\SQMClient\\MachineId"}
+{"host":"LAB-NEAR","event_id":13,"target_object":"HKLM\\SOFTWARE\\Microsoft\\SQMClient\\Token"}
+{"host":"LAB-NEAR","event_id":12,"target_object":"HKLM\\SOFTWARE\\Microsoft\\SQMClient\\ConfigPath"}
