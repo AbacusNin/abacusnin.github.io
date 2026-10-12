@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Relay That Gave Away a Secret One Byte at a Time - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="I mistook the busiest host for the compromised one. Tracing the POST bodies back to their source changed the answer, and a pair of response lengths exposed the compression side channel.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/arp-icmp-compression-oracle/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Relay That Gave Away a Secret One Byte at a Time">
+  <meta property="og:description" content="I mistook the busiest host for the compromised one. Tracing the POST bodies back to their source changed the answer, and a pair of response lengths exposed the compression side channel.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/arp-icmp-compression-oracle/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Forensics / <span aria-current="page">The Relay That Gave Away a Secret One Byte at a Time</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Relay That Gave Away a Secret One Byte at a Time</h1>
+        <p class="lead">I first picked the host at the center of the traffic graph. That answer was wrong. The useful clue was where the secret-bearing requests began.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Identify the compromised server, the information taken, and the techniques used in a short network capture with TLS key material.</p>
+<p><strong>What I did.</strong> I mapped protocol and host conversations, inspected ARP and ICMP, decoded the POST bodies, then used the key log to examine the HTTPS response bodies and compare sizes.</p>
+<p><strong>The result.</strong> The case record identifies the victim as the source of the repeated flag guesses and reports an accepted CRIME answer. The HTTP response compression mechanism is more precisely BREACH-class.</p>
+<p><strong>The limit.</strong> The capture, key log, exact secret, and submission receipts are not reproduced here. Packet counts and acceptance are from the recorded solve; the linked defensive tools use invented events.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 560" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Map traffic; Pick relay; Trace origin; Inspect redirection; Decrypt responses; Compare sizes; Bound the result">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Map traffic</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Three hosts and two application legs</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Pick relay</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">First host answer rejected</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Trace origin</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Victim sent the guesses</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Inspect redirection</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">ARP replies and ICMP Type 5</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Decrypt responses</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Key log reveals gzip and the token</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Compare sizes</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">342 and 343 byte frames reported</text>
+<line x1="180" y1="463" x2="180" y2="482" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="485" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="509" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Bound the result</text><text x="18" y="529" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">HTTP compression is BREACH-class</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Network forensics / cryptographic side channel</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Hard</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>PCAP analysis, TLS decryption, ARP poisoning, ICMP redirect, CRIME, BREACH, gzip oracle, MITM, exfiltration</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved-Verified</td>
+</tr>
+<tr>
+<td>Recorded result</td>
+<td>The victim originated the flag-guess sequence; the relay forwarded it to a TLS endpoint. The case record reports acceptance of "CRIME."</td>
+</tr>
+<tr>
+<td>Evidence boundary</td>
+<td>Packet and key-log observations below come from the recorded analysis. I cannot independently replay the capture here, and the exact flag remains private.</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/arp-icmp-compression-oracle/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>Solve Process Flow</h2>
+<pre><code class="language-mermaid">flowchart LR
+    A[Protocol hierarchy] --&gt; B[Three-host topology]
+    B --&gt; C[Relay chosen as victim]
+    C --&gt; D[Wrong submission]
+    D --&gt; E[Trace POST origin]
+    E --&gt; F[ARP and ICMP redirect review]
+    F --&gt; G[TLS key log and gzip]
+    G --&gt; H[342 and 343 byte buckets]
+    H --&gt; I[Secret visible in decrypted responses]
+</code></pre>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I had a roughly 4.7 MB Ethernet capture covering about 45 seconds, plus a TLS session key log. The task was to find the compromised server, say what left it, identify the attack techniques, and explain how to stop a similar incident. I could inspect packets and decrypt the TLS leg with the supplied keys. I had no endpoint image or process telemetry.</p>
+<p>Three roles emerged: a victim that generated secret-bearing requests, a host that handled both legs of the conversation, and a remote endpoint that returned compressed responses. The case uses a flag as the secret. In an application, the corresponding risk would be a token or another value placed beside reflected attacker input in a compressed response. The capture begins after any initial access. It can show traffic behavior, but it cannot establish how the attacker first controlled a host.</p>
+<p>The story describes an ARP and ICMP assisted relay plus a length oracle. I treat each part separately. A packet proves a packet was sent; it does not prove the receiving kernel installed a route or that every observed size difference came from one compressor decision. Those require cache or route state and controlled comparisons.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<h3>Solve Trace</h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>What I did and what the case record says</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ST.1</td>
+<td>I started with <code>tshark -z io,phs</code>: 128 ARP frames, 5 ICMP frames, and 648 frames each in the recorded HTTP and TLS-decoded HTTP categories. Those category counts were a clue, not proof of 648 paired requests.</td>
+</tr>
+<tr>
+<td>ST.2</td>
+<td>IP conversations placed the victim with the relay in 3,888 frames, the relay with the remote endpoint in 10,988, and the victim with the remote endpoint in 5 ICMP frames. This suggested a relay topology.</td>
+</tr>
+<tr>
+<td>ST.2a</td>
+<td>I first submitted the relay as the compromised host. That answer was rejected. I had followed volume instead of the origin of the secret-bearing data.</td>
+</tr>
+<tr>
+<td>ST.3</td>
+<td>The recorded ARP extraction counted 128 replies and no requests in the capture. One MAC claimed both the relay and remote IPs. That combination warrants binding-table review; the capture alone cannot prove a cache overwrite.</td>
+</tr>
+<tr>
+<td>ST.4</td>
+<td>Five ICMP Type 5 Code 1 redirects advertised the relay as gateway. I did not have the victim's route table to show acceptance.</td>
+</tr>
+<tr>
+<td>ST.5</td>
+<td>Decoding <code>http.file_data</code> from the plaintext POST leg revealed 288 unique flag-prefix guesses attributed to the victim. The changing prefixes made the source of the sensitive data clearer than the conversation totals had.</td>
+</tr>
+<tr>
+<td>ST.6</td>
+<td>A key log let tshark decrypt the relay-to-remote TLS sessions. The recorded responses carried <code>Content-Encoding: gzip</code>, an nginx banner, and a constant secret-bearing token beside the reflected guess.</td>
+</tr>
+<tr>
+<td>ST.7</td>
+<td>The recorded 200 responses fell into 342 and 343 byte frame buckets. A one-byte difference is a useful lead. Response-to-guess pairing and controls are needed before calling that difference a reliable oracle.</td>
+</tr>
+<tr>
+<td>ST.8</td>
+<td>The challenge reportedly accepted "CRIME." Because the compression was HTTP <code>Content-Encoding: gzip</code>, I describe the mechanism as BREACH-class.</td>
+</tr>
+<tr>
+<td>ST.9</td>
+<td>The decrypted response body contained the secret directly. This was the forensic recovery path available to me. A ciphertext-only observer would need to establish and use the length oracle instead.</td>
+</tr>
+</tbody>
+</table>
+<h3>Tool / Code Timeline</h3>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Input and operation</th>
+<th>Recorded output or decision</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Recon</td>
+<td>Protocol hierarchy and IP conversations</td>
+<td>Three-host shape; first host identification failed</td>
+</tr>
+<tr>
+<td>Link and route analysis</td>
+<td>ARP fields and ICMP Type 5 decode</td>
+<td>128 ARP replies, five redirects, relay gateway field</td>
+</tr>
+<tr>
+<td>Content analysis</td>
+<td>POST <code>http.file_data</code> hex decode</td>
+<td>288 unique prefix guesses from the victim</td>
+</tr>
+<tr>
+<td>TLS analysis</td>
+<td><code>tls.keylog_file</code> applied to the captured sessions</td>
+<td>Decrypted responses with gzip and the secret token</td>
+</tr>
+<tr>
+<td>Size review</td>
+<td>200 response frame lengths</td>
+<td>Reported 342 and 343 byte buckets</td>
+</tr>
+<tr>
+<td>Answer</td>
+<td>Follow data origin and distinguish labels</td>
+<td>Victim host corrected; "CRIME" reportedly accepted</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Methodology notes</strong></p>
+<p>The wrong host answer was useful. The relay had the busiest conversations, so it looked important, and it was. It was still the wrong answer to "which server was compromised?" I went back to the POST bodies and asked which machine generated the secret-bearing guesses. That moved the answer to the victim. I kept the relay as a separate suspect for traffic interception and forwarding.</p>
+<p>I also kept two kinds of visibility apart. The analyst with the key log could read the response token. Someone observing only ciphertext could see lengths and timing, but recovering the same token from size alone would need enough controlled guesses, stable framing, and verified response pairing.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<h3>3.1 tshark Reconnaissance One-Liners</h3>
+<p>These are the core pivots I would repeat against the capture. I would preserve the original PCAP and key log, work from copies, and restrict access to decrypted payload exports.</p>
+<pre><code class="language-bash">tshark -r capture.pcap -q -z io,phs
+tshark -r capture.pcap -q -z conv,ip
+tshark -r capture.pcap -Y 'arp' -T fields \
+  -e frame.time_epoch -e arp.opcode -e arp.src.hw_mac -e arp.src.proto_ipv4
+tshark -r capture.pcap -Y 'icmp.type == 5' -T fields \
+  -e frame.time_epoch -e ip.src -e ip.dst -e icmp.code -e icmp.gateway
+tshark -r capture.pcap -Y 'http.request.method == &quot;POST&quot;' -T fields \
+  -e frame.number -e ip.src -e ip.dst -e http.request.uri -e http.file_data
+tshark -r capture.pcap -o 'tls.keylog_file:tls_keys.log' \
+  -Y 'http.response.code == 200' -T fields \
+  -e frame.number -e tcp.stream -e frame.len -e http.content_encoding
+</code></pre>
+<p>The last command is for triage, not an oracle verdict. An HTTP message may span frames, and a frame can contain overhead or multiple records. I would compare complete, paired responses with equal-length guesses and a stable server path before attributing one byte to gzip.</p>
+<h3>3.2 Bulk HTTP Body Decoder</h3>
+<p>The recorded decoder converted <code>http.file_data</code> from hex, grouped by source and destination, and counted unique bodies. That is how the 288 distinct prefixes became readable. A practical revision also retains the frame number and order; sorting a set hides the sequence that matters to the prefix tree. Raw decoded bodies can contain secrets, so I would summarize shape and counts in ordinary logs and put any full-body export in restricted evidence storage.</p>
+<pre><code class="language-python">import sys
+
+for row in sys.stdin:
+    frame, src, dst, raw = row.rstrip(&quot;\n&quot;).split(&quot;\t&quot;, 3)
+    try:
+        body = bytes.fromhex(raw).decode(&quot;utf-8&quot;)
+    except (ValueError, UnicodeDecodeError):
+        continue
+    print(frame, src, dst, len(body), body.startswith(&quot;FLAG:&quot;), sep=&quot;\t&quot;)
+</code></pre>
+<h3>3.3 ARP Poisoning Detector</h3>
+<p>The recorded helper grouped ARP replies by MAC and declared poisoning when one MAC claimed more than one IP. I would keep the grouping but change the conclusion to a review signal. Virtual IPs, routers, and load balancers can use one MAC for several IPs. The detector also needs requests and replies with timestamps, authorized bindings, switch port, and the victim's neighbor cache to distinguish a suspicious claim from a successful poisoning event.</p>
+<p>The linked <a href="./artifacts/network_hunt.py">offline network hunt</a> implements the bounded multi-IP claim signal. Its <a href="./artifacts/README.md">guide</a> states the normalized fields and its <a href="./artifacts/test_network_hunt.py">tests</a> include a benign multi-address example that still triggers review.</p>
+<h3>3.4 CRIME Oracle Response Length Analyzer</h3>
+<p>The recorded analyzer grouped response frame lengths and intersected whitespace tokens in decrypted short responses. That can surface a candidate secret, but repeated headers or ordinary words can also survive the intersection. More importantly, a short frame does not automatically mean a correct guess. I would pair each request with its response, compare candidates of equal byte length, and repeat a known incorrect control after each candidate. I would avoid printing the token in a routine alert.</p>
+<p>The linked hunt emits a <a href="./artifacts/network_hunt.py">length-oracle hypothesis</a> only after a burst has two adjacent response sizes. That deliberately stops short of claiming extraction. It accepts normalized response byte counts; it does not decode TLS records or prove same-body compression.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<h3>4.1 ARP Cache Poisoning</h3>
+<p>ARP resolves an IPv4 address to a link-layer address on a local segment. It does not authenticate that binding. A forged reply can therefore induce a host to send frames toward an attacker-controlled interface. The recorded 128 reply frames and shared MAC claim fit that hypothesis. Whether the victim actually changed its cache is a separate observation. I would compare the claimed bindings to switch, DHCP-snooping, and endpoint neighbor records. <a href="https://attack.mitre.org/techniques/T1557/002/">MITRE's ARP cache poisoning entry</a> describes both solicited and gratuitous reply paths.</p>
+<h3>4.2 ICMP Redirect Injection</h3>
+<p>ICMP Type 5 tells a host that another gateway is a better route; Code 1 is a host redirect. The five packets here advertised the relay. Modern host configuration and router-origin checks affect whether a host accepts them, so I cannot infer an installed route from their presence alone. For an incident, I would collect the route table and relevant kernel settings before and after containment. <a href="https://www.rfc-editor.org/rfc/rfc792">RFC 792</a> defines the message; local host policy decides whether to honor it.</p>
+<h3>4.3 CRIME and BREACH: Compression Ratio Side-Channel Attacks</h3>
+<p>The distinction changed how I explained the answer. CRIME originally exploited TLS-level compression of secret and attacker-controlled material. BREACH applies the same family of length inference to HTTP response compression. The case record says the challenge accepted "CRIME," and the recorded response header says <code>Content-Encoding: gzip</code>. The observed mechanism therefore belongs to the HTTP compression side of the family. The <a href="https://breachattack.com/">BREACH project</a> describes that setting, and the <a href="https://wiki.wireshark.org/TLS">Wireshark TLS guide</a> explains what the key log changes for a forensic analyst.</p>
+<h3>4.4 The gzip / LZ77 Compression Oracle Mechanism</h3>
+<p>DEFLATE can encode repeated substrings compactly. When attacker-controlled text and a secret appear in the same compression context, a better match can shorten output. A remote or on-path observer may then infer a guess from response length. The exact output is affected by Huffman coding, headers, TLS record layout, TCP segmentation, and application variation. A one-byte frame difference is consistent with the idea; it does not, by itself, prove an LZ77 back-reference or leak exactly eight bits of secret.</p>
+<p>The attack model is adaptive: hold the request shape steady, vary one candidate character, and compare response distributions against controls. The recorded 288 distinct guesses and prefix expansion support an automated search pattern. They do not supply, in this public account, a complete request-response pairing that independently proves every character was learned from ciphertext lengths.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit/Analysis Mechanics</summary>
+<h3>5.1 Establishing the MITM Position (ST.3, ST.4)</h3>
+<p>The ARP stream lasted through the short capture, and the five redirects appeared early. The two mechanisms could have steered traffic through the relay. The flow graph then showed plaintext POSTs on the victim-to-relay leg and TLS sessions from relay to the remote endpoint. That combination is stronger than the ARP count alone. I still cannot see the victim's ARP cache, accepted route, or the operator's installation actions.</p>
+<p>The relay's recorded Werkzeug/Python banner is a triage lead. Werkzeug can also belong to a legitimate service, and a banner cannot establish persistence. I would identify the owning process, deployment record, and listening socket before calling it attacker tooling.</p>
+<h3>5.2 Decrypting the Relay Leg (ST.6)</h3>
+<p>The TLS key log was decisive for my forensic view. Tshark can use session secrets supplied in NSS key-log format to decrypt matching TLS traffic. The case record says that exposed the forwarded POST guesses and response bodies. I would not publish the key log: it is secret material for these sessions. Nor would I assume all enterprise TLS can be decrypted this way; collection must be deliberately enabled, protected, and lawful. <a href="https://wiki.wireshark.org/TLS">Wireshark's guide</a> covers the decryption prerequisite.</p>
+<h3>5.3 The Oracle in Detail: LZ77 Back-Reference Arithmetic (ST.7)</h3>
+<p>The recorded 342- and 343-byte buckets made me look for a length oracle. They were reported for 200 responses on the TLS leg. To confirm the mechanism, I would map each prefix guess to one complete response, normalize the variable fields, and repeat equal-length correct and incorrect candidates. Then I would compare compressed body lengths and ciphertext record lengths separately. Without that controlled pairing, packet length can be a confounder.</p>
+<p>This is also why I would avoid calling the delta "eight bits leaked." A one-byte difference in output length can signal a yes/no comparison, with noise and false positives. The signal does not disclose eight secret bits directly.</p>
+<h3>5.4 Flag Recovery (ST.9)</h3>
+<p>The recorded decrypted bodies contained a constant second token holding the flag. That gave the analyst a direct recovery path. The changing submitted prefixes, including a branch ending in <code>IDVS-8461</code>, are consistent with a character search. The case record says guesses continued beyond the matching suffix, so the search may have exhausted a character set before moving on. I cannot prove the attacker's exact loop from that fact.</p>
+<p>I withheld the actual secret. The meaningful result is the distinction between direct decryption during analysis and an on-path compression oracle as an attack capability. The former is documented in the solve. The latter is a credible mechanism that needs the controls described above to reproduce confidently.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<h3>What the Exercise Validated</h3>
+<p>Starting with protocol hierarchy and IP conversations kept me from getting lost in thousands of frames. The small ICMP count was worth inspecting, and the key log opened a view that ciphertext alone could not provide. The POST bodies gave the answer to the host question because they showed where the secret-bearing guesses began.</p>
+<h3>What the Exercise Surfaced as Gaps</h3>
+<p>My first host submission was wrong. I had treated the relay's central position as proof that it was the compromised server. The rejection pushed me to trace data origin instead of traffic volume. In a real response, I would investigate both hosts: one may hold the sensitive data, and another may be the forwarding foothold. I would not infer the initial intrusion path from these packets.</p>
+<p>The source's detector ideas also needed more careful boundaries. A multi-IP MAC is a review signal, an ICMP redirect is a message rather than a confirmed route change, and two response lengths do not prove secret recovery. I kept those signals but attached the extra checks they require.</p>
+<h3>Transferable Principles</h3>
+<table>
+<thead>
+<tr>
+<th>Observation</th>
+<th>What I would carry into an investigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Relay dominates the flow graph</td>
+<td>Ask which host originated the sensitive data before naming the victim</td>
+</tr>
+<tr>
+<td>Many ARP replies, few ICMP redirects</td>
+<td>Check both link bindings and routing state</td>
+</tr>
+<tr>
+<td>Secret visible after TLS decryption</td>
+<td>Restrict key logs and decrypted exports as sensitive evidence</td>
+</tr>
+<tr>
+<td>Repeated prefix guesses</td>
+<td>Preserve sequence, response pairing, and timing</td>
+</tr>
+<tr>
+<td>Two neighboring size buckets</td>
+<td>Test the compression hypothesis with equal-length controls</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<h3>7.1 Individual Practitioner Skill Development</h3>
+<p>This case made me practice four separate jobs: mapping a capture, reconstructing a relay, handling TLS session secrets, and judging a side-channel claim. The last job required the most restraint. A pattern can point me toward a mechanism while leaving the mechanism unproven. I would next run a controlled application test that toggles compression and compares paired responses without placing a real secret in the fixture.</p>
+<h3>7.2 Security Operations (SOC, IR, Threat Hunting)</h3>
+<p>I would hunt for the sequence, not one magic threshold: repeated unauthorized ARP claims on a switch port, redirects from a host that is not an approved gateway, a server generating many similarly shaped POSTs, and a relay making outbound TLS connections. The <a href="./artifacts/network_hunt.py">offline hunt</a> models those four signals from normalized events. Its results are review queues, not incident verdicts.</p>
+<p>For containment, I would preserve volatile host and switch state as the situation allows, isolate the suspected relay and victim, and repair the binding or route condition. Flushing caches alone would be temporary if the source kept sending forged replies. The order of imaging and isolation depends on live risk and collection capability; I would not keep an active exfiltration path open just to preserve memory.</p>
+<h3>7.3 Intelligence Operations (SIGINT, IO, Attribution)</h3>
+<p>Size and timing remain visible around encrypted sessions, which makes this case useful for traffic-analysis thinking. They do not identify an actor. Werkzeug, nginx, and a relay-shaped topology are common technology choices, so I would use them to pivot across local evidence, not to attribute a campaign. A production intelligence report would need infrastructure history, repeated tooling fingerprints, and independent corroboration.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<h3>8.1 PCAP Triage Decision Tree</h3>
+<p>My sequence is: map protocols and conversations; inspect ARP sender claims and ICMP redirect senders; identify request origin; apply available TLS keys under evidence controls; pair guesses and responses; compare sizes with equal-length controls. At each stage I keep a separate column for observed packets and inferred host behavior. The <a href="./artifacts/README.md">tool guide</a> defines a small normalized schema for the post-capture hunt.</p>
+<h3>8.2 CRIME / Compression Oracle Assessment Checklist</h3>
+<p>For an authorized application review, I would check whether a secret and attacker-controlled input enter one compressed response; whether a client can generate many chosen requests; whether an observer can measure a stable response length; and whether equal-length candidate and control guesses produce repeatable differences. Disabling compression on the affected secret-bearing response or separating the secret from reflected input removes the central condition. Random padding may add noise but should not be the primary fix. HTTP/2 is not a generic cure for HTTP response compression.</p>
+<h3>8.3 Wireshark Display Filter Reference</h3>
+<pre><code class="language-text">arp.opcode == 2
+icmp.type == 5
+http.request.method == &quot;POST&quot;
+http.response.code == 200
+http.content_encoding contains &quot;gzip&quot;
+</code></pre>
+<p>The <a href="./artifacts/network_hunt.py">hunt code</a>, <a href="./artifacts/test_network_hunt.py">test cases</a>, and <a href="./artifacts/README.md">field guide</a> are newly built defensive examples. They use invented addresses and no challenge packets.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<h3>9a. Tier 1 - Required Checklist</h3>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>Case-specific fit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MITRE ATT&amp;CK</td>
+<td><a href="https://attack.mitre.org/techniques/T1557/002/">T1557.002</a> fits the ARP poisoning hypothesis. <a href="https://attack.mitre.org/techniques/T1071/001/">T1071.001</a> is a possible web-protocol C2 mapping if the remote service truly served that role. T1048 is not assigned merely because TLS was used; an alternative exfiltration protocol has not been established.</td>
+</tr>
+<tr>
+<td>MITRE ATLAS</td>
+<td>No AI system was in the observed path.</td>
+</tr>
+<tr>
+<td>OWASP Top 10</td>
+<td>Secret and reflected input in one compressed response are an application design risk. A generic category label cannot substitute for testing this endpoint.</td>
+</tr>
+<tr>
+<td>OWASP Top 10 for LLM Applications</td>
+<td>No LLM application was involved.</td>
+</tr>
+<tr>
+<td>CVSS, EPSS, CISA KEV</td>
+<td>These are vulnerability prioritization references, not scores for the whole captured chain. I do not assign a CVSS score or imply KEV listing for this case.</td>
+</tr>
+<tr>
+<td>Cloud frameworks</td>
+<td>No cloud workload or control plane is evidenced.</td>
+</tr>
+</tbody>
+</table>
+<h3>9b. Tier 2 - Depth Mappings</h3>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Useful mapping and limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CAPEC</td>
+<td>MITM and cache poisoning describe the hypothesized positioning. A general reverse-engineering pattern would be too broad for this oracle.</td>
+</tr>
+<tr>
+<td>CWE</td>
+<td><a href="https://cwe.mitre.org/data/definitions/203.html">CWE-203</a> fits a repeatable observable response discrepancy. Plaintext on the victim-to-relay leg needs its actual trust boundary established before calling it a separate missing-encryption defect. Cookie-attribute weaknesses were not observed.</td>
+</tr>
+<tr>
+<td>STRIDE</td>
+<td>Spoofing and information disclosure fit the proposed chain; tampering is possible from a relay position but not shown here. Repudiation, denial of service, and privilege escalation are not established.</td>
+</tr>
+<tr>
+<td>D3FEND</td>
+<td>Network traffic analysis, network isolation, and authenticated service paths are useful defensive concepts; I would verify exact technique identifiers before attaching a code.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53</td>
+<td>SC-8, SC-7, SC-23, and SI-4 are relevant control families. Mapping is guidance for a design review, not evidence of compliance.</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<h3>10a. STIX 2.1 Sample SDOs</h3>
+<p>I would represent the observed behavior as an attack pattern or incident note with a source reference and confidence, then keep sanitized IP and MAC placeholders out of machine-actionable indicators. The source included illustrative STIX objects, but their redacted UUIDs and timestamps are not valid deployable STIX IDs, and a network-traffic pattern on a generic byte count would not capture "two response buckets across a burst." A real bundle needs valid IDs, SCO relationships, indicator semantics, and schema validation before TAXII sharing. No TAXII exchange occurred.</p>
+<p>For a sample machine-readable case that a team could adapt, I would start from an internal normalized event record: <code>arp_reply_claim</code>, <code>icmp_redirect</code>, <code>post_burst</code>, and <code>response_length_pair</code>, each with source sensor, timestamp, host role, and confidence. That is the same boundary the <a href="./artifacts/network_hunt.py">offline hunt</a> uses. A detection hypothesis is not an IOC until a concrete, reliable value is established.</p>
+<h3>10b. STIG References</h3>
+<p>The source named specific STIG V-IDs for redirect acceptance and switch inspection. I would verify those identifiers against the exact platform and benchmark revision before a compliance ticket. The technically relevant checks are whether hosts accept redirects, whether switches inspect ARP on the affected VLAN, and whether exceptions for static bindings are documented. A packet capture cannot establish STIG compliance.</p>
+<h3>10c. CIS Controls v8</h3>
+<p>CIS Controls for protecting data in transit, securing network architecture, and monitoring network infrastructure are pertinent to the path. The source's safeguard numbers are useful search leads, but I would verify the current text and implementation group before claiming a formal mapping. The case tests behavior, not an organization's CIS conformance.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>11a. Standards Mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Design question this case raises</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NIST SC-8</td>
+<td>Is the victim's service traffic protected across its real trust boundary?</td>
+</tr>
+<tr>
+<td>NIST SC-23</td>
+<td>Does the client authenticate the intended service, and does the service authenticate authorized clients?</td>
+</tr>
+<tr>
+<td>NIST SC-7</td>
+<td>Can an untrusted relay host share the L2 segment or reach the remote endpoint?</td>
+</tr>
+<tr>
+<td>NIST SI-4</td>
+<td>Can the team see ARP claims, redirect attempts, and repeated application requests?</td>
+</tr>
+<tr>
+<td>NIST IA-3</td>
+<td>Are device identity and switch-port bindings available for this environment?</td>
+</tr>
+</tbody>
+</table>
+<p>These are proposed applications of controls. I did not assess a deployed system.</p>
+<h3>11b. Mitigation Realization</h3>
+<p>I would start at the application: avoid placing a secret beside reflected attacker input in a compressed response. Disable response compression for that endpoint if the response must carry a secret. I would test the actual deployed route and verify the response headers and body sizes after the change.</p>
+<p>Next I would protect the path: authenticated TLS or mTLS where service identities are controlled, segmentation and explicit egress policy, Dynamic ARP Inspection where the switch and binding source support it, and host policies that reject unneeded ICMP redirects. The source included illustrative nginx, Cisco, firewall, and sysctl snippets. I would adapt each to the actual platform and verify the effect, including static-IP binding exceptions. A standalone <code>add_header Content-Encoding ""</code> is not a reliable way to undo upstream compression, and random spaces appended to a response are not an adequate padding control.</p>
+<p>The test I would ask a purple team to run is bounded: generate invented prefix guesses against a nonsecret fixture, collect raw and normalized network events, confirm the hunt raises the expected hypotheses, then turn off compression and check that the size distinction disappears while the app still functions. Re-run with a legitimate multi-IP MAC and an authorized redirect to measure expected false positives.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>The detection work here is scaffolding. It has synthetic tests but no deployed sensor, SIEM conversion, or production false-positive rate.</p>
+<h3>12a. IOCs (Sanitized / Illustrative)</h3>
+<p>The source identifies a MAC that claimed two IPs, a relay address, a remote address and port, <code>/ping</code>, and a Werkzeug banner. Their values are placeholders here, not deployable block indicators. A URI or banner is weak alone. I would preserve exact values in the incident record, then decide whether any is stable and specific enough for sharing.</p>
+<h3>12b. Sigma Rules</h3>
+<p>The source drafted Sigma-like rules for a multi-IP ARP MAC, unauthorized ICMP redirect, and high POST rate. The aggregate <code>group-by</code>, <code>having</code>, and <code>timeframe</code> blocks in those examples are not portable Sigma detection syntax; <code>zeek_arp</code> and <code>zeek_icmp</code> are not guaranteed standard Zeek logs. I would normalize packet or switch telemetry first, convert simple event selections with a supported backend, and implement the cross-event count in the SIEM. The <a href="./artifacts/test_network_hunt.py">local tests</a> exercise that count logic on invented records, including a benign multi-address MAC.</p>
+<h3>12c. Splunk SPL Detection Queries</h3>
+<p>An SPL translation needs a real data model. The source's ARP query grouped by exact <code>_time</code>, which would often separate the claims it wanted to correlate. A starting pattern after mapping fields is:</p>
+<pre><code class="language-spl">index=network event_type=arp_reply
+| bin _time span=1m
+| stats dc(claimed_ip) as ip_count values(claimed_ip) as ips by _time, src_mac, switch_port
+| where ip_count &gt; 1
+</code></pre>
+<p>That is a review queue and needs an authorized-binding lookup. For redirects, compare sender IP against an approved gateway lookup. For POST bursts, group by source, destination, URI, and minute. For a suspected oracle, retain per-response sizes and pair them with the corresponding request before testing a two-bucket distribution. These are query designs; I have not run them against a Splunk backend.</p>
+<h3>12d. Log Source and Data Pipeline Requirements</h3>
+<p>ARP needs L2 packet capture, switch inspection events, or endpoint neighbor state. ICMP needs packet or host telemetry that retains type, code, sender, and advertised gateway. HTTP requests need method, endpoint, timestamp, and source identity. The length hunt needs a response-size measurement that is consistent across the same leg and a reliable request-response key. A TLS key log adds plaintext for authorized forensics, but it is sensitive evidence and is not required to observe outer packet lengths. Zeek's <a href="https://docs.zeek.org/en/current/reference/zeekscript/log-files.html">current standard log list</a> does not promise <code>arp.log</code> or <code>icmp.log</code>; those would require a known local package or custom pipeline.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">solve process flow</a> near the top keeps the wrong host choice visible. It also separates the redirection evidence, the analyst's TLS decryption, and the length-oracle hypothesis. That is the sequence I would put on a case board before deciding what to contain.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://www.rfc-editor.org/rfc/rfc826">RFC 826: Address Resolution Protocol</a></li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc792">RFC 792: Internet Control Message Protocol</a></li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc8446">RFC 8446: TLS 1.3</a></li>
+<li><a href="https://breachattack.com/">BREACH project and original research</a></li>
+<li><a href="https://wiki.wireshark.org/TLS">Wireshark TLS decryption guide</a></li>
+<li><a href="https://attack.mitre.org/techniques/T1557/002/">MITRE ATT&amp;CK T1557.002: ARP Cache Poisoning</a></li>
+<li><a href="https://cwe.mitre.org/data/definitions/203.html">MITRE CWE-203: Observable Discrepancy</a></li>
+<li><a href="https://docs.zeek.org/en/current/reference/zeekscript/log-files.html">Zeek standard log reference</a></li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
