@@ -999,5 +999,29 @@
     ],
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/forensics/motion-delta-reconstruction/"
+  },
+  {
+    "title": "The ELF That Would Not Load",
+    "category": "Reversing",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "ELF",
+      "binary tampering",
+      "static analysis",
+      "byte substitution",
+      "header repair",
+      "Capstone"
+    ],
+    "summary": "A changed ELF magic byte led me to a file-wide null-to-space substitution. When a blanket repair broke the dynamic linker, I traced the surviving symbols and character immediates to reconstruct the intended output statically.",
+    "aliases": [
+      "corrupt ELF",
+      "null to space",
+      "ELF magic",
+      "program header",
+      "static output recovery"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/reversing/tampered-elf-static-recovery/"
   }
 ]

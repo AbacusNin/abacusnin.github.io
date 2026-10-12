@@ -1,0 +1,9 @@
+# ELF substitution review proof of concept
+
+`elf_substitution_review.py` reads one file as bytes, checks a 32 MiB limit, and prints JSON. It does not execute, patch, disassemble, or upload the file. Its positive condition is deliberately narrow: an ELF-like identification (`7f 45 4c`), valid class/data/version bytes, changed fourth magic byte, no NUL bytes in at least 4096 bytes, and more than half the file consisting of `0x20`. The thresholds are a lab hypothesis, not a proven detector.
+
+Run `python -B elf_substitution_review.py path/to/file` or `python -B -m unittest test_pocs.py`. The tests build invented byte strings in memory: a positive null-to-space transform, a benign ELF-like file, a magic-only near miss, a short-file near miss, and a many-to-one transform demonstration. These are structural fixtures, not runnable ELF files and not the challenge binary.
+
+Input sensor: raw file bytes from a file collection or on-write scanning pipeline. Output fields: size, four-byte prefix, ELF-like identification status, zero and space counts, space ratio, contributing signals, and a boolean review lead. An integration would also need a stable file identifier, host, path, collection time, SHA-256, and access controls supplied by the collector; this script does not create or verify those fields. A SIEM event without file bytes cannot calculate this signature. Apply allowlists and review known text conversion/build paths before alerting. Files with many spaces or corrupted transfer encodings can match; other obfuscation patterns will be missed. Neither a hit nor a negative result establishes intent, malware status, original bytes, or the file's runtime behavior.
+
+Local tests validate Python logic only. No YARA/Sigma compiler, endpoint sensor, production corpus, false-positive rate, backend conversion, or challenge-file replay was available for this proof of concept.

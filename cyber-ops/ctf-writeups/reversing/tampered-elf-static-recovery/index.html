@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The ELF That Would Not Load - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="A changed ELF magic byte led me to a file-wide null-to-space substitution. When a blanket repair broke the dynamic linker, I traced the surviving symbols and character immediates to reconstruct the intended output statically.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/reversing/tampered-elf-static-recovery/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The ELF That Would Not Load">
+  <meta property="og:description" content="A changed ELF magic byte led me to a file-wide null-to-space substitution. When a blanket repair broke the dynamic linker, I traced the surviving symbols and character immediates to reconstruct the intended output statically.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/reversing/tampered-elf-static-recovery/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Reversing / <span aria-current="page">The ELF That Would Not Load</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The ELF That Would Not Load</h1>
+        <p class="lead">I could make the loader recognize the file, but that was not enough to make it run.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Recover the intended stdout of a deliberately corrupted x86_64 PIE executable without relying on execution.</p>
+<p><strong>What I did.</strong> Compare the first bytes and byte distribution, test a repair, then use surviving symbols, segment mapping, raw code, and call order.</p>
+<p><strong>The result.</strong> I reached the intended output by static reconstruction after the loader path failed; the exact stdout and an acceptance receipt are not retained.</p>
+<p><strong>The limit.</strong> The binary and final stdout are not available for independent replay here. The linked defensive proof of concept uses invented bytes and tests file-triage logic only.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Check the first bytes; Count every byte; Try a broad repair; Trace surviving structure; Recover output statically">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Check the first bytes</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">ELF became ELK</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Count every byte</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">NUL absent and spaces dominant</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Try a broad repair</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Loader aborts before main</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Trace surviving structure</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Symbols and code give footholds</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Recover output statically</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Preserve uncertain bytes</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>At-a-Glance Mental Model</h2>
+<p>The first four bytes looked like an ELF signature with its final letter changed. I expected a simple header repair until I counted the whole file: the roughly 17 KB image had no zero bytes and about 14,100 spaces. A global <code>0x00</code> to <code>0x20</code> change explained that pattern, but it destroyed information. Some of those spaces had been real spaces all along. My attempt to turn every space back into a zero made the file recognizable and got it past the kernel, then the dynamic linker aborted. I moved to static recovery: find the surviving functions, read low bytes of character immediates, check format strings and call targets, and assemble output in call order. <a href="#analysis-flow">The flow above</a> follows those pivots.</p>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Reverse Engineering / File Format Forensics</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>ELF, binary tampering, static analysis, byte substitution, header repair, Capstone</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved</td>
+</tr>
+<tr>
+<td>Result</td>
+<td>Static recovery reported; final stdout and platform acceptance were not retained</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/reversing/tampered-elf-static-recovery/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I was given a single on-disk binary and asked what it was meant to print. <code>file</code> called it <code>data</code>, even though the challenge hint pointed toward ELF. I had no source code and no service to query. The file was an x86_64 position-independent executable after enough of its header was repaired to classify it, but executing that broad repair did not reach its own code.</p>
+<p>The challenge models a useful forensic problem: an executable-shaped file may fail ordinary typing or loading, yet still hold enough structure to analyze. A real incident could involve a damaged transfer, an adversarially altered file, or a staged payload that another component repairs. This exercise alone does not establish a real adversary, a repair loader, or a host compromise.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I began with the first 64 bytes using <code>od -A x -t x1z -v</code>. The signature was <code>7f 45 4c 4b</code>, spelling <code>ELK</code> where an ELF file should begin <code>7f 45 4c 46</code>. At that point I suspected one magic-byte change. Before patching it, I counted every byte with Python's <code>Counter</code>. In approximately 17 KB, there were zero <code>0x00</code> bytes and roughly 14,100 <code>0x20</code> bytes. Those are reported rounded figures; I do not have the image to remeasure them.</p>
+<p>That distribution changed the question. The evidence suggested two visible alterations: the <code>F</code>-to-<code>K</code> magic change and a file-wide <code>0x00</code>-to-<code>0x20</code> substitution. I tried the tempting broad inverse, changing all spaces to zero and restoring the magic. <code>file</code> then identified an x86_64 PIE and the kernel accepted it, but the dynamic linker stopped at <code>elf_get_dynamic_info</code> before <code>main</code>. Recognition was not recovery. A genuine <code>0x20</code> in a string, instruction, or offset is indistinguishable from a substituted zero without context.</p>
+<p>I changed course to raw-byte analysis. <code>readelf -s</code> and <code>nm</code> were the symbol-inspection tools; <code>readelf -s</code> exposed <code>main</code>, <code>flag</code>, and <code>flag1</code> through <code>flag4</code>. The text <code>LOAD</code> segment had both file offset and virtual address <code>0x1000</code>, so within that segment its symbol virtual addresses matched file offsets. I used that mapping, Capstone disassembly, <code>mov</code> immediates, format-string references, and the call chain to reconstruct the printed characters. I reached the intended output statically. I did not retain the exact output or an accepted submission, so I cannot replay or display either result here.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<h3>3.1 Byte-distribution triage</h3>
+<p>I counted values before changing the file. <code>Counter(data)</code> exposed the missing NULs and dominant spaces more quickly than repeated hex dumps. The defensive <a href="artifacts/elf_substitution_review.py">read-only ELF substitution reviewer</a> applies a bounded version of this check to a supplied file and returns JSON. Its <a href="artifacts/README.md">usage and limits</a> matter: a match is a review lead, not a malicious verdict.</p>
+<h3>3.2 ELF magic / header sanity check</h3>
+<p>The first four bytes were <code>7f 45 4c 4b</code>. I checked <code>EI_CLASS</code>, <code>EI_DATA</code>, and <code>EI_VERSION</code> before treating the prefix as ELF-like. In an ELF64 little-endian header, <code>e_type</code> begins at offset <code>0x10</code> and <code>e_machine</code> at <code>0x12</code>. Their upper bytes can reveal a substitution when otherwise small values have become <code>0x20xx</code>. This is a clue, not a safe automatic correction: endianness and file class must be checked first.</p>
+<h3>3.3 Static recovery via Capstone</h3>
+<p>The useful raw-code pattern was <code>bf 6d 00 00 00</code> for <code>mov edi, 0x6d</code>, which becomes <code>bf 6d 20 20 20</code>. The low byte <code>0x6d</code>, or <code>m</code>, survives. I traced <code>putchar</code> arguments from <code>edi</code>, <code>%c</code> arguments from <code>esi</code>, and RIP-relative <code>lea</code> references to format strings. I had to inspect string boundaries and small displacements in context, since every <code>0x20</code> could be an original space. I then walked the short <code>flag</code> function chain in execution order. A general simulator would need the actual symbol ranges and PLT targets, so this method is not a ready-to-run tool for another ELF.</p>
+<h3>3.4 Fallback: surgical patch + execute under strace</h3>
+<p>I prepared a narrower fallback: repair only structural fields needed for loading, then capture writes in an isolated environment with <code>strace -e trace=write</code>. I did not complete that path. It would require checking dynamic entries and relocations one at a time; a broad replacement would simply repeat the failure. I kept static recovery as the recorded route to the output.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<h3>4.1 ELF header at a glance</h3>
+<p>An ELF file starts with the 16-byte <code>e_ident</code> array. The first four bytes are <code>\x7fELF</code>; class, data encoding, and version follow. <code>Elf64_Ehdr</code> then contains type, machine, entry point, and offsets to program and section headers. The program headers describe what the loader maps. The section and symbol information helped me navigate this image, while the dynamic section still had to satisfy the linker's rules. Fixing a signature does not fix all of those fields.</p>
+<h3>4.2 Why the substitution is so destructive</h3>
+<p>Changing every zero byte to <code>0x20</code> damages small multibyte fields, padding, NUL-terminated names and strings, and instruction operands. For example, <code>0x00000003</code> in little-endian storage becomes bytes ending in three spaces when the zero positions change. A call displacement can point somewhere entirely different after that. The transformation is many-to-one: original zero and original space both appear as space. That is why my wholesale inverse could create a recognizable but still broken executable.</p>
+<h3>4.3 What survives</h3>
+<p>Nonzero bytes other than <code>0x20</code> survive this rule. In the character-immediate example, the low <code>0x6d</code> survives even though the higher zeros do not. Some opcodes, symbol-name letters, and relative structural relationships remain useful. None is universally safe: an intended literal space is ambiguous, and an opcode or displacement containing an original zero changes. I checked each candidate against its instruction form, segment bounds, adjacent calls, and expected output behavior.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<h3>5.1 The invariant that was violated</h3>
+<p>The loader needs the on-disk header and dynamic records to contain their actual encoded values. Here the magic was wrong, and the substituted zeros damaged fields throughout the image. The magic change explains the initial type and kernel rejection. The broad inverse repaired that gate while corrupting legitimate spaces; the subsequent linker assertion showed that a file that passes the first gate can still be unusable. It does not by itself identify which dynamic record was wrong.</p>
+<h3>5.2 The reconstruction recipe</h3>
+<p>I kept the original bytes intact, mapped a symbol virtual address to a file offset with <code>p_offset + (VA - p_vaddr)</code>, and disassembled only within the mapped segment and known function sizes. The text segment's offset and VA were both <code>0x1000</code> in this case; that equality must never be assumed for another ELF. For each candidate <code>mov reg32, imm32</code> feeding <code>putchar</code> or <code>printf</code>, I retained the low byte only when the encoding and surrounding call supported it. I identified <code>0x1030</code> and <code>0x1040</code> as PLT call targets in this image; those addresses cannot be generalized. I treated each RIP-relative displacement and rodata terminator as a hypothesis to check, then followed the actual call order.</p>
+<p>This also exposed a mistake: I first trusted a disassembler-resolved call target and got an off-by-one result. Recomputing from the raw instruction address, length, and signed displacement was the right check. I assembled the intended stdout, but I cannot reproduce its exact bytes here.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<h3>6.1 What the exercise validated</h3>
+<p>The cheapest useful pivot was a byte count. It showed the corruption was wider than the header before I spent time on loaders. Symbols and raw code still offered a foothold when normal file parsing was unreliable. Capstone could disassemble a supplied byte buffer without successfully loading the ELF.</p>
+<h3>6.2 Gaps and inefficiencies surfaced</h3>
+<p>I spent about ten minutes on the blanket inverse even though the map was noninvertible. I also trusted a resolved target once without checking raw displacement arithmetic. Both errors came from treating a plausible tool output as if it had already restored the original bytes. I would establish the many-to-one property and the segment mapping first next time.</p>
+<h3>6.3 Transferable principles</h3>
+<p>I now put hashes, magic, byte counts, and a small header dump at the start of unfamiliar-file triage. I document the transform rule and its ambiguity before attempting repair. If a loader refuses a file, static analysis can still recover limited behavior; I keep that analysis separate from claims about actual execution.</p>
+<h3>6.4 Exercise-to-operations mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Exercise step</th>
+<th>Operational use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>file</code>, <code>od</code>, and byte counts</td>
+<td>Preserve the file, hash it, and investigate classifier failures without altering evidence.</td>
+</tr>
+<tr>
+<td>Broad inverse failed</td>
+<td>Avoid automatic bulk repair of many-to-one transformations.</td>
+</tr>
+<tr>
+<td>Symbol and program-header mapping</td>
+<td>Use a bounded static path when a sample cannot safely run.</td>
+</tr>
+<tr>
+<td>Raw call-target check</td>
+<td>Verify disassembler interpretation against instruction bytes.</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<h3>7.1 Individual practitioner skill development</h3>
+<p>This exercise made me practice <code>e_ident</code>, ELF header fields, program headers, symbol addresses, the dynamic section, little-endian immediates, RIP-relative addressing, and call sequencing together. The next useful drills would be a stripped ELF, a nonidentity VA-to-offset mapping, and a literal space in the target output; each removes a convenience this case had.</p>
+<h3>7.2 Security operations (SOC, IR, threat hunting)</h3>
+<p>For an endpoint collection, I would preserve the original file and hash, inspect its first bytes, and calculate distribution features before any repair. A near-ELF prefix plus zero NULs and dominant spaces is a narrow lead for file review. An <code>execve</code> format failure can help prioritize that review, but the syscall event does not carry file bytes or prove this substitution. I would correlate by a reliable path or file identity, host, and time, then compare with build pipelines and transfers that may have altered encoding accidentally.</p>
+<h3>7.3 Intelligence operations (SIGINT, IO/IW, OSINT, attribution)</h3>
+<p>If several collected samples share a corruption rule, I would record it as a low-confidence clustering feature alongside hashes, provenance, compiler traits, and any actual repair code. A shared rule alone cannot identify an actor; independent text conversion could produce it. A real loader that repairs the bytes would strengthen an adversary-behavior hypothesis, but none was observed in this case.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<h3>8.1 Triage decision tree for unfamiliar binaries</h3>
+<p>I use this order: preserve and hash; inspect magic; count bytes; check class/endianness and header fields; decide whether a transform is plausible and reversible in specific positions; map symbols and segments; then analyze raw code. A dynamic run belongs in a controlled lab after I understand what was changed. The <a href="artifacts/README.md">artifact guide</a> states what the local triage proof of concept can and cannot tell me.</p>
+<h3>8.2 Reusable: byte-distribution probe (abstracted from 3.1)</h3>
+<p>The <a href="artifacts/elf_substitution_review.py">Python reviewer</a> returns file size, prefix, zero count, space count and ratio, contributing signals, and a boolean <code>review_lead</code>. It reads at most 32 MiB and never writes to the input. Its positive condition mirrors the reported pattern; those thresholds have not been tuned on a production corpus.</p>
+<h3>8.3 Reusable: x86_64 immediate harvester</h3>
+<p>A character harvester can start with Capstone's x86_64 mode and emit the address, register, raw immediate bytes, and candidate low byte for <code>mov reg32, imm32</code>. I would require a nearby relevant output call and record uncertainty around original <code>0x20</code> values. Merely masking every decoded immediate with <code>0xff</code> will produce false characters from unrelated instructions. A five-function replay needs actual symbol ranges, PLT targets, format strings, and call validation; I have not packaged one as a runnable recovery utility.</p>
+<h3>8.4 Solve-pattern checklist for tampered-header artifacts</h3>
+<p>Record the original hash; dump the header; count all bytes; identify a plausible rule; mark ambiguous positions; map VA through program headers; cross-check symbols and instruction bytes; reconstruct output in call order; and state exactly what was verified. The <a href="artifacts/test_pocs.py">synthetic tests</a> include a positive, a valid-header benign case, a magic-only near miss, and a direct demonstration that zero and space collapse to the same byte.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<p>The closest ATT&amp;CK analogy is <a href="https://attack.mitre.org/techniques/T1027/">T1027, Obfuscated Files or Information</a>, if a real adversary deliberately altered a payload to make analysis harder. This CTF does not prove such activity. I would apply <a href="https://attack.mitre.org/techniques/T1140/">T1140, Deobfuscate/Decode Files or Information</a> only after observing an adversary's loader or script restoring the bytes, not to my own analysis. <a href="https://attack.mitre.org/techniques/T1027/001/">T1027.001, Binary Padding</a> describes added junk data and does not fit a zero-to-space substitution. The magic mismatch also does not, by itself, show impersonation required for Masquerading. I do not assign those two labels to the case.</p>
+<p>On the defensive side, <a href="https://d3fend.mitre.org/technique/d3f%3AFileContentRules/">D3-FCR, File Content Rules</a> fits a tested content signature, and <a href="https://d3fend.mitre.org/technique/d3f%3AFileAnalysis/">D3-FA, File Analysis</a> fits the static review. These describe proposed defensive practice here. CAPEC-636 concerns hiding code in file features and is too specific for this substitution; CAPEC-572 was not needed to explain the mechanism. OWASP and STRIDE add little to a single damaged binary with no application design to assess.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<h3>10.1 STIX sample</h3>
+<p>I would share this as an <em>analytic description</em> first: ELF-like prefix <code>7f 45 4c ??</code>, altered fourth byte, valid class/data/version, no NULs in a file of at least 4096 bytes, and spaces over half the bytes. It is a heuristic, not a known malicious sample. A STIX 2.1 Indicator with a YARA pattern would require a valid rule, stable ID and timestamps, defined producer, confidence, and test evidence. I do not have those prerequisites or an exchange destination, so there is no publishable STIX object or TAXII feed for this case.</p>
+<h3>10.2 STIG applicability</h3>
+<p>There is no STIG check for this particular CTF byte pattern. In an actual deployment I would inspect the applicable operating-system and endpoint-protection STIG for configured malware protection and logging, then record the exact product and version. I would not claim a configuration finding from this sample alone.</p>
+<h3>10.3 CIS Controls v8</h3>
+<p><a href="https://www.cisecurity.org/controls/cis-controls-navigator/v8">CIS Controls v8</a> places endpoint malware software under Safeguard 10.1, audit-log collection under 8.2, centralized alerting under 13.1, and host-based intrusion prevention under 13.7 where appropriate. A tested file-content rule could support 10.1 through a product that actually accepts it. A reliable event join could support 13.1. Network-flow collection under 13.6 is not the sensor needed for this on-disk byte pattern. None of these controls was deployed in the challenge.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>11a. Standards Mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Control family</th>
+<th>Case-fit use</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NIST SP 800-53 SI-3</td>
+<td>Malware protection could inspect suspicious files at collection or write time.</td>
+<td>Proposed; no product integration tested.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 SI-4</td>
+<td>Monitoring could join a file verdict with a failed execution event.</td>
+<td>Proposed; requires stable identity and timestamps.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 SI-7</td>
+<td>Integrity checks could detect modification of a known managed executable.</td>
+<td>Conditional; no trusted baseline here.</td>
+</tr>
+<tr>
+<td>CIS 10.1 / 8.2 / 13.1</td>
+<td>Endpoint scanning, logs, and centralized review.</td>
+<td>Proposed implementation path.</td>
+</tr>
+</tbody>
+</table>
+<h3>11b. Mitigation Realization</h3>
+<p>I would integrate file-byte scanning with an agent capable of on-write or scheduled inspection, route leads to an analyst queue, and collect <code>execve</code> failure events separately. The collector would attach host, path or file ID, timestamp, and SHA-256. Tuning would compare known converters, build outputs, and test fixtures. I would not auto-quarantine on this heuristic alone. FIM or IMA becomes useful where a trusted binary baseline exists; it does not reconstruct unknown bytes. These are implementation requirements, not controls proven active by this exercise.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<h3>12.1 IOCs (illustrative, sanitized)</h3>
+<p>There is no retained hash, host, path, actor, or network indicator to share. The reported artifact traits are <code>7f 45 4c 4b</code>, zero NULs, roughly 14,100 spaces, and approximately 17 KB total. Only the first trait is an exact recorded byte sequence; the counts are rounded. I treat the combination as a file-triage signature, not an IOC tied to a campaign.</p>
+<h3>12.2 YARA rule</h3>
+<p>A YARA rule could combine ELF-like identification with <code>math.count</code> thresholds. I have not validated that form with a YARA engine or measured false positives. The <a href="artifacts/elf_substitution_review.py">Python implementation</a> is the tested local form of the narrow hypothesis. Its result should feed manual review before any YARA port is deployed.</p>
+<h3>12.3 Sigma rule</h3>
+<p>A Linux <code>auditd</code> Sigma rule for <code>execve</code> returning <code>-8</code> could flag an <code>ENOEXEC</code> event, provided the log pipeline maps syscall and exit fields as assumed. Such an event cannot assert ELF-like magic because audit events do not contain the file's first bytes. I would title that rule "Linux exec format failure," keep it low severity, and enrich it with a separate file scan. I have not shipped it as a standalone detector because the event alone does not answer the file-content question.</p>
+<h3>12.4 SIEM queries</h3>
+<p>The useful join is <code>file_scan(host, stable_file_id_or_path, scan_time, verdict)</code> to <code>exec_failure(host, attempted_path, exec_time, errno)</code> within a short, ordered window. An auditd <code>exe</code> field can name the <em>calling</em> executable rather than the failed target, so I would normalize the target from appropriate <code>PATH</code> records and verify an event adapter against real logs. A file-create event joined to an unrelated process-create event by device alone does not establish failed execution. There is no validated SPL or KQL query to publish for this particular sensor schema.</p>
+<h3>12.5 Telemetry requirements</h3>
+<p>The byte signature requires access to the file image, or counts calculated by a trusted collector. For correlation, I need host ID, stable file identity or canonical path, collection time, hash, scan result, attempted execution target, syscall return, and synchronized clocks. I would document retention and permissions for binary collection. Sysmon for Linux process-creation records can provide useful process context, but cannot substitute for a missing file-byte scan or prove a failed attempt by themselves.</p>
+<h3>12.6 Detection-engineering notes</h3>
+<p>I tested the <a href="artifacts/test_pocs.py">invented positive, benign, and near-miss fixtures</a> locally. The positive reproduces the hypothesized substitution; the near miss changes only the magic; the benign retains a standard ELF-like header. Those tests establish only the Python branch logic. Real ELF corpora, build pipelines, anti-malware scanning, YARA conversion, audit schemas, false-positive rates, and real attacker samples remain untested. A hit should be triaged with provenance and file content, not treated as proof of intent.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow diagram above</a> shows the decisive contrast: a file-type repair got me past the first gate, then a loader failure pushed me toward static structure and output reconstruction. For defensive use, the corresponding layers are file-byte triage, endpoint context, a possible execution-failure join, and an analyst decision. None of the proposed operational layers was live in the CTF.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://refspecs.linuxfoundation.org/elf/elf.pdf">ELF specification, System V ABI</a>, for the file header, program headers, and symbol representation.</li>
+<li><a href="https://attack.mitre.org/techniques/T1027/">MITRE ATT&amp;CK T1027</a>, <a href="https://attack.mitre.org/techniques/T1027/001/">T1027.001</a>, and <a href="https://attack.mitre.org/techniques/T1140/">T1140</a>, for the bounded technique comparison.</li>
+<li><a href="https://d3fend.mitre.org/technique/d3f%3AFileAnalysis/">MITRE D3FEND File Analysis</a> and <a href="https://d3fend.mitre.org/technique/d3f%3AFileContentRules/">File Content Rules</a>.</li>
+<li><a href="https://www.cisecurity.org/controls/cis-controls-navigator/v8">CIS Controls v8 Navigator</a>, for safeguard wording.</li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5</a>, for SI-3, SI-4, and SI-7.</li>
+<li><a href="https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html">OASIS STIX 2.1</a>, for requirements of a structured indicator.</li>
+<li><a href="https://man7.org/linux/man-pages/man2/execve.2.html">Linux <code>execve(2)</code></a>, for <code>ENOEXEC</code> semantics.</li>
+<li><a href="https://www.capstone-engine.org/documentation.html">Capstone documentation</a>, for raw-buffer disassembly.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
