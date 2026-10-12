@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Loop That Would Outlive the Ciphertext - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="A broken decryptor hid a Chebyshev recurrence behind an impossible loop. I used doubling to recover a repeating XOR keystream, then accounted for the three ciphertext bytes the first attempt lost.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/chebyshev-xor/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Loop That Would Outlive the Ciphertext">
+  <meta property="og:description" content="A broken decryptor hid a Chebyshev recurrence behind an impossible loop. I used doubling to recover a repeating XOR keystream, then accounted for the three ciphertext bytes the first attempt lost.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/chebyshev-xor/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Cryptography / <span aria-current="page">The Loop That Would Outlive the Ciphertext</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Loop That Would Outlive the Ciphertext</h1>
+        <p class="lead">The script looked one fix away from working. Then I saw its loop count: 10 to the 25th.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Recover the plaintext from a 35-byte encrypted file and a Python decryptor that could not finish as written.</p>
+<p><strong>What I did.</strong> I read the code, identified the recurrence, checked a logarithmic evaluator against the slow loop, and cycled the recovered key bytes across the full file.</p>
+<p><strong>The result.</strong> The account reports a flag-shaped plaintext and trailing newline after cycling the keystream. The local lab verifies the method with invented data.</p>
+<p><strong>The limit.</strong> The ciphertext bytes, actual base value, full plaintext, and platform receipt are absent here, so I could not independently replay the challenge solve.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Read the script; Name the recurrence; Test the shortcut; Recover key bytes; Cycle across 35 bytes">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Read the script</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Find the file and loop defects</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Name the recurrence</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Chebyshev T-n mod p</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Test the shortcut</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Slow and fast agree</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Recover key bytes</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Use minimal big-endian form</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Cycle across 35 bytes</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Check the complete result</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Lightweight Overview</h2>
+<p>I started with <code>flag.enc</code> and a Python script meant to decode it. The script could not read the file as written, and its central loop tried to run <code>10**25</code> iterations. The recurrence inside that loop was the useful clue. It computes a Chebyshev polynomial in a prime field, so I could evaluate the same term with doubling in about 84 bit steps. My first XOR covered only 32 of the file's 35 bytes. Cycling the computed key bytes gave the complete flag-shaped result reported in the challenge account. The <a href="#analysis-flow">flow above</a> shows those checkpoints.</p>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Cryptography</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>stream-cipher, chebyshev-polynomial, finite-field-arithmetic, lucas-doubling, custom-crypto, code-review</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved</td>
+</tr>
+<tr>
+<td>Recorded result</td>
+<td>A 35-byte ciphertext decoded to a flag-shaped line after the recovered key bytes were cycled</td>
+</tr>
+<tr>
+<td>Evidence boundary</td>
+<td>The ciphertext, actual base value, full plaintext, and grading receipt are not present in this account</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/crypto/chebyshev-xor/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>The prompt asked why a decode script did not work. I had two challenge items: a 35-byte <code>flag.enc</code> and a Python decryptor. The goal was plaintext recovery, not merely making the script run. A string method was called on a file name, a recurrence loop had a counter of <code>10**25</code>, and the final <code>zip()</code> would stop after one short key block. Each defect mattered at a different point in the solve.</p>
+<p>For a defensive analogy, imagine recovering a binary blob and an incomplete decoder from a suspicious host. I would want to identify the transform, make it tractable, and preserve the decoded bytes for triage. This exercise did not include a host, intrusion, or adversary sample. It demonstrated how a custom transform could slow an analyst who simply runs the code.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<h3>2.1 Initial triage of the supplied script</h3>
+<p>I read <code>decode.py</code> before executing it. <code>("flag.enc").read_bytes()</code> fails because a string has no <code>read_bytes()</code> method; <code>Path("flag.enc").read_bytes()</code> is the intended shape. The <code>key - 1</code> loop was the real blocker, with <code>key = 10**25</code>. At a hypothetical hundred million modular operations per second, that many iterations would still take roughly 3.2 billion years. The actual Python rate would be different, but no benchmark is needed to know the linear loop is unusable.</p>
+<p>The file had 35 bytes. <code>long_to_bytes(secret)</code> yields at most 32 bytes for an element below the 256-bit prime, and <code>zip(ciphertext, key_bytes)</code> silently discards the tail. My first run produced a 32-byte partial output, so this was a concrete mismatch.</p>
+<h3>2.2 Identification of the recurrence</h3>
+<p>The loop carried <code>(prev, current) = (1, x)</code> and updated <code>current</code> with <code>(2*x*current - prev) % p</code>. Those are the starting values and recurrence for the Chebyshev polynomial of the first kind, <code>T_n(x)</code>. The modulus was the secp256k1 base-field prime, <code>2**256 - 2**32 - 977</code>. I did not need elliptic-curve group operations. Here it is a large prime modulus for arithmetic on the recurrence.</p>
+<p>I briefly checked whether the expression was a Lucas <code>U_n</code> or <code>V_n</code> variant. The initial pair <code>(1, x)</code> and the <code>2*x</code> coefficient made the Chebyshev reading direct. That mattered because I could use its doubling identities instead of trying to speed up the original loop with a faster machine.</p>
+<h3>2.3 Replacing the linear recurrence with logarithmic computation</h3>
+<p>I maintained adjacent values <code>(T_k, T_{k+1})</code> and stepped through the bits of <code>n</code>. The identities are <code>T_{2k} = 2*T_k**2 - 1</code> and <code>T_{2k+1} = 2*T_k*T_{k+1} - x</code>, all reduced modulo <code>p</code>. <code>10**25</code> has 84 bits. The work depends on those bits rather than on twenty-five digits' worth of iterations. The linked <a href="artifacts/chebyshev_lab.py">Chebyshev lab</a> contains the exact bounded implementation and an independent matrix evaluator.</p>
+<h3>2.4 Verification before execution</h3>
+<p>I compared the fast routine with the slow recurrence for indices <code>0, 1, 2, 3, 5, 17, 100, 1000, 12345</code>. My notes report exact agreement at all nine. I kept that gate before evaluating <code>10**25</code>: a swapped pair or sign error in a doubling formula would produce plausible-looking bytes and a wrong key. The newly authored <a href="artifacts/test_pocs.py">tests</a> repeat the nine checks with invented <code>x</code>, and compare against a separate matrix implementation. They also compare the fast and matrix paths at <code>10**25</code>; the actual challenge base value is not available.</p>
+<h3>2.5 First decryption attempt - partial output</h3>
+<p>With the fast recurrence in place, the first XOR returned 32 bytes. The recorded text began with the expected flag prefix and then stopped without a closing brace. That matched the <code>zip()</code> limit from my static read. I did not treat the plausible prefix as a finished solve. Three ciphertext bytes remained.</p>
+<h3>2.6 Resolving the length mismatch</h3>
+<p>I tried three ways to cover the tail:</p>
+<table>
+<thead>
+<tr>
+<th>Candidate</th>
+<th>Recorded result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cycle the <code>long_to_bytes(secret)</code> block</td>
+<td>Printable completion, closing brace, trailing newline</td>
+</tr>
+<tr>
+<td>Add zero bytes</td>
+<td>Nonprintable tail</td>
+</tr>
+<tr>
+<td>Concatenate neighboring <code>T_k</code> values</td>
+<td>Nonprintable tail</td>
+</tr>
+</tbody>
+</table>
+<p>Cycling was the only candidate consistent with the full recorded output. My notes describe a 32-byte block in this run, but <code>long_to_bytes</code> uses the shortest big-endian representation of an integer, so another value could use fewer bytes. I preserve that exact conversion before cycling. The challenge's encryptor is absent here; the reported plaintext and failed alternatives support the cycle inference.</p>
+<h3>2.7 Dead ends documented for tradecraft</h3>
+<p>I considered a hidden key in the constants and a different Lucas-sequence interpretation. The recurrence shape and its starting pair made those detours unnecessary. I also kept the zero-pad and neighboring-polynomial failures because the length fix was an inference from output, not a rule I could read directly from the supplied decryptor.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<h3>3.1 Working decryption</h3>
+<p>The essential replacement is small. The <a href="artifacts/chebyshev_lab.py">linked lab</a> runs it with synthetic inputs, and the exact decryption requires the missing challenge values:</p>
+<pre><code class="language-python">from pathlib import Path
+from Crypto.Util.number import long_to_bytes
+from itertools import cycle, islice
+
+ct = Path(&quot;flag.enc&quot;).read_bytes()
+secret = chebyshev_T(base_val, 10**25, p)
+key_bytes = long_to_bytes(secret)
+keystream = bytes(islice(cycle(key_bytes), len(ct)))
+plaintext = bytes(c ^ k for c, k in zip(ct, keystream))
+</code></pre>
+<p>My example uses illustrative <code>BASE_VAL = 0x1337C0DE</code>, separate from the challenge base. The linked lab uses Python's built-in <code>int.to_bytes</code> to reproduce <code>long_to_bytes</code>'s minimal big-endian behavior for a nonnegative field element, avoiding an extra dependency. It bounds the index size and rejects an empty keystream.</p>
+<h3>3.2 Reference-versus-fast equivalence harness</h3>
+<p>The slow reference starts with <code>1, x</code> and repeats <code>prev, cur = cur, (2*x*cur - prev) % p</code>. I ran it only at small indices. The <a href="artifacts/test_pocs.py">local tests</a> compare that reference against fast doubling, independent matrix exponentiation, and the <a href="artifacts/linear_recurrence.py">generic recurrence evaluator</a> at the nine recorded indices. Agreement on test points supports the implementation. It does not validate the missing ciphertext or the reported flag.</p>
+<h3>3.3 Fallback path (not executed but prepared)</h3>
+<p>If the doubling derivation had failed, I could use the companion matrix <code>[[2*x, -1], [1, 0]]</code>. For <code>n &gt;= 1</code>, its <code>(n-1)</code>st power acting on <code>[x, 1]</code> has <code>T_n</code> in the first component. Matrix exponentiation also takes logarithmic steps. I did not need that route for the reported challenge. The lab's independent matrix evaluator now gives the shortcut another mathematical check. The account's written formula for the full power matrix had the indices shifted; the vector form above is the relation I tested.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<h3>4.1 Chebyshev polynomials of the first kind</h3>
+<p><code>T_0(x)=1</code>, <code>T_1(x)=x</code>, and <code>T_{n+1}(x)=2*x*T_n(x)-T_{n-1}(x)</code>. I evaluated these polynomials modulo <code>p</code>, so every step stayed in a finite field. Chebyshev polynomials also have a composition property, but this case did not implement key exchange. It derived one deterministic integer and turned that integer into a repeating XOR block. The named secp256k1 prime did not make that construction an elliptic-curve cipher.</p>
+<h3>4.2 Why the doubling identity exists</h3>
+<p>The recurrence is second order, so a two-value state is enough. The companion matrix advances <code>[T_{k+1}, T_k]</code> by one step; squaring its power advances by twice as many. That structure gives the even and odd identities used in the fast evaluator. I checked both routes rather than relying on the label "Lucas doubling" alone. <a href="https://dlmf.nist.gov/18.9">NIST's Digital Library of Mathematical Functions</a> documents the Chebyshev recurrence family.</p>
+<h3>4.3 Why naive O(n) was the trap</h3>
+<p>The original algorithm was correct in shape but impossible at <code>10**25</code> steps. The shortcut changed the growth of the work from linear in <code>n</code> to linear in the number of bits of <code>n</code>, with modular multiplications at each bit. The particular processor speed did not decide this challenge. Recognizing the recurrence did.</p>
+<h3>4.4 XOR keystream with a fixed key</h3>
+<p>Once I had the polynomial result, the ciphertext was repeating-key XOR. The same key bytes recur after one block. With known plaintext, repeated messages, or the visible derivation, that offers no modern confidentiality guarantee. The 35-byte file exposed the repetition boundary because the key block covered fewer bytes than the file. The challenge shows a vulnerable construction, not a cryptographic library to reuse.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit/Analysis Mechanics</summary>
+<p>The assumption behind the obfuscation was that evaluating <code>T_(10**25)</code> required <code>10**25</code> loop iterations. I used the identities to compute the same field element, converted it to its minimal big-endian bytes, and repeated those bytes to the ciphertext length. The first 32-byte prefix kept me from overlooking the final three bytes. The recorded full output had a flag-shaped envelope and a trailing newline. Without the 35 ciphertext bytes and real base value, I cannot independently confirm the bytes or grading result. The <a href="artifacts/test_pocs.py">toy 35-byte round trip</a> confirms that cycling, rather than <code>zip()</code> truncation, handles the same length condition.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<h3>6.1 What this validated</h3>
+<p>Reading the whole script saved me from treating a type error as the whole problem. The recurrence, its starting values, and the length mismatch were all visible before the expensive run. I trust the fast implementation because it agreed with a slow reference on small cases, not because its output looked cryptographic.</p>
+<h3>6.2 What this surfaced as a gap</h3>
+<p>I had to recognize a particular recurrence and know where to look for a fast form. A more general fallback is companion-matrix exponentiation. I added the <a href="artifacts/linear_recurrence.py">bounded generic evaluator</a> for future analysis, with tests against this case and Fibonacci. It handles constant coefficients; it does not turn an arbitrary nonlinear loop into a linear recurrence.</p>
+<h3>6.3 Transferable principles</h3>
+<table>
+<thead>
+<tr>
+<th>In this solve</th>
+<th>What I would carry forward</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Read before running</td>
+<td>Separate trivial code errors from the real computational blocker</td>
+</tr>
+<tr>
+<td>Compare slow and fast</td>
+<td>Catch recurrence mistakes before a huge index</td>
+</tr>
+<tr>
+<td>Check <code>zip()</code> length</td>
+<td>Verify every ciphertext byte was processed</td>
+</tr>
+<tr>
+<td>Try a few tail constructions</td>
+<td>Keep failed candidates when they constrain the inferred encryptor</td>
+</tr>
+<tr>
+<td>Recognize shape over constants</td>
+<td>Search for the update rule, then assess what the modulus contributes</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<h3>7.1 Individual practitioner skill development</h3>
+<p>This case gave me practice with modular arithmetic, fast exponentiation, and testing an optimized implementation against a simple one. The companion-matrix method applies to other constant-coefficient recurrences. Finite-field square roots and elliptic-curve operations are adjacent subjects, but neither was needed here.</p>
+<h3>7.2 Security operations (SOC, IR, threat hunting)</h3>
+<p>If I found this in a real loader, I would preserve the sample and its surrounding process context, identify where the base value and counter came from, then decode a copy. The recovered configuration could supply network addresses or behavior to investigate, but this challenge gives no such real indicators. A high-CPU Python process by itself is a poor alert: data science, builds, and legitimate math jobs do the same thing. The more specific source-code review hypothesis is the recurrence shape next to a large integer constant. The linked <a href="artifacts/recurrence_review.py">static reviewer</a> tests that narrow pattern on Python source, with positive, benign, and near-miss fixtures in the <a href="artifacts/test_pocs.py">tests</a>. A match asks for review; it does not classify malware.</p>
+<h3>7.3 Intelligence operations (SIGINT, IO/IW, OSINT, attribution)</h3>
+<p>I would catalog the recurrence, modulus, key-byte conversion, and XOR framing as traits of a real sample. Reuse could help cluster samples, but public code copying and common constants weaken any attribution claim. A shared secp256k1 prime alone is especially weak. I would require independently collected samples and corroborating behavior before linking an actor. No such collection occurred in this challenge.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<h3>8.1 Triage decision tree for "custom recurrence" obfuscation</h3>
+<p>When I see <code>new = f(previous, current, constants) % p</code>, I first write down the initial values and identify the recurrence order. The pair <code>(1, x)</code> with <code>2*x*current - previous</code> points to Chebyshev <code>T_n</code>. A constant-coefficient second-order recurrence can be expressed as a two-by-two matrix; higher-order constant-coefficient cases use larger companion matrices. A huge iteration count makes the fast form worth deriving. A cubic expression does not automatically become a linear recurrence merely because it has several state variables.</p>
+<h3>8.2 Reusable primitive - generic linear-recurrence fast evaluator</h3>
+<p>The <a href="artifacts/linear_recurrence.py">companion-matrix evaluator</a> accepts coefficients, the matching initial values, index, and modulus. It computes a term in logarithmic index steps, with matrix work depending on the recurrence order. I bound the order at 16 and the index at 4096 bits. The <a href="artifacts/test_pocs.py">test suite</a> checks it against <code>T_n</code> at nine small points and against Fibonacci's 20th term. For the actual challenge path, the specialized doubling function is simpler and faster. The <a href="artifacts/README.md">guide</a> names every input, output, and limit.</p>
+<h3>8.3 Solve-pattern checklist for custom-cipher CTF or malware</h3>
+<p>My sequence is to read the code, list the defects, identify the recurrence, test a fast form against a slow one, verify key and ciphertext lengths, and inspect every output byte. For a real malware sample I would add provenance for each input and keep decoded bytes isolated from execution. The linked math lab uses invented parameters and contains no challenge <code>flag.enc</code>.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<p>I considered <a href="https://attack.mitre.org/techniques/T1027/013/">ATT&amp;CK T1027.013</a> for a real encoded or encrypted file used to hide behavior. The challenge's local file alone does not establish adversary use. <a href="https://attack.mitre.org/techniques/T1140/">T1140</a> describes adversary decoding during execution; my analyst decryption is the defensive counterpart, not an observation of that adversary technique. T1059.006 would need evidence that an attacker ran Python. The fact that the supplied solver is Python is not enough.</p>
+<p><a href="https://cwe.mitre.org/data/definitions/327.html">CWE-327</a> fits the risky repeating-XOR construction as a software weakness. <a href="https://cwe.mitre.org/data/definitions/1240.html">CWE-1240</a> is also a candidate for a risky cryptographic implementation. CWE-330 is less precise here: the visible issue is a deterministic, repeated keystream, with no documented random-value generation path. CAPEC-97 Cryptanalysis describes an attack pattern, but the work in this record is analyst recovery of a challenge artifact. CAPEC-20 brute forcing was considered and rejected; I used structure. D3FEND file analysis fits the defensive workflow broadly. The slow-reference test was mathematical validation, not sandboxed dynamic analysis of malware. STRIDE and OWASP did not add useful detail to this file-and-script exercise.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<h3>10.1 STIX 2.1 representation</h3>
+<p>My notes sketched STIX attack-pattern, indicator, and course-of-action objects with <code>REDACTED</code> identifiers and times. Those placeholders cannot be shared as valid intelligence. A recurrence shape is a detection hypothesis until it is tied to an observed sample and tested rule. I would record a real sample's provenance, exact file hash, collection time, code behavior, confidence, and relationships before creating and validating a <a href="https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html">STIX 2.1</a> bundle. No TAXII exchange or campaign IOC appears in this case.</p>
+<h3>10.2 STIG references</h3>
+<p>I considered application-development STIG findings about cryptographic modules and key protection. This case has no assessed system or benchmark version. I would select the exact current benchmark and assess real code and module boundaries before citing a finding ID as applicable. The Chebyshev recurrence and fixed XOR have no module validation evidence.</p>
+<h3>10.3 CIS Controls v8</h3>
+<p>CIS 16.10 and 16.11 were suggested as secure-design and vetted-component areas. They point toward code review and maintained cryptographic libraries. I did not measure a control implementation or claim compliance from a CTF solve.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>11a. Standards Mapping</h3>
+<p>I mapped NIST SP 800-53 SC-13, SC-12, SA-11, SA-15, and SI-10, plus NIST SP 800-175B and CIS 16.10/16.11. For a real product, I would use these as review prompts: choose vetted primitives, govern key material, test the security code, and validate input framing. Any FIPS or STIG conclusion requires the exact module and system boundary. A blanket rule that every key must come from a KMS or HSM would miss legitimate designs and does not by itself establish compliance.</p>
+<h3>11b. Mitigation Realization</h3>
+<p>The practical source-code gate for this case is a review finding when a Python file contains a large integer literal and a modular <code>2*a*b-c</code> recurrence. The <a href="artifacts/recurrence_review.py">AST reviewer</a> is a small proof of concept for that signal. It reads at most 256 KB, parses without executing, and reports the line. The tests include the target shape, a benign large-prime calculation, and the recurrence with a small modulus. It will miss reordered expressions, constants imported from elsewhere, compiled code, or different languages. I would require a human review of a match before blocking a build.</p>
+<p>I also considered an SBOM/source review, designated crypto reviewer, and a length check at decryption boundaries. I would scope each to the actual repository and threat model. A code review checklist is a useful process artifact but does not prove that a protection ran; <code>assert</code> is also unsuitable as a production input guard because optimization can remove it. The public <a href="artifacts/README.md">README</a> states the tested boundary of the executable reviewer.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<h3>12.1 Sanitized IOCs</h3>
+<p>The recurrence expression and secp256k1 prime are code traits, not compromise indicators. The prime occurs in legitimate software. Their combination merits inspection if I find it in an unexpected source tree, but it does not establish actor identity or malicious intent. No actual path, hash, domain, or process event was retained as an IOC.</p>
+<h3>12.2 YARA rule</h3>
+<p>The proposed YARA combined a regex for <code>(2*name*name-name)%name</code>, the tail of the secp256k1 prime, and Python imports. That is a useful seed for source-like files, but I have no representative malicious sample set, benign corpus, or YARA-engine test here. Its regex is also narrow: syntax and variable rearrangements can break it. I published the locally tested Python AST reviewer instead of calling the YARA rule a validated detector.</p>
+<h3>12.3 Sigma rule</h3>
+<p>The proposed Sigma rule selected Python process creation and excluded a few ordinary commands. Its title claimed high CPU and no network I/O, but a process-creation event supplies neither CPU duration nor network absence. I would need correlated resource and network telemetry, and a useful baseline, before writing that behavior rule. A syntax-valid Sigma file alone would not close that gap.</p>
+<h3>12.4 SIEM detection (Splunk SPL)</h3>
+<p>The proposed SPL joined Sysmon process-create, network-connect, and terminate events by <code>ProcessGuid</code>; the KQL joined Defender process and network tables. Neither query established CPU use. A process start-to-stop duration is not CPU time, and a missing network event can mean a collection gap. Field names, process identity, and join windows also need testing on the actual backend. I have not deployed or validated those queries, so I did not publish them as ready-to-run detection.</p>
+<h3>12.5 Log source and data pipeline requirements</h3>
+<p>The code-review proof needs accessible Python source and a review event with file path and finding line. A behavior hunt would separately need process lifetime, per-process CPU measurements, network events, stable process identifiers, clock alignment, and documented collection gaps. Sysmon IDs 1, 3, and 5 can help with process and network context when configured, but they do not supply CPU saturation. A five-minute retention granularity would be too coarse for some joins; I would choose event fidelity from the hunt question.</p>
+<h3>12.6 Detection engineering notes</h3>
+<p>My static reviewer trades coverage for a clear, testable shape. Its positive and negative fixtures passed locally. Legitimate numerical code can still match, while an obfuscated or compiled implementation will not. I would tune it on a real repository, require a reviewer to explain matches, and record false positives before promoting it to a blocking gate. The long-running-Python hypothesis remains untested.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow above</a> shows the work in order: static read, recurrence recognition, equivalence test, key-byte recovery, and the 35-byte length fix. My broader defender cross-section would put source review and cryptographic design review before release, with sample recovery and telemetry investigation after an actual incident. The standards, YARA, Sigma, and SIEM layers were ideas for that real setting. This CTF did not deploy them.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://dlmf.nist.gov/18.9">NIST Digital Library of Mathematical Functions, Chebyshev recurrence relations</a></li>
+<li><a href="https://attack.mitre.org/techniques/T1027/013/">MITRE ATT&amp;CK T1027.013</a> and <a href="https://attack.mitre.org/techniques/T1140/">T1140</a></li>
+<li><a href="https://capec.mitre.org/data/definitions/97.html">MITRE CAPEC-97</a>, <a href="https://cwe.mitre.org/data/definitions/327.html">CWE-327</a>, and <a href="https://cwe.mitre.org/data/definitions/1240.html">CWE-1240</a></li>
+<li><a href="https://doi.org/10.6028/NIST.SP.800-53r5">NIST SP 800-53 Rev. 5</a>, <a href="https://csrc.nist.gov/pubs/sp/800/175/b/r1/final">SP 800-175B</a>, <a href="https://csrc.nist.gov/pubs/sp/800/131/a/r2/final">SP 800-131A</a>, and <a href="https://csrc.nist.gov/pubs/fips/140-3/final">FIPS 140-3</a></li>
+<li><a href="https://www.cisecurity.org/controls/v8">CIS Controls v8</a>, <a href="https://d3fend.mitre.org/">MITRE D3FEND</a>, <a href="https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html">STIX 2.1</a></li>
+<li>Mason and Handscomb, <em>Chebyshev Polynomials</em> (2002); Bergamo et al., "Security of public-key cryptosystems based on Chebyshev polynomials" (2005). The latter concerns key-exchange proposals, not this XOR exercise.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>

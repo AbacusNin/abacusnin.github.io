@@ -930,5 +930,28 @@
     ],
     "status": "Complete",
     "url": "/cyber-ops/ctf-writeups/crypto/layered-encoding/"
+  },
+  {
+    "title": "The Loop That Would Outlive the Ciphertext",
+    "category": "Cryptography",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "stream-cipher",
+      "chebyshev-polynomial",
+      "finite-field-arithmetic",
+      "lucas-doubling",
+      "custom-crypto",
+      "code-review"
+    ],
+    "summary": "A broken decryptor hid a Chebyshev recurrence behind an impossible loop. I used doubling to recover a repeating XOR keystream, then accounted for the three ciphertext bytes the first attempt lost.",
+    "aliases": [
+      "Chebyshev XOR",
+      "secp256k1 field",
+      "repeating key XOR",
+      "recurrence"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/crypto/chebyshev-xor/"
   }
 ]
