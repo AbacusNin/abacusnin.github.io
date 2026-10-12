@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The One Tile That Didn&#x27;t Belong - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="I had a million same-size PNGs and too little disk space to extract them. Hash frequency led me to one unusual tile; its tiny caption then exposed a flag-format trap.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/asset-cache-frequency/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The One Tile That Didn&#x27;t Belong">
+  <meta property="og:description" content="I had a million same-size PNGs and too little disk space to extract them. Hash frequency led me to one unusual tile; its tiny caption then exposed a flag-format trap.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/asset-cache-frequency/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Forensics / <span aria-current="page">The One Tile That Didn&#x27;t Belong</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The One Tile That Didn&#x27;t Belong</h1>
+        <p class="lead">A million files, all 12,051 bytes. Size told me nothing. Repetition did.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Find the single altered PNG in a million-file asset cache from a used embedded device and recover its message.</p>
+<p><strong>What I did.</strong> I profiled archive sizes, streamed and hashed fixed-size members, extracted the rare image, then read its caption at the pixel level.</p>
+<p><strong>The result.</strong> The case record reports one singleton and an accepted answer after changing the rendered square-bracket wrapper to the platform&#x27;s curly-brace form.</p>
+<p><strong>The limit.</strong> The archive, singleton PNG, hash, and submission receipt were unavailable for replay. The linked lab uses invented valid PNGs and reports review leads, not maliciousness.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Profile the archive; Check the workspace; Stream and hash; Read the pixels; Correct the wrapper; Test the defense">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Profile the archive</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">One million 12,051-byte PNGs</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Check the workspace</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">9.7 GiB free; 11.2 GiB payload</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Stream and hash</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Rare digest leads to one tile</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Read the pixels</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">29 caption glyph segments</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Correct the wrapper</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Square brackets to curly braces</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Test the defense</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Synthetic repeated and rare assets</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Forensics / embedded asset triage</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>forensics, embedded, IoT, automotive-telematics, NDIAS, frequency-analysis, deduplication, steganography, solid-archive, large-corpus-triage</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved-Verified</td>
+</tr>
+<tr>
+<td>Recorded result</td>
+<td>One rare PNG led to a pixel-baked message; the corrected wrapper was recorded as accepted</td>
+</tr>
+<tr>
+<td>Evidence boundary</td>
+<td>The acquired archive, image, exact hash, flag interior, and grading receipt are not available here</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/asset-cache-frequency/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I was handed an asset cache from a used vehicular head unit. Its archive held a <code>100 x 100 x 100</code> directory grid, a million PNGs in all, and each entry was 12,051 bytes. One file carried the challenge's added content. I had no clean reference hash list and no useful size difference to guide me.</p>
+<p>The device story matters, but the puzzle only establishes a modified file in a provided cache. It does not establish who placed it or that a real vehicle was compromised. In an acquired device, I would care about the same question: which assets diverge from a known-good population, and what is inside them? That can apply to map tiles, sprites, firmware assets, or other stores with enough genuine repetition to form a baseline. The acquisition and its provenance would have to be handled separately.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>The first clue was an absence of clues. I listed the archive with <code>7z l</code> and grouped the PNG sizes with <code>awk</code>. My count came to a million entries of exactly 12,051 bytes. The size-outlier pass found none. I kept that failed branch because it changed the plan: scanning the image names or sorting by length would never isolate the planted one.</p>
+<p>I then checked free space with <code>df -h</code>. The machine had 9.7 GiB available; the uncompressed files would need about 11.2 GiB. Full extraction followed by a directory walk would not fit. I switched to <code>7z x -so</code>, consuming decompressed bytes as a stream and splitting them into 12,051-byte records. That split depended on a strict assumption: the selected archive output had only those uniformly sized PNG members in the expected sequence. I checked the eight-byte PNG signature at every boundary before trusting the hash counts. The reported pass found no bad signatures.</p>
+<p>SHA-256 frequencies gave me the useful contrast. The case record describes about a thousand heavily repeated tile hashes and one singleton. It also writes this as <code>1000 x 1000 + 1</code>, which would be 1,000,001 files, one more than the stated grid. I use the reliable qualitative result, one rare digest among repeated assets, without pretending the exact per-hash histogram was reconciled. A legitimate tile replaced by a unique tile could leave one repeated class at 999 and a singleton, but the retained figures do not prove that was the distribution.</p>
+<p>I extracted the candidate image by its reported archive path and checked it for ordinary text and metadata with <code>strings</code>, Pillow's <code>Image.info</code>, and a PNG chunk survey. No plaintext or <code>tEXt</code>, <code>iTXt</code>, or <code>eXIf</code> carrier was reported. The message was in visible pixels near the bottom. Thresholding the red channel above 100 in rows <code>y=238..249</code> exposed a thin text mask. Column gaps separated 29 glyph groups. I compared the small bitmaps by eye where OCR could confuse <code>1/l/I</code>, <code>O/0</code>, <code>S/5</code>, or the wrapper characters.</p>
+<p>That last distinction mattered. The visible message used square brackets. The first submitted form, <code>FLAG[REDACTED_FLAG_INTERIOR]</code>, was recorded as wrong. The platform expected curly braces, and the same interior in <code>FLAG{REDACTED_FLAG_INTERIOR}</code> was recorded as accepted. The two wrapper glyphs in the image had straight vertical strokes and flat lips, with no middle pinch, so the pixel reading and the platform format genuinely differed. I did not quietly relabel the image to make the final answer look inevitable.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<h3>3.1 Archive structural survey</h3>
+<p>The first pass used archive metadata, not decompressed image bytes. This is the command shape I used, with the size column checked against the local <code>7z l</code> format before relying on <code>$4</code>:</p>
+<pre><code class="language-bash">7z l &quot;cache.7z&quot; |
+  awk '/\.png$/ {sizes[$4]++; if ($4 != 12051) print &quot;OUTLIER:&quot;, $0}
+       END {for (s in sizes) print &quot;size=&quot; s &quot; count=&quot; sizes[s]}'
+df -h
+</code></pre>
+<p>The reported result was one size group and no size outlier. <code>df</code> made the next constraint concrete: 9.7 GiB free against roughly 11.2 GiB of PNG bytes. An archive listing can contain directories, headers, and version-specific columns, so I would inspect a sample line before automating this parser on another case.</p>
+<h3>3.2 Stream-and-hash primitive</h3>
+<p>The solve used <code>7z x -so</code> and a Python reader that pulled one 12,051-byte chunk at a time. For each chunk it checked <code>b"\x89PNG\r\n\x1a\n"</code>, calculated SHA-256, and incremented a counter. The key logic was:</p>
+<pre><code class="language-python">from collections import Counter
+import hashlib
+
+counts = Counter()
+for index in range(expected_count):
+    data = read_exact(stream, 12051)
+    if len(data) != 12051 or not data.startswith(b&quot;\x89PNG\r\n\x1a\n&quot;):
+        raise ValueError(f&quot;bad member boundary at {index}&quot;)
+    counts[hashlib.sha256(data).hexdigest()] += 1
+</code></pre>
+<p>My first implementation recorded <code>bad_magic=0</code> for the million expected chunks. That is a strong framing check for the run. It does not parse the rest of each PNG, authenticate the archive, verify extraction order, or by itself check for trailing stdout bytes and a nonzero extractor exit. Those are prerequisites when using the method again.</p>
+<p>The linked <a href="artifacts/asset_frequency.py">asset-frequency reviewer</a> provides bounded stream and trusted-directory modes. Stream mode checks the expected byte count, every PNG signature, extra output, and distinct-hash limits. It reports rare hash <strong>ordinals</strong> because a raw byte stream carries no path. The <a href="artifacts/README.md">lab guide</a> shows the inputs and exit checks. Neither tool has been run on the challenge archive.</p>
+<h3>3.3 Singleton path resolution</h3>
+<p>I took a second pass to find the singleton's archive path. The code read path names from <code>py7zr.list()</code> and paired those names with fixed-size chunks from another <code>7z x -so</code> run. That pairing assumes the two orders agree. A wrong mapping would still give a correct singleton hash and a wrong path.</p>
+<p>For an acquired archive, I would confirm that listing order and stdout order agree for the actual 7z version and member selection, then extract the proposed member by name and hash it again. The final digest equality would bind the path to the rare content. My targeted extraction produced a roughly 12 KiB PNG; the path and digest are redacted here.</p>
+<h3>3.4 Pixel-baked caption reader</h3>
+<p>Pillow and NumPy handled the visual layer after the rare file was on disk. The selected code isolated <code>img[238:250, :, 0]</code>, marked red-channel values over 100, and began a glyph at each nonempty column after a blank. It printed each slice as <code>#</code> and <code>.</code> for manual comparison:</p>
+<pre><code class="language-python">from PIL import Image
+import numpy as np
+
+with Image.open(&quot;candidate.png&quot;) as opened:
+    image = np.asarray(opened.convert(&quot;RGBA&quot;))
+if image.shape[0] &lt; 250:
+    raise ValueError(&quot;caption band falls outside the image&quot;)
+band = image[238:250, :, 0]
+mask = band &gt; 100
+occupied = mask.any(axis=0)
+segments = []
+start = None
+for column, has_ink in enumerate(occupied):
+    if has_ink and start is None:
+        start = column
+    elif not has_ink and start is not None:
+        segments.append((start, column))
+        start = None
+if start is not None:
+    segments.append((start, len(occupied)))
+
+for start, end in segments:
+    print(f&quot;columns {start}..{end - 1}&quot;)
+    for row in mask[:, start:end]:
+        print(&quot;&quot;.join(&quot;#&quot; if bit else &quot;.&quot; for bit in row))
+</code></pre>
+<p>I counted 29 segments. For the square brackets, I compared the flat top and bottom lips and straight side against the waist of a curly brace. On a tiny font I would still look for touching glyphs, antialiasing, and off-by-one row selection before treating a segment count as a text length. I could not repeat that reading without the image bytes.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<h3>4.1 Asset-cache redundancy as a structural invariant</h3>
+<p>Exact duplicates make an internal reference set. If a cache repeats a small set of tile bytes many times, a new digest stands out even when every file has the same name pattern and length. SHA-256 is useful here because it groups byte-identical files reliably. It does <strong>not</strong> make an unusual file malicious. A map update, cache warming, or a one-off legitimate tile can also be unique. The method is strongest after I establish how repetition behaves for that device model, firmware, map region, and acquisition state.</p>
+<p>For <code>N</code> files and <code>M</code> distinct tiles with <code>M &lt;&lt; N</code>, the average replication factor is <code>N/M</code>. Averages can hide real singletons. I would inspect the whole frequency distribution before choosing a threshold. Copying an emplaced tile into several files would also remove its singleton status without requiring an impossible SHA-256 preimage collision.</p>
+<h3>4.2 Solid archive access economics</h3>
+<p>A solid 7z block compresses a run of members together. Repeated random reads can reprocess earlier compressed data, so sequential output is attractive for a full sweep. The case considered <code>py7zr.readall()</code> too memory hungry and targeted per-file reads too expensive. Streaming let the hash pass use little disk and process each byte once.</p>
+<p>Uniform size made fixed-width framing possible. That convenience is fragile: one unexpected member, a different length, or stray output shifts every later boundary. The PNG signature is a cheap alarm for that failure. A full PNG check needs more. I need an exact record count, an EOF check, the extractor's exit status, and eventually a digest check on any extracted candidate.</p>
+<h3>4.3 PNG payload surfaces</h3>
+<p>I checked several places a message could live. <code>tEXt</code>, <code>iTXt</code>, or <code>zTXt</code> chunks carry PNG text; bytes after <code>IEND</code> are another place to inspect. An alpha channel or low-bit plane needs pixel-level work. This image's message was simpler: a visible caption baked into a narrow band. After the million-file search, reading it became an image-analysis problem rather than an archive problem.</p>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>First check</th>
+<th>What it would establish</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Text chunks</td>
+<td>Enumerate PNG chunks and decode permitted text</td>
+<td>A metadata message, if present</td>
+</tr>
+<tr>
+<td>Trailing bytes</td>
+<td>Walk declared chunks through <code>IEND</code></td>
+<td>Data beyond the PNG datastream</td>
+</tr>
+<tr>
+<td>Pixel low bits</td>
+<td>Inspect channels and statistics</td>
+<td>A candidate covert payload, not an automatic decode</td>
+</tr>
+<tr>
+<td>Visible caption</td>
+<td>Render and inspect a channel mask</td>
+<td>The text carried by displayed pixels</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit/Analysis Mechanics</summary>
+<p>The classifier was a count of exact content digests. For each file <code>f</code>, calculate <code>h = SHA256(f)</code> and increment <code>count[h]</code>. Then review digests with much lower counts than the repeated groups. In the reported challenge, one digest had count 1. That was the lead, not a verdict. I still had to bind it to an archive member and inspect the image.</p>
+<pre><code class="language-text">inventory -&gt; fixed-size stream -&gt; boundary checks -&gt; SHA-256 counts
+          -&gt; rare digest -&gt; verified extraction -&gt; caption analysis
+</code></pre>
+<p>I initially called the challenge precision 1.0. That would require ground truth for all flagged and unflagged files; I had one singleton and a solved puzzle, not a measured detector precision. A current reference set matters more than the collision resistance of SHA-256 for real-world false positives. A malicious edit to one copy creates a new hash; an edit to every copy can create a common new hash. Perceptual hashes might group visually similar tiles, but they do not automatically detect all low-bit payloads, and I did not test that fallback.</p>
+<p>The million boundary signatures I recorded as valid make a framing slip less likely. They do not prove that all bytes were authentic PNGs, that every member belonged to the intended grid, or that the archive had a trusted origin. Those checks belong in a production acquisition workflow.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned</summary>
+<h3>Validated</h3>
+<p>The size survey was worth doing even though it failed to find the target. It ruled out a cheap discriminator in seconds. The disk check kept me from starting an extraction that could not fit. The streaming hash pass then changed the search from a million manual opens into one frequency table and one focused image read.</p>
+<p>The wrapper mistake also stays in my notes. The pixels supported square brackets; the grader required curly braces. Keeping both facts is more honest and more useful than smoothing the attempt into a single successful submission.</p>
+<h3>Surfaced gaps</h3>
+<p>The bitmap reader was a local one-off. A reusable reader could display each glyph beside candidate font templates and a confidence score, especially for <code>1/l/I</code> and <code>O/0</code>. I would still verify the low-confidence glyphs manually. I considered perceptual hashing and LSB analysis as follow-ups, but exercised neither in the solve; I have not promoted them to validated detectors.</p>
+<p>The archive-path lookup also needs an explicit order check. The raw hash pass can point to a digest and stream ordinal. Assigning a file name requires a matching index or a second extraction whose bytes hash to that digest. The <a href="artifacts/test_asset_frequency.py">synthetic lab tests</a> cover repeated assets, an ordinary new tile that appears rare, and malformed streams. They do not test <code>7z</code>, path resolution, OCR, or the challenge's million-member runtime.</p>
+<h3>Transferable principles</h3>
+<p>I would use the same sequence on a large file population: measure before extracting, check the storage budget, look for natural repetition, validate parser boundaries, and investigate anomalies as leads. In a SOC, rarity also appears in process trees or loaded modules, but those events need their own baseline and context. A rare file hash alone says little about intent.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<p>For my own practice, this case sharpened a useful combination: archive economics, simple statistics, and patient pixel inspection. The million-file count sounded like a brute-force problem. Once I saw the cache's repetition, the question became which equivalence class had changed. I still needed to understand the solid archive well enough to read it without filling the disk.</p>
+<p>For a responder, I would collect a complete asset snapshot and compare it against a reference for the same device model, firmware revision, and content region. A file integrity monitor that only knows a set of approved hashes may miss the shape of the population; a frequency report can show a new singleton, a reduced repeated group, or a whole new common group. In a managed web or container asset directory, on-write events can trigger the scan. They cannot replace the snapshot. A new file event tells me about a change, not how many distinct files currently share its bytes.</p>
+<p>The device story also raises privacy issues. A real head unit may retain map tiles, destinations, paired-device records, and other location-linked traces. Any wider acquisition would need authority, a chain of custody, and data minimization. I would not infer a driver's travels from this puzzle's synthetic grid. A vendor or upstream tile set might help build a reference, but mismatches could also come from firmware changes, regional content, or a different provider. Those explanations need testing before an attribution claim.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<h3>8.1 Triage decision tree</h3>
+<p>My practical order is: inventory count and sizes, check free space, choose a safe access path, calculate frequencies, then inspect rare candidates. If member sizes vary, I group by size or use a format-aware extractor rather than pretending the byte stream has fixed records. If no rare digest appears, I look for a clean reference set, changes in expected counts, or visual differences. Perceptual matching and bit-plane analysis are further experiments, not results from this case.</p>
+<p>The decision is never "singleton equals malicious." The <a href="artifacts/asset_frequency.py">asset-frequency reviewer</a> emits <code>review_candidates</code> to make that boundary explicit. Its <a href="artifacts/test_asset_frequency.py">tests</a> show an innocent vendor tile receiving exactly the same rarity label as an invented planted tile. This is the false-positive case I want a defender to see before building an alert.</p>
+<h3>8.2 Reusable primitive: <code>corpus_freq.py</code></h3>
+<p>My <code>corpus_freq.py</code> sketch walked an extracted directory, hashed each file in 1 MiB blocks, counted SHA-256 digests, and printed counts below a configurable threshold. That is a useful small-dataset primitive. It does not solve the disk constraint I met, map a digest back to a path, cap resource use, or compare against a revision-matched baseline.</p>
+<p>I put the reusable version in one <a href="artifacts/asset_frequency.py">bounded Python tool</a>. <code>directory</code> mode reports sample relative paths. <code>stream</code> mode works on fixed-size decompressed stdout and reports record ordinals. It refuses a short record, bad PNG signature, extra output, and over-limit work. The tool's inputs are a trusted local directory or a verified byte stream, an expected file size and count for stream mode, and a rarity threshold. Its JSON output carries counts and review leads. The <a href="artifacts/README.md">README</a> spells out the data mapping and the checks still required to assign an archive path.</p>
+<h3>8.3 Solve-pattern checklist</h3>
+<ol>
+<li>Record the archive count, uncompressed size, member sizes, file types, and available disk space.</li>
+<li>Inspect a sample <code>7z l</code> line before using a column-based parser; verify the archive and acquisition hashes under the case workflow.</li>
+<li>Pick full extraction only if resources permit. For a fixed-size stream, verify member selection, output order, count, each boundary, EOF, and extractor exit status.</li>
+<li>Count exact hashes. Review singleton and low-count groups against legitimate updates and expected distribution.</li>
+<li>Resolve a candidate path by verified content hash after targeted extraction, then inspect chunks, strings, channels, and pixels.</li>
+<li>Keep the visible message separate from a platform-specific submission wrapper. Record both attempts and the observed verdict.</li>
+</ol>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<h3>9.1 Tier 1 - Standing checklist (present at every tier)</h3>
+<p>The puzzle has an emplaced PNG with a visible caption. <a href="https://attack.mitre.org/techniques/T1027/003/">ATT&amp;CK T1027.003</a> is useful context for information hidden in media, but I did not find a covert bit plane, executable payload, or real adversary activity. I would map it as an analogy only. T1564 is similarly broad context for hiding artifacts. T1005, data from local system, would require a collection step that this case does not show.</p>
+<p>ATLAS and the OWASP LLM list have no AI component to map. OWASP Web Top 10 does not describe this filesystem acquisition. CVSS, EPSS, and KEV apply to vulnerabilities and CVEs; I found an altered asset, not an exploit of a software flaw. The cloud control catalogs are outside this on-device case unless a specific connected service is later found.</p>
+<h3>9.2 Tier 2 - Frameworks that add analytical value</h3>
+<table>
+<thead>
+<tr>
+<th>Reference</th>
+<th>Fit to this case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://d3fend.mitre.org/technique/d3f:FileHashing/">D3FEND D3-FH, File Hashing</a></td>
+<td>The exact digest is the core grouping primitive; the population-frequency extension is my analytic design.</td>
+</tr>
+<tr>
+<td><a href="https://d3fend.mitre.org/technique/d3f:FileContentAnalysis/">D3FEND D3-FCOA, File Content Analysis</a></td>
+<td>Inspecting chunks and caption pixels is static file-content work.</td>
+</tr>
+<tr>
+<td><a href="https://capec.mitre.org/data/definitions/636.html">CAPEC-636</a></td>
+<td>A nearby pattern for data hidden inside files, but its description centers on less visible file facilities; this caption was visually present.</td>
+</tr>
+<tr>
+<td><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 SI-7 and SI-4</a></td>
+<td>Integrity checks and monitoring are sensible places for a managed cache baseline; the puzzle does not prove a deployed control.</td>
+</tr>
+</tbody>
+</table>
+<p>I first labeled D3-FBA "File Behavior Analysis." D3-FBA is <strong>Firmware Behavior Analysis</strong>, so I leave it out of the asset-frequency mapping. CWE-506 concerns embedded malicious code; this case reports text in an image, with no malicious code shown. STRIDE could help design a future device threat model, while CACAO or OpenC2 would matter if a response playbook were actually exchanged. None was used here.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<p>I have no actor, campaign, infrastructure, or transferable challenge hash to publish as threat intelligence. The reported digest and flag interior are redacted. A behavioral observation travels better: a full snapshot of a highly repetitive static cache contains a new, contextually unexplained image hash, and content review finds a caption inconsistent with the expected asset. That statement still needs the baseline profile attached. Without it, another team cannot tell whether a singleton is ordinary cache behavior.</p>
+<p>I sketched a STIX 2.1 attack-pattern, indicator, and course-of-action bundle with placeholder IDs and dates. It communicates the intended structure, but the placeholders cannot be exchanged as a valid STIX object. An indicator for one redacted file hash would also be brittle, and a STIX file-hash pattern cannot express "count this hash across a firmware-matched population" on its own. I would publish a STIX bundle only after validating identifiers, timestamps, relationships, pattern syntax, evidence provenance, and an actual observable worth sharing. No TAXII exchange took place.</p>
+<p>For an organization operating connected devices, <a href="https://www.cisecurity.org/controls/cis-controls-navigator/v8">CIS Controls v8</a> 1.1 can put those devices in inventory and 8.5 can support detailed audit collection if the platform exposes it. Retention and disposal are separate policy questions. A generic operating-system STIG identifier does not establish that a head unit can emit the needed events or that it has been assessed against that profile.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>11a. Standards mapping (abbreviated for T2)</h3>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Practical realization</th>
+<th>Status here</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NIST SI-7</td>
+<td>Compare a complete asset snapshot with a clean model-and-revision baseline; review unknown, missing, and changed-frequency digests.</td>
+<td>Proposed</td>
+</tr>
+<tr>
+<td>NIST SI-4 / AU-6</td>
+<td>If the device or acquisition pipeline emits events, retain scan summaries and review exceptions with a human case record.</td>
+<td>Proposed</td>
+</tr>
+<tr>
+<td>NIST MP-6</td>
+<td>Define verified media-sanitization steps for devices leaving an organization; keep evidence of the disposition.</td>
+<td>Separate from inbound anomaly detection</td>
+</tr>
+<tr>
+<td>CIS 1.1 / 8.5</td>
+<td>Inventory the device and collect relevant audit events where supported.</td>
+<td>Applicability depends on platform telemetry</td>
+</tr>
+</tbody>
+</table>
+<h3>11b. Mitigation realization</h3>
+<p>My <code>evaluate(reference, observed, tolerance=0.1)</code> sketch compared three conditions: unknown hashes, count deviations, and missing hashes. I would keep all three. A new rare digest is only one class of drift. The reference must be scoped to the same device model, firmware revision, map-data version or region, and snapshot completeness. A threshold of 10% is a starting example, not a tested alert threshold.</p>
+<p>An analyst should first check acquisition completeness and update timing. A missing hash could reflect a partial cache. A count change could reflect a lawful map refresh. An unknown hash could be a new tile. Once those causes are considered, the candidate can go to metadata and pixel review. The local tool gives the frequency observation; it does not provide that baseline comparison or a quarantine decision.</p>
+<p>For outbound used hardware, MP-6 is about a documented sanitization and verification process. A factory reset alone does not prove every user-data partition was cleared. For inbound hardware, I would preserve the device and compare its assets with a trusted reference before changing it. Those are different custody workflows. The SOC playbook would inventory the device, acquire a revision-matched reference, hash a complete snapshot, triage unknown/missing/count changes, and record the disposition.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p><strong>Detection maturity: synthetic local proof of concept.</strong> The <a href="artifacts/asset_frequency.py">reviewer</a> and <a href="artifacts/test_asset_frequency.py">test suite</a> exercise exact-hash rarity on invented valid PNGs. No challenge cache, deployed FIM, Windows sensor, SIEM backend, or measured field false-positive rate was tested.</p>
+<h3>12.1 Illustrative IOCs (sanitized)</h3>
+<p>The digest and path are redacted, so I have no useful hash IOC to share. The grid shape <code>&lt;archive_root&gt;/&lt;X&gt;/&lt;Y&gt;/&lt;Z&gt;.png</code> describes this cache; other products will differ. The behavior worth preserving is "a rare exact hash in a population expected to contain many repeats, followed by content that fails the asset's purpose." Pixel-baked text is a review clue; benign maps can also carry labels.</p>
+<h3>12.2 YARA scaffolding - PNG carriers with bottom-band caption structure</h3>
+<p>My YARA sketch checked the PNG signature, <code>IHDR</code>, <code>IDAT</code>, <code>IEND</code>, and a size under 50 KiB. That is a broad PNG funnel. YARA byte conditions cannot prove there is caption text in the bottom band; a normal map tile could satisfy the rule. I would only use it to preselect files for a format-aware image inspection, then test the pixel logic on actual benign and altered assets. A size cap may also exclude a valid candidate. I did not ship that broad rule as a production detector.</p>
+<h3>12.3 Sigma scaffolding - new file in high-redundancy static directory</h3>
+<p>I sketched a Sigma rule for Windows file-create events in two static paths and filtered some installer processes. That might flag an unexpected write to a managed directory. It cannot establish the hash distribution of the directory, and filtering installer names could suppress a relevant event. A path policy needs to reflect the real deployment and its content-update mechanism. The embedded acquisition here has no Windows file-event stream. I would use a Sigma rule only after confirming a sensor, field mapping, change windows, and benign updates in a target environment.</p>
+<h3>12.4 SIEM detection scaffolding</h3>
+<p>My first SPL and KQL sketches counted <em>events</em> by file hash over a time window. One file can create multiple events, while an unchanged file may create none. That count is not the number of files in a snapshot. Microsoft's <a href="https://learn.microsoft.com/en-us/defender-xdr/advanced-hunting-devicefileevents-table">DeviceFileEvents schema</a> also says <code>SHA256</code> is usually unpopulated. An EDR query alone would miss many assets here.</p>
+<p>For an actual SIEM, I would ingest one record per digest from a scheduled, complete scan, with <code>snapshot_id</code>, <code>device_model</code>, <code>firmware_rev</code>, <code>content_region</code>, <code>sha256</code>, <code>file_count</code>, scan completion, and acquisition time. A query then selects <code>file_count &lt; threshold</code> within a verified profile and joins a revision-matched baseline for unknown or missing hashes. The local reviewer already emits a frequency histogram and candidate counts as JSON, but an ingestion adapter and backend-specific field mapping remain to be built. No SPL or KQL execution is claimed.</p>
+<p>With an adapter that emits one row per digest into a custom <code>AssetFrequency_CL</code> table, the KQL shape would be:</p>
+<pre><code class="language-kusto">AssetFrequency_CL
+| where ScanComplete_b == true
+| where DeviceModel_s == &quot;approved-model&quot; and FirmwareRev_s == &quot;approved-revision&quot;
+| where SnapshotId_s == &quot;selected-complete-snapshot&quot;
+| where FileCount_d &lt; 3
+| project SnapshotId_s, SHA256_s, FileCount_d, ExamplePath_s
+</code></pre>
+<p>The equivalent SPL assumes a <code>sourcetype=asset_frequency</code> with the same normalized fields:</p>
+<pre><code class="language-spl">index=asset_inventory sourcetype=asset_frequency scan_complete=true
+    device_model=&quot;approved-model&quot; firmware_rev=&quot;approved-revision&quot;
+    snapshot_id=&quot;selected-complete-snapshot&quot; file_count&lt;3
+| table snapshot_id sha256 file_count example_path
+</code></pre>
+<p>Those are <strong>integration sketches</strong>, not tested alerts. The adapter must reject partial scans and guarantee exactly one digest count per snapshot. I would add an unknown-hash join only after a trustworthy matching reference set existed. A genuine deployment also needs retention, access controls, and review of benign update windows.</p>
+<h3>12.5 Telemetry requirements</h3>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Required data</th>
+<th>Limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Full-cache frequency scan</td>
+<td>Complete file bytes, paths or verified ordinals, device/profile identity, scan time</td>
+<td>A path list alone does not supply content hashes</td>
+</tr>
+<tr>
+<td>Change trigger</td>
+<td>File creation/modification event and stable asset path</td>
+<td>Triggers rescan; does not measure population frequency</td>
+</tr>
+<tr>
+<td>Candidate content review</td>
+<td>Extracted PNG bytes, chunk list, safe image render, channel mask</td>
+<td>Visual anomaly needs analyst context</td>
+</tr>
+<tr>
+<td>Acquisition record</td>
+<td>Source device, image digest, custody record, parser/tool versions</td>
+<td>Necessary for real evidence handling</td>
+</tr>
+</tbody>
+</table>
+<h3>12.6 Detection notes</h3>
+<p>The clean puzzle made the singleton compelling. A live cache moves. Cache warming, partial sync, regional tile differences, and firmware updates can all produce rare files. I would tune by device and content profile and compare full snapshots, then let a reviewer inspect unknown tiles. A blanket 24-hour quarantine could delay a real finding or clear it for the wrong reason; the window should be tied to known update behavior. An adversary can also duplicate the altered tile until its frequency looks ordinary. Semantic fit and trusted reference content are separate checks.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">diagram near the top</a> follows my solve: size survey, disk check, stream hash, image read, and wrapper correction. This second <a href="artifacts/defense-layers.svg">defender-side diagram</a> shows what would have to exist to turn the case into an operational hunt. The snapshot and profile come first. A rare digest leads to content review and a case decision; standards help place the work, but do not supply telemetry or validate the alert.</p>
+<p><img alt="Asset-cache triage layers, from complete snapshot and profile through frequency review, content inspection, and analyst disposition" src="artifacts/defense-layers.svg" /></p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://documentation.help/7-Zip/stdout.htm">7-Zip <code>-so</code> switch documentation</a> and <a href="https://www.7-zip.org/sdk.html">7-Zip SDK</a> for the archive access method.</li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc2083">RFC 2083, PNG specification</a> for the signature and chunk model.</li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5</a> for SI-7, SI-4, AU-6, and MP-6; <a href="https://csrc.nist.gov/pubs/sp/800/86/final">NIST SP 800-86</a> for forensic process context.</li>
+<li><a href="https://attack.mitre.org/techniques/T1027/003/">MITRE ATT&amp;CK T1027.003</a>, <a href="https://capec.mitre.org/data/definitions/636.html">CAPEC-636</a>, <a href="https://d3fend.mitre.org/technique/d3f:FileHashing/">D3FEND File Hashing</a>, and <a href="https://d3fend.mitre.org/technique/d3f:FileContentAnalysis/">File Content Analysis</a> for the qualified technique discussion.</li>
+<li><a href="https://www.cisecurity.org/controls/cis-controls-navigator/v8">CIS Controls v8 navigator</a>, <a href="https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html">STIX 2.1</a>, and <a href="https://learn.microsoft.com/en-us/defender-xdr/advanced-hunting-devicefileevents-table">Microsoft DeviceFileEvents schema</a> for the proposed operational handoff and its limits.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>

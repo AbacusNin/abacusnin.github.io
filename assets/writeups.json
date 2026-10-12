@@ -849,5 +849,26 @@
     "summary": "I separated a keyfob-like packet from two other 433 MHz emitters, measured its OOK carrier and 500 microsecond chip, then corrected an ASK label the grader rejected. The accepted answer is recorded; the defensive lab uses invented IQ.",
     "status": "Solved-Verified",
     "url": "/cyber-ops/ctf-writeups/rf/keyfob-phy-recovery/"
+  },
+  {
+    "title": "The One Tile That Didn't Belong",
+    "category": "Forensics",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "forensics",
+      "embedded",
+      "IoT",
+      "automotive-telematics",
+      "NDIAS",
+      "frequency-analysis",
+      "deduplication",
+      "steganography",
+      "solid-archive",
+      "large-corpus-triage"
+    ],
+    "summary": "I had a million same-size PNGs and too little disk space to extract them. Hash frequency led me to one unusual tile; its tiny caption then exposed a flag-format trap.",
+    "status": "Solved-Verified",
+    "url": "/cyber-ops/ctf-writeups/forensics/asset-cache-frequency/"
   }
 ]

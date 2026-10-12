@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 440" role="img" aria-labelledby="title desc">
+  <title id="title">Asset-cache frequency triage layers</title>
+  <desc id="desc">A complete asset snapshot and matching reference profile feed a hash frequency comparison. Rare candidates receive PNG content review and analyst disposition. Change events can trigger a scan but cannot replace a snapshot.</desc>
+  <rect width="960" height="440" fill="#0b0f18"/>
+  <g font-family="Arial, sans-serif" fill="#e6e9f0">
+    <text x="40" y="46" font-size="26" font-weight="700">From rare hash to defensible finding</text>
+    <text x="40" y="75" font-size="15" fill="#aab5c6">Proposed workflow for a managed asset cache</text>
+  </g>
+  <g fill="#121b2a" stroke="#36d4c7" stroke-width="2">
+    <rect x="40" y="112" width="270" height="82" rx="8"/>
+    <rect x="345" y="112" width="270" height="82" rx="8"/>
+    <rect x="650" y="112" width="270" height="82" rx="8"/>
+    <rect x="40" y="256" width="270" height="82" rx="8"/>
+    <rect x="345" y="256" width="270" height="82" rx="8"/>
+    <rect x="650" y="256" width="270" height="82" rx="8"/>
+  </g>
+  <g font-family="Arial, sans-serif" fill="#e6e9f0" font-size="18">
+    <text x="58" y="146">Complete snapshot</text>
+    <text x="58" y="174" font-size="13" fill="#aab5c6">File bytes, paths, scan status</text>
+    <text x="363" y="146">Matching profile</text>
+    <text x="363" y="174" font-size="13" fill="#aab5c6">Model, firmware, region</text>
+    <text x="668" y="146">Hash frequency</text>
+    <text x="668" y="174" font-size="13" fill="#aab5c6">Unknown, missing, count drift</text>
+    <text x="58" y="290">Rare candidate</text>
+    <text x="58" y="318" font-size="13" fill="#aab5c6">Review lead only</text>
+    <text x="363" y="290">Content inspection</text>
+    <text x="363" y="318" font-size="13" fill="#aab5c6">Chunks, channels, pixels</text>
+    <text x="668" y="290">Analyst decision</text>
+    <text x="668" y="318" font-size="13" fill="#aab5c6">Explain benign change or escalate</text>
+  </g>
+  <g stroke="#ff66ac" stroke-width="3" fill="none">
+    <path d="M310 153 H345"/>
+    <path d="M615 153 H650"/>
+    <path d="M785 194 V226 H175 V256"/>
+    <path d="M310 297 H345"/>
+    <path d="M615 297 H650"/>
+  </g>
+  <g fill="#ff66ac">
+    <path d="M345 153 l-10 -6 v12z"/>
+    <path d="M650 153 l-10 -6 v12z"/>
+    <path d="M175 256 l-6 -10 h12z"/>
+    <path d="M345 297 l-10 -6 v12z"/>
+    <path d="M650 297 l-10 -6 v12z"/>
+  </g>
+  <text x="40" y="396" font-family="Arial, sans-serif" font-size="15" fill="#aab5c6">File-change events may start a scan; they do not measure the current population.</text>
+</svg>
