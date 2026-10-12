@@ -1302,5 +1302,25 @@
     ],
     "status": "Solved-Verified",
     "url": "/cyber-ops/ctf-writeups/forensics/elf-jpeg-hidden-image/"
+  },
+  {
+    "title": "The Caesar Shift That Changed at Every Position",
+    "category": "Crypto",
+    "difficulty": "Easy",
+    "date": "2026-10-12",
+    "tags": [
+      "classical-cipher",
+      "positional-shift",
+      "progressive-caesar",
+      "known-plaintext-attack"
+    ],
+    "summary": "A short hint said the shift accumulated across the string. I used the known answer prefix to measure the offsets, then let the punctuation tell me which index rule worked.",
+    "aliases": [
+      "progressive shift",
+      "position based Caesar",
+      "crib"
+    ],
+    "status": "Solved-Verified (local structural verification; scoreboard confirmation not captured)",
+    "url": "/cyber-ops/ctf-writeups/crypto/progressive-caesar/"
   }
 ]

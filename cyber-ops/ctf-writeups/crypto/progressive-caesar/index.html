@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Caesar Shift That Changed at Every Position - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="A short hint said the shift accumulated across the string. I used the known answer prefix to measure the offsets, then let the punctuation tell me which index rule worked.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/progressive-caesar/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Caesar Shift That Changed at Every Position">
+  <meta property="og:description" content="A short hint said the shift accumulated across the string. I used the known answer prefix to measure the offsets, then let the punctuation tell me which index rule worked.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/progressive-caesar/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Crypto / <span aria-current="page">The Caesar Shift That Changed at Every Position</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Caesar Shift That Changed at Every Position</h1>
+        <p class="lead">I had an 83-character ciphertext, a verse-shaped hint, and the expected opening of the answer. The first few letters gave away the shift pattern.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Recover the plaintext from one positionally shifted ciphertext using the in-band hint and known answer format.</p>
+<p><strong>What I did.</strong> I compared ciphertext letters with the known prefix, derived offsets 0 through 5, and decoded the whole string using absolute character positions while leaving punctuation unchanged.</p>
+<p><strong>The result.</strong> The recorded local decode produced coherent plaintext with the expected prefix and format. No scoreboard acceptance receipt is available.</p>
+<p><strong>The limit.</strong> The challenge ciphertext and answer are withheld. The linked reviewer and fixture use an invented 42-character example, not the 83-character challenge input.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Read hint; Use known prefix; Choose index; Decode; Check">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Read hint</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Shift accumulates by position</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Use known prefix</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Six letter offsets are 0 to 5</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Choose index</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Delimiters also advance position</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Decode</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Add absolute index modulo 26</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Check</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Readable text and expected format</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Cryptography / classical cipher</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Easy</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>classical-cipher, positional-shift, progressive-caesar, known-plaintext-attack</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved-Verified (local structural verification; scoreboard confirmation not captured)</td>
+</tr>
+<tr>
+<td>Recorded result</td>
+<td>A position-dependent alphabet shift decoded the 83-character ciphertext into coherent text with the expected prefix and format.</td>
+</tr>
+<tr>
+<td>Evidence boundary</td>
+<td>The actual ciphertext and plaintext are withheld. The recorded local checks support the rule; scoreboard acceptance is unrecorded.</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/crypto/progressive-caesar/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>Solve Process Flow</h2>
+<pre><code class="language-mermaid">flowchart LR
+  A[Hint: cumulative shift] --&gt; B[Known answer prefix]
+  B --&gt; C[Offsets 0 to 5]
+  C --&gt; D[Absolute index rule]
+  D --&gt; E[Decode 83 characters]
+  E --&gt; F[Readable text and format check]
+</code></pre>
+<h2>Positional Shift Cipher (Progressive Caesar)</h2>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>This one was small enough to hold in my head. The challenge gave me an 83-character ciphertext and a hint written as a verse. It described a shift applied one character at a time, increasing as the string advanced. Braces and underscores stayed as they were. The expected answer format gave me a few plaintext letters at the front.</p>
+<p>There was no host, file format, packet capture, or adversary action to reconstruct. The useful question was whether a weak position-based substitution could be recovered from a known prefix. That is a narrow cryptographic exercise, and I kept the operational claims narrow too.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I began with the hint instead of trying every classical cipher. A constant Caesar shift could not explain the different offsets forced by the known prefix. Six alphabetic crib positions gave offsets of 0, 1, 2, 3, 4, and 5. That pointed to a shift that grows by one at each absolute character index.</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>What I checked</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ST.1</td>
+<td>I classified the transform as alphabetic shifting with nonletters passed through. The ciphertext length was 83 characters.</td>
+</tr>
+<tr>
+<td>ST.2</td>
+<td>I aligned the known answer prefix to the ciphertext. The six letter positions implied offsets 0 through 5; a single fixed shift could not satisfy them all.</td>
+</tr>
+<tr>
+<td>ST.3</td>
+<td>I used the absolute index in the original string. Braces and underscores stayed visible but still advanced the counter. An alphabetic-only counter would diverge after the first delimiter.</td>
+</tr>
+<tr>
+<td>ST.4</td>
+<td>I decoded the full string with Python and checked readability, the known prefix, and the expected answer format. The recorded local result passed those checks.</td>
+</tr>
+</tbody>
+</table>
+<p>My only meaningful ambiguity was the counter. Before the first punctuation mark, absolute and letter-only indexing give the same letters. I did not separately execute an alphabetic-only rejection in the original solve; the absolute-index output read coherently across all 83 positions. There were no wrong submissions or dead-end branches to explain.</p>
+<p>For each ASCII letter at absolute index <code>i</code>, the decoded alphabet position is:</p>
+<pre><code class="language-text">plain[i] = (cipher[i] + i) mod 26
+</code></pre>
+<p>The equation uses letter values 0 through 25, with case preserved. The nonletters are copied to the output, while their places still count toward the next <code>i</code>. A general step <code>s</code> would use <code>i * s</code>; the crib here supported <code>s = 1</code>. The zero offset at position 0 is expected for any step, while positions 1 through 5 check the step repeatedly.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>The solve used an inline Python transformation. I later wrote a small reviewer to make the indexing choice visible. The linked <a href="./artifacts/progressive_shift_review.py">offline reviewer</a> tests both absolute and letter-only indices and all 26 step values against a known prefix. Its <a href="./artifacts/synthetic_ciphertext.txt">invented ciphertext</a>, <a href="./artifacts/test_progressive_shift_review.py">test cases</a>, and <a href="./artifacts/README.md">guide</a> are separate from the challenge text.</p>
+<pre><code class="language-python">def decode(ct, step=1):
+    out = []
+    for i, ch in enumerate(ct):
+        if ch.isascii() and ch.isalpha():
+            base = ord(&quot;A&quot;) if ch.isupper() else ord(&quot;a&quot;)
+            out.append(chr(base + (ord(ch) - base + i * step) % 26))
+        else:
+            out.append(ch)
+    return &quot;&quot;.join(out)
+</code></pre>
+<p>The original illustrative code checked that the offsets were consistent with step 1, rather than solving for every possible step. The linked reviewer enumerates the steps and shows a useful near miss: a short <code>flag{</code> crib lets both index bases through, because they agree until the first delimiter. Extending the crib past the brace separates them in the invented example. A prefix match still needs full-text review.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>A Caesar cipher moves letters by one fixed amount. Here the amount changes with position. Knowing even a short piece of plaintext gives equations for that change. I measured the letter offsets from the crib, then checked whether one rule explained all of them. Because punctuation stays in place, I also had to decide whether those characters advanced the counter. The readable full decode settled that choice in the recorded solve.</p>
+<p>This is a weak substitution, not modern encryption. A correct known prefix and one consistent step can make it easy to undo. A short crib can also match by accident, which is why the whole decoded text matters.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>I treated the format prefix as a crib. At the first alphabetic position, the offset was zero. The next five offsets increased by one. Adding the absolute index modulo 26 to each ciphertext letter produced the candidate plaintext. I copied braces and underscores without shifting them, while continuing to count their positions.</p>
+<p>The example in the <a href="./artifacts/synthetic_ciphertext.txt">linked fixture</a> is 42 characters, far shorter than the 83-character challenge ciphertext. It decodes as <code>flag{Positional_Shift_Cipher_Example_Text}</code> under absolute indexing, step 1. This is a demonstration of the rule, not a disclosure of the challenge answer.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<p>The hint narrowed the search, but the known prefix did the real measurement. I could rule out a constant shift before writing code because the offsets differed. The brace and underscores then became useful tests of indexing, even though they were not themselves encrypted.</p>
+<p>This also reminded me to distinguish deriving a rule from merely seeing readable text. The crib constrained the step; readability and format checked the rest of the string. Without the ciphertext or a scoreboard receipt here, I keep the outcome at the recorded local verification level.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<p>For an authorized content review, a position-based shift is worth checking when a string has readable delimiters, a recognizable prefix shape, and alphabetic text that fails a fixed Caesar test. The <a href="./artifacts/progressive_shift_review.py">offline reviewer</a> gives an analyst candidate decodes. It does not decide whether a message is malicious.</p>
+<p>I would not build a network alert that fires on this cipher name. A real hunt would need a source of content, a reason the content is suspicious, and context about the sender or process. Those observations were outside this puzzle.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The <a href="./artifacts/progressive_shift_review.py">reviewer</a> accepts one local printable-ASCII line up to 4,096 bytes and a crib, then reports candidate step and index basis with the decoded text. The <a href="./artifacts/README.md">guide</a> describes its inputs, limits, and sensitive-output handling. Five <a href="./artifacts/test_progressive_shift_review.py">tests</a> cover the intended positive, a short-crib false positive, a benign nonmatch, a wrong-basis near miss, and invalid input.</p>
+<p>The tool is a local reasoning aid. With no crib, no useful source context, or a wrong character set, it cannot certify a cipher family. A matching prefix is a candidate; the rest of the text and any independent answer check still carry the decision.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<p>This puzzle has no observed adversary, endpoint, network, web application, AI system, cloud component, or CVE. I would leave MITRE ATT&amp;CK, ATLAS, OWASP, CVSS, EPSS, CISA KEV, and cloud-control mappings unassigned. Decoding a challenge string as an analyst does not establish an ATT&amp;CK adversary technique.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<p>No actor, campaign, infrastructure, malware, or shareable IOC came from this solve. There is no case-specific STIX or TAXII object to create. A real incident might involve an encoded string, but that would require independent evidence and context before an intelligence record.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<p>There is no deployed service or control to remediate in this puzzle. If a production protocol used this shift to protect a secret, the design would need replacement with a reviewed cryptographic construction and appropriate key handling. This case alone does not establish that such a production protocol exists.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>Detection maturity here is reframed as an offline decode exercise. The observable is one ciphertext string. I had no logs, packets, process events, or production content stream. I would need those inputs before writing a Sigma rule or SIEM query for this behavior.</p>
+<p>The linked reviewer can help inspect authorized text exports. Its synthetic tests show that a short crib may match both indexing rules, a useful false-positive lesson. None of those tests measure a live sensor, a detection rate, or an attacker's use of this transform.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">solve process flow</a> puts the two real checks in order: derive the rising offsets from known plaintext, then use punctuation to decide the index basis. The full-string readability and format check close the local solve. No attack chain is drawn because none was observed.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<p>The challenge's own hint and known answer format were the decisive references. The <a href="./artifacts/README.md">linked guide</a> documents the synthetic reviewer and its limits. No external standard is needed to establish the modulo-26 arithmetic used here.</p>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
