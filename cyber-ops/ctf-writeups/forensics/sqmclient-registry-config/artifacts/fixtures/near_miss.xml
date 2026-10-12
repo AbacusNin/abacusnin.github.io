@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<hive><node name="ROOT"><node name="Microsoft">
+  <node name="SQMClient"><value key="Token" type="string" value="AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=" /></node>
+</node></node></hive>

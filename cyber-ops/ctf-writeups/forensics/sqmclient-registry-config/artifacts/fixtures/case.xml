@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<hive><node name="ROOT"><node name="Microsoft">
+  <node name="SQMClient">
+    <value key="MachineId" type="string" value="synthetic-id" />
+    <value key="Token" type="string" value="AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=" />
+    <value key="ConfigPath" type="string" value="C:\Users\Public\svchost.exe" />
+    <value key="CacheMap" type="string" value="\Classes\Installer" />
+    <value key="SessionMap" type="string" value="\Microsoft\Wbem" />
+    <mtime>2026-01-01T00:00:00Z</mtime>
+  </node>
+  <node name="Wbem"><value key="SessionId" type="binary" value="000102030405060708090a0b" /></node>
+</node><node name="Classes"><node name="Installer">
+  <value key="Upload" type="string" value="AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gIQ==" />
+</node></node></node></hive>

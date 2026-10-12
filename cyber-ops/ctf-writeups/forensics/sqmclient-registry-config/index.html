@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Implant Trail Through Three Registry Keys - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="I started with the usual Windows autorun keys, found nothing useful, and followed a program path into SQMClient. Two more registry keys explained the encrypted configuration. The graded cipher answer was accepted; the C2 domain stayed closed to me.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/sqmclient-registry-config/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Implant Trail Through Three Registry Keys">
+  <meta property="og:description" content="I started with the usual Windows autorun keys, found nothing useful, and followed a program path into SQMClient. Two more registry keys explained the encrypted configuration. The graded cipher answer was accepted; the C2 domain stayed closed to me.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/sqmclient-registry-config/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Forensics / <span aria-current="page">The Implant Trail Through Three Registry Keys</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Implant Trail Through Three Registry Keys</h1>
+        <p class="lead">The familiar persistence keys were quiet. A path to an executable under Public led me somewhere more interesting.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Trace a suspicious configuration through an offline Windows SOFTWARE hive and identify the encryption method behind it.</p>
+<p><strong>What I did.</strong> I moved from autorun triage to a hive-wide path search, followed two registry pointers, and compared the blob lengths before answering the cipher question.</p>
+<p><strong>The result.</strong> The challenge account reports six graded answers accepted, including ChaCha20-Poly1305 after an AES-256-GCM rejection. The optional attempt to recover the C2 domain did not succeed.</p>
+<p><strong>The limit.</strong> No grader transcript or implant binary is available. A local XML copy is truncated; only one 34-byte Upload value could be checked in it. The defensive lab was tested on invented data.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Autoruns; Path search; Follow pointers; Cipher shape; Grader; Boundary">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Autoruns</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Standard launch keys were unhelpful</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Path search</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Public executable path under SQMClient</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Follow pointers</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Installer Upload and Wbem SessionId</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Cipher shape</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">32, 12, 34 bytes fit two algorithms</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Grader</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">AES-GCM rejected, ChaCha accepted</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Boundary</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">C2 domain remained encrypted</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Forensics / Windows registry and applied cryptography</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Hard</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>Windows Forensics, Registry Hive Analysis, ChaCha20-Poly1305, AEAD, T1112, T1036.005, Registry-Resident Implant, Schema-Foreign Detection, Structured Uncertainty</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved-Verified in the challenge account</td>
+</tr>
+<tr>
+<td>Graded result</td>
+<td>Six answers reported accepted; the cipher answer was ChaCha20-Poly1305 after a rejected AES-256-GCM answer</td>
+</tr>
+<tr>
+<td>Unfinished lead</td>
+<td>The optional C2 FQDN recovery did not authenticate or yield a domain</td>
+</tr>
+<tr>
+<td>Evidence limit</td>
+<td>No grader transcript or implant binary; the local XML copy stops mid-document</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/sqmclient-registry-config/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>A simulated perimeter alert pointed to periodic outbound traffic from a Windows workstation. I had an offline <code>HKLM\SOFTWARE</code> hive export and a set of graded questions about the host, the suspicious registry state, and the encryption method. The hoped-for operational prize was the command-and-control domain. If I could recover it, a defender could check DNS history and block or sinkhole the name. I never got that domain.</p>
+<p>The challenge account says all six graded answers were accepted. That is the solved part of this case. The attempt to decrypt the FQDN came afterward and stayed open. I do not have the grader transcript or the implant executable to replay either claim. The investigation described an export around 120 MB. A local <code>software.xml</code> copy is 46 MB and incomplete: XML parsing stops on an unclosed token. I could independently locate an <code>Upload</code> value under <code>Classes\Installer</code> and confirm its base64 data decodes to 34 bytes. I could not replay the complete hive walk from that copy.</p>
+<h3>Threat model</h3>
+<p>The scenario describes an implant with enough access to write under <code>HKLM\SOFTWARE</code>. That suggests a privileged process or a suitably permissive key, but the hive alone does not identify the writing token. A program path under <code>C:\Users\Public\</code> points toward a possible on-disk component. The file itself was not available, so I cannot show that it executed, what launched it, or how it handled the encrypted values.</p>
+<p>That distinction matters for the word "persistence." The registry values preserve configuration across reboots. I did not find an autorun trigger in the keys I checked. The specific execution mechanism remains unknown. The perimeter alert also gives context, not a packet capture or proof that the unknown domain carried DNS-based C2.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I began with the ordinary Windows routes. A streaming XML walk through Group Policy DataStore helped identify the workstation; ProfileList and LogonUI narrowed the user context to the account with RID 1001. Those are orientation steps, not malware evidence. I then checked Run, RunOnce, Winlogon, IFEO, and AppInit DLL locations. The account records no malicious hit there. Its two Run entries were <code>SecurityHealth</code> and <code>VMware User Process</code>; I treated them as routine leads, though I cannot recheck their signatures from the surviving XML.</p>
+<p>The useful pivot came from changing the question. I had been asking what started automatically. The scenario also mentioned downloaded malware, so I searched the hive for a path to an executable in a user-writable place. One recorded hit put <code>C:\Users\Public\svchost.exe</code> in <code>Microsoft\SQMClient\ConfigPath</code>. That path made me inspect the surrounding values instead of continuing to widen the autorun sweep.</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Action and result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ST.1</td>
+<td>Walked GP DataStore for the host name.</td>
+</tr>
+<tr>
+<td>ST.2</td>
+<td>Cross-checked ProfileList and LogonUI for the user context.</td>
+</tr>
+<tr>
+<td>ST.3</td>
+<td>Checked standard launch keys; no suspicious trigger was established.</td>
+</tr>
+<tr>
+<td>ST.3a</td>
+<td>Considered Defender exclusions, then deprioritized the unfinished sweep after the path hit.</td>
+</tr>
+<tr>
+<td>ST.3b</td>
+<td>Considered a top-level <code>Partner</code> key; the recorded Wallet subkey did not support that lead.</td>
+</tr>
+<tr>
+<td>ST.4</td>
+<td>Shifted from launch-key search to stored configuration.</td>
+</tr>
+<tr>
+<td>ST.5</td>
+<td>Found the Public executable path in <code>SQMClient\ConfigPath</code>.</td>
+</tr>
+<tr>
+<td>ST.6</td>
+<td>Found <code>Token</code>, <code>ConfigPath</code>, <code>CacheMap</code>, and <code>SessionMap</code> at the SQMClient root.</td>
+</tr>
+<tr>
+<td>ST.7</td>
+<td>Followed <code>CacheMap</code> to <code>Classes\Installer\Upload</code>, recorded as REG_SZ with 34 decoded bytes.</td>
+</tr>
+<tr>
+<td>ST.8</td>
+<td>Followed <code>SessionMap</code> to <code>Microsoft\Wbem\SessionId</code>, recorded as a 12-byte REG_BINARY value.</td>
+</tr>
+<tr>
+<td>ST.9</td>
+<td>Read the XML <code>type="string"</code> attribute for <code>Upload</code>, which corresponds to REG_SZ in this export.</td>
+</tr>
+<tr>
+<td>ST.10</td>
+<td>Treated the 32/12/34-byte grouping as an AEAD hypothesis with at least two candidates.</td>
+</tr>
+<tr>
+<td>ST.10a</td>
+<td>Submitted AES-256-GCM on a Windows-library prior; the account records a rejection.</td>
+</tr>
+<tr>
+<td>ST.11</td>
+<td>Submitted ChaCha20-Poly1305; the account records acceptance.</td>
+</tr>
+<tr>
+<td>ST.12-13</td>
+<td>Tried roughly 2,000 initial and 17,322 later decryption combinations; no authenticated plaintext was recorded.</td>
+</tr>
+<tr>
+<td>ST.14</td>
+<td>Stopped the optional FQDN search and named the additional artifacts needed.</td>
+</tr>
+<tr>
+<td>ST.15</td>
+<td>The account reports all six graded questions accepted and a separate fifteen-question follow-up answered from the hive. That Q&amp;A is unavailable to reproduce here.</td>
+</tr>
+</tbody>
+</table>
+<h3>Methodology notes on the rejected branches and pivots</h3>
+<p>The clean autorun sweep was useful because it ruled out the obvious explanation within the keys examined. It did <strong>not</strong> rule out every launch mechanism. My first time-window scan was also noisy; ordinary Windows updates crowded the same key last-write range. The path search gave me a better lead. The two extra keys then made sense of the pointers stored under SQMClient.</p>
+<p>I can see why AES-GCM seemed plausible. A 32-byte key candidate, 12-byte nonce candidate, and 16-byte tag fit common AES-256-GCM and IETF ChaCha20-Poly1305 layouts. Windows as the target system was a prior, not a discriminator. The grader response is what separated the two answers in this record; no successful local tag check did.</p>
+<h3>Tool/Code Timeline</h3>
+<p>Python's <code>xml.etree.ElementTree.iterparse</code> drove the hive walk and key inspection. A path search found the Public executable reference. Local scripts then compared value names and blob lengths. The later decryption attempts crossed candidate key derivations, nonce interpretations, additional authenticated data (AAD), and ciphertext/tag layouts. No runnable script or attempt log from those sessions survives, so the counts describe the account rather than an independently replayed sweep.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<h3>3.1 Streaming regxml walker with mtime windowing</h3>
+<p>The export represents keys as nested <code>node</code> elements with a key-level <code>mtime</code>. Its <code>value</code> elements carry <code>key</code>, <code>type</code>, and <code>value</code> attributes. I used a streaming walk so a large XML export did not need to become one document tree in memory. The key last-write time can narrow a search, but it belongs to the key, not to each value. A later benign write can change it.</p>
+<p>I checked the published <code>iterparse</code> sketch again before making a reusable tool. It asks for a parent key's mtime while processing child values, even though the XML may place <code>&lt;mtime&gt;</code> after those values. It also clears elements without removing them from their parent, so its claim of constant memory is too strong. <a href="artifacts/regxml_review.py">The offline snapshot reviewer</a> waits until a node ends, retains only its small target-key fields, and removes processed elements. It requires a complete parse before reporting anything. The available XML copy fails that check rather than producing a partial clean bill.</p>
+<h3>3.2 Schema-foreign value detector</h3>
+<p>The four SQMClient names and the <code>SessionId</code> and <code>Upload</code> companions are worth checking together. I originally treated a small list of "normal" value names as a complete Microsoft schema. It is safer to call that list a local baseline candidate. Windows version, installed features, and vendor software can change what appears under a legitimate key. An extra value is a review lead, not proof of injection. The <a href="artifacts/regxml_review.py">snapshot reviewer</a> therefore reports the exact six-value case pattern without asserting that every other name is malicious.</p>
+<h3>3.3 AEAD brute-force harness (algorithm-generic)</h3>
+<p>The exploratory harness tried a raw 32-byte <code>Token</code>, hashes and HMACs of hive fields, HKDF/PBKDF2 variants, registry paths as AAD, and several ciphertext layouts. The later ChaCha-focused rounds were recorded as 10,400, 5,536, and 1,386 combinations, which sum to 17,322. With the earlier approximate 2,000 attempts, the account describes roughly 19,300 attempts overall, not 17,300 total. I cannot establish which variants actually ran because the run log is absent.</p>
+<p>The saved code excerpt also passes <code>hashlib.sha256</code> to PyCryptodome's HKDF and PBKDF2 functions. A local harmless-input check raises <code>AttributeError</code> before either derives a key; that API expects PyCryptodome's SHA256 module. This does not prove the exploratory sessions used the broken excerpt. It does mean the excerpt cannot verify their negative result. I would start any new recovery attempt with a published AEAD test vector, the actual binary's calls or constants, and a logged, bounded candidate set. I have not published a speculative decryption tool as a working recovery artifact.</p>
+<h3>3.4 Triage one-liner -- registry-resident high-entropy blob detector</h3>
+<p>The saved shell pipeline proposed an entropy cutoff above 5.5 bits per byte for decoded values as short as 8 to 64 bytes. For a 32-byte sample, the maximum plug-in Shannon estimate is <code>log2(32) = 5</code> bits per byte, even if every byte differs. A 34-byte sample tops out near 5.09. That threshold would discard the very <code>Token</code> and <code>Upload</code> lengths it was meant to find. I use strict base64 decoding and length checks as triage features in the <a href="artifacts/regxml_review.py">snapshot reviewer</a>, then ask whether the names and pointers form a coherent case. Short-sample entropy is too brittle here.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<h3>4.1 Windows registry forensic semantics</h3>
+<p>Windows records a <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ns-wdm-_key_basic_information">last-write time on each registry key</a>, including when one of its values changes. A value has no separate last-write timestamp in this view. A fresh SQMClient timestamp could come from the suspect write or later ordinary activity. That is why I treated the time window as a search aid and looked at the value set and linked paths before drawing a conclusion.</p>
+<p>The XML <code>type</code> attribute describes the exported registry value type. In this case <code>Upload</code> was a string containing base64 text, and <code>SessionId</code> was described as binary. Base64 is an encoding, not evidence of encryption. I had to decode it and check the resulting size before the AEAD idea had any shape at all.</p>
+<h3>4.2 ChaCha20-Poly1305 (IETF) cryptographic structure</h3>
+<p><a href="https://www.rfc-editor.org/rfc/rfc8439.html">RFC 8439</a> defines the IETF AEAD with a 32-byte key, a 12-byte nonce, and a 16-byte authentication tag. ChaCha20 encrypts the plaintext; Poly1305 authenticates the ciphertext and any AAD. An implementation often stores <code>ciphertext || tag</code>, so 34 decoded bytes could represent 18 bytes of ciphertext plus a tag. AES-256-GCM can use the same key and nonce lengths and a 16-byte tag. Size alone cannot tell those constructions apart, and arbitrary 34-byte data could have a different purpose entirely.</p>
+<p>The registry account describes a 32-byte decoded <code>Token</code>, a 12-byte <code>SessionId</code>, and a 34-byte decoded <code>Upload</code>. That grouping made AEAD a reasonable hypothesis. It did not prove that <code>Token</code> was the key, <code>SessionId</code> was the actual nonce, or <code>Upload</code> used a canonical layout. The grader accepted ChaCha20-Poly1305 as the answer to its cipher question. A verified decrypt would be a different kind of evidence, and I did not get one.</p>
+<h3>4.3 Registry-resident configuration as a defense-evasion pattern</h3>
+<p>The interesting part is the indirection. SQMClient held a path and two pointers. One pointer led to the short binary value under Wbem; another led to the longer encoded value under Classes\Installer. A rule looking only for a new registry key would miss writes into these existing keys. A reviewer reading only SQMClient would also miss the companion blobs. Encryption kept the supposed domain out of an ordinary string search.</p>
+<p>The same design could be benign in another product. The path under Public, this particular value grouping, and the challenge context make it suspicious here. I would still check the writing process and compare a full host snapshot with an approved baseline before naming a real implant.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit/Analysis Mechanics</summary>
+<h3>5.1 Why mtime banding works (with caveats)</h3>
+<p>The key last-write time helped me choose where to look, but my initial time-only sweep returned too much ordinary activity. A six-hour window before collection was a starting query, not a general detection threshold. Clock skew, later updates, and missing collection context can move a real write outside that band. The value pattern carried more weight than the timestamp.</p>
+<h3>5.2 Why schema-foreign detection is dispositive</h3>
+<p>I would no longer call one foreign value dispositive. A baseline gathered from the same Windows build and approved software can show which names are unusual. The six values across three linked keys form a stronger case lead than <code>Token</code> alone. <a href="artifacts/regxml_review.py">The offline reviewer</a> tests that exact combination and deliberately leaves the verdict to a human. Its benign and single-value fixtures show the difference.</p>
+<h3>5.3 Why AEAD parameter inference is high-confidence</h3>
+<p>The 32/12/34-byte partition narrows my hypotheses but cannot identify the cipher or even prove that all three values belong to one cryptographic operation. The <code>Upload</code> length is consistent with 18 bytes of ciphertext and a 16-byte tag. AES-GCM shares that layout. I should have presented both candidates until I had a tag check, API trace, binary constant, or grader response. The grader supplied the last of those, and only for the answer it marked correct.</p>
+<h3>5.4 Why ST.10a failed and what it teaches</h3>
+<p>I submitted AES-256-GCM first because it was a plausible Windows-native choice. It was rejected. ChaCha20-Poly1305 was then accepted. The wrong turn is useful: when two algorithms share the same visible lengths, familiarity with one implementation is a guess about the environment. I would preserve both hypotheses in a real investigation and tell the next analyst what observation could distinguish them.</p>
+<h3>5.5 Why the cryptanalytic sweep terminated in structured uncertainty</h3>
+<p>The extra FQDN search produced no authenticated plaintext. That is a real stop point, but it does not identify the missing ingredient. A different AAD, transformed token, nonce construction, record layout, or error in the test harness could each explain the misses. Poly1305 tag byte distance does not tell me whether a wrong key is "close" to the right key. I would not use a tag-difference score as a key-derivation guide.</p>
+<p>My next collection requests would be the executable named by <code>ConfigPath</code>, the full host registry set including SYSTEM and relevant user hives, and process or network telemetry from the same period. Those could reveal the actual derivation or the domain in use. Until then, the C2 FQDN stays unknown. The graded challenge is complete; that optional operational question is not.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<h3>What this exercise validated</h3>
+<p>The clean Run-key pass forced me to change the question. Searching for where a program stored state found the SQMClient path and the two pointers. The recorded grader feedback also settled the answer I could not settle from length alone. I learned more from the rejected AES-GCM submission than from treating every 12-byte value as a nonce.</p>
+<h3>What this exercise surfaced as gaps</h3>
+<p>I lacked a host-specific registry baseline and the implant binary. The time-only filter was noisy. The saved entropy cutoff would miss the 32- and 34-byte blobs. The printed KDF example fails its own library call, and I have no test-vector or attempt log proving the optional sweep ran as described. These gaps limit the crypto conclusion to the reported grader answer and leave the FQDN unrecovered.</p>
+<h3>Transferable principles</h3>
+<p>For a real host, I would inventory the artifact, log ordinary dead ends, and keep the launch mechanism separate from stored configuration. I would compare the whole three-key pattern against a same-build baseline before promoting a registry-value hit. A failed AEAD tag check tells me only that one exact key, nonce, layout, and AAD combination did not authenticate. It cannot measure how near I am to a correct key.</p>
+<h3>Methodological principle: describe before hypothesize</h3>
+<p>My useful steps described bytes, types, paths, and value names before naming an implant or cipher. The AES-GCM answer moved faster than the evidence allowed. In the write record, I can keep both facts: the prior was understandable, and the submission was wrong.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<h3>7.1 Individual practitioner skill development</h3>
+<p>This case gave me practice walking a large registry export, following internal references across keys, and separating a cipher-shaped blob from an authenticated decrypt. The next skill I would build is a reproducible evidence ledger for every tested crypto combination. It should record the candidate construction and pass or fail without printing keys or plaintext into logs.</p>
+<h3>7.2 Security operations (SOC, IR, threat hunting)</h3>
+<p>On an endpoint I own, I would look for registry value-set events at these exact paths, then ask who wrote them and whether the named executable exists. <a href="artifacts/registry_value_candidate.yml">The Sigma candidate</a> catches a single matching write. <a href="artifacts/registry_event_review.py">The event reviewer</a> can show whether all six names appeared on one host in a retained event export. Neither sees an old value written before logging began. An offline snapshot supplies that missing state; a trusted baseline supplies context.</p>
+<p>I would acquire the binary and full registry set before trying to decrypt the domain. If a DNS log exists, I would compare it with actual process and network evidence. I would not call a non-resolving name C2 solely because the scenario suggested one. Once a domain is recovered and confirmed, it can support broader host searches and response actions.</p>
+<h3>7.3 Intelligence operations</h3>
+<p>The three-key layout is a useful behavioral feature for comparison with other samples. It does not establish actor attribution. The encrypted blob and reported cipher answer are similarly weak attribution evidence without the executable or matching campaigns. I can share a careful pattern description with a defender now. I cannot share a verified FQDN or claim a TAXII feed received one.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<h3>8.1 Triage decision tree</h3>
+<pre><code class="language-text">Start with a complete SOFTWARE snapshot
+  -&gt; inspect common launch keys and record the negatives
+  -&gt; search for executable paths in user-writable locations
+  -&gt; inspect the parent key and follow any registry pointers
+  -&gt; compare the value set against an approved same-build baseline
+  -&gt; decode candidate blobs and record lengths without guessing a cipher
+  -&gt; obtain the executable or a verified test vector before decrypting
+</code></pre>
+<h3>8.2 AEAD-fingerprint checklist</h3>
+<table>
+<thead>
+<tr>
+<th>Observation</th>
+<th>What it supports</th>
+<th>What it cannot settle</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>32 decoded bytes</td>
+<td>A 256-bit key candidate or another 32-byte value</td>
+<td>Whether the bytes are a key or need derivation</td>
+</tr>
+<tr>
+<td>12 binary bytes</td>
+<td>A common AEAD nonce length</td>
+<td>Whether this value was used as the nonce</td>
+</tr>
+<tr>
+<td>34 decoded bytes</td>
+<td>A possible 18-byte ciphertext with a 16-byte tag</td>
+<td>Whether the value is AEAD output or which cipher made it</td>
+</tr>
+<tr>
+<td>Accepted ChaCha20-Poly1305 answer</td>
+<td>The reported grader choice</td>
+<td>A local authenticated decrypt or the hidden FQDN</td>
+</tr>
+</tbody>
+</table>
+<h3>8.3 Schema-baseline corpus (starter set)</h3>
+<p>The short list of common SQMClient, Wbem, and Installer names I used during the solve is a starter hypothesis, not an exhaustive Microsoft schema. I would build the real baseline from approved hosts on the same OS build and review differences with the system owner. The case's six names provide a separate, testable selector. <a href="artifacts/regxml_review.py">The regxml reviewer</a> reports the pattern without labeling every other name malicious.</p>
+<p>The runnable defensive set includes the <a href="artifacts/regxml_review.py">offline XML reviewer</a>, <a href="artifacts/registry_event_review.py">normalized event reviewer</a>, <a href="artifacts/registry_value_candidate.yml">Sigma candidate</a>, <a href="artifacts/hunt_queries.md">KQL and SPL templates</a>, <a href="artifacts/test_registry_lab.py">seven-test suite</a>, and <a href="artifacts/README.md">lab guide</a>. The invented fixtures are <a href="artifacts/fixtures/case.xml">complete case XML</a>, <a href="artifacts/fixtures/benign.xml">benign XML</a>, <a href="artifacts/fixtures/near_miss.xml">single-value near miss</a>, <a href="artifacts/fixtures/events.jsonl">mixed event stream</a>, <a href="artifacts/fixtures/truncated.xml">truncated XML</a>, <a href="artifacts/fixtures/doctype.xml">DTD rejection case</a>, and <a href="artifacts/fixtures/malformed.jsonl">malformed events</a>. The <a href="artifacts/defense_path.svg">diagram</a> is also a downloadable file. Every input is synthetic; none contains the challenge's secret material.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<h3>Tier 1 -- Always-Present Checklist</h3>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>Case fit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MITRE ATT&amp;CK</td>
+<td><a href="https://attack.mitre.org/techniques/T1112/">T1112 Modify Registry</a> fits the described placement of configuration values. <a href="https://attack.mitre.org/techniques/T1036/005/">T1036.005</a> is a plausible masquerade hypothesis for <code>svchost.exe</code> under Public; I have no binary or process event to confirm it. <a href="https://attack.mitre.org/techniques/T1071/004/">T1071.004</a> needs actual DNS-based command traffic and is not observed here. <a href="https://attack.mitre.org/techniques/T1140/">T1140</a> and <a href="https://attack.mitre.org/techniques/T1027/013/">T1027.013</a> remain conditional on binary or decrypted-content evidence.</td>
+</tr>
+<tr>
+<td>MITRE ATLAS and OWASP LLM Top 10</td>
+<td>No ML or LLM system appears in the case.</td>
+</tr>
+<tr>
+<td>OWASP Top 10</td>
+<td>No web application is in scope.</td>
+</tr>
+<tr>
+<td>CVSS, EPSS, CISA KEV</td>
+<td>No affected product or CVE is identified.</td>
+</tr>
+<tr>
+<td>Cloud benchmarks and CSA CCM</td>
+<td>The scenario is an endpoint, with no cloud control plane to assess.</td>
+</tr>
+</tbody>
+</table>
+<h3>Tier 2 -- Applied Where They Add Value</h3>
+<p><a href="https://capec.mitre.org/data/definitions/203.html">CAPEC-203</a> describes manipulating registry information through an authorization weakness. The hive does not show how this writer gained permission, so I treat it as an investigative comparison, not a demonstrated exploit. CAPEC-441 and CWE-693 are too broad to turn the observed value names into a specific product defect. The useful design question is who can write these keys, what the application trusts from them, and which sensor records the change. STRIDE's tampering category can organize that review. D3FEND labels are unnecessary to run the concrete snapshot and write-event checks below.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<h3>10.1 STIX 2.1 representation</h3>
+<p>I would share the key paths and case value-name pattern with its provenance and confidence. I had also noticed leading whitespace in the encoded <code>Token</code>; it may help compare a second sample, but it cannot identify an actor by itself. I had sketched a STIX bundle, but its fields were placeholders. I have no verified FQDN, sample hash, or production sighting to put in an observed indicator, and I did not validate the pattern with a STIX implementation. A future STIX object could describe an indicator derived from a confirmed sample or fleet hunt. No TAXII exchange happened here.</p>
+<h3>10.2 STIG references</h3>
+<p>I had also listed representative Windows STIG IDs. I could not verify them against a pinned OS and STIG release for this case, so I do not make a STIG finding here. A defender who needs that mapping should use the version applied to their host. The immediate technical requirement is clearer: <a href="https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/event-4657">Security Event 4657</a> needs a <code>Set Value</code> SACL on the key as well as an Audit Registry policy. <a href="https://learn.microsoft.com/en-us/windows/security/operating-system-security/sysmon/sysmon-events">Sysmon registry events 12-14</a> offer another route when configured to collect these paths.</p>
+<h3>10.3 CIS Controls v8</h3>
+<p><a href="https://cas8.docs.cisecurity.org/en/latest/source/Controls8/">CIS 8.5 and 8.11</a> fit detailed audit collection and review of the value writes. <a href="https://cas8.docs.cisecurity.org/en/latest/source/Controls13/">CIS 13.6</a> concerns network flow collection, which could help revisit the perimeter alert; it does not expose encrypted registry data or prove DNS C2. Disabling telemetry services would not remove an attacker's ability to write a key they already control, so I have not offered it as a fix for this pattern.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>11a. Standards Mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Concrete connection</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5 SI-4</a></td>
+<td>Monitor registry value changes and investigate unusual writers.</td>
+</tr>
+<tr>
+<td>AU-2 and AU-6</td>
+<td>Choose the registry events to log and establish a review process.</td>
+</tr>
+<tr>
+<td>AC-6</td>
+<td>Limit who may modify protected configuration keys. Check effective ACLs rather than assuming HKLM always requires elevation.</td>
+</tr>
+<tr>
+<td>SI-7</td>
+<td>Check integrity of a trusted baseline and the executable referenced by the configuration.</td>
+</tr>
+<tr>
+<td>CIS 8.5 and 8.11</td>
+<td>Collect and review the value-write records that the hunt needs.</td>
+</tr>
+</tbody>
+</table>
+<p>This table points to work a real owner can perform. I have not assessed the challenge host for compliance.</p>
+<h3>11b. Mitigation Realization</h3>
+<p>First, I would preserve the host state: the SOFTWARE hive, SYSTEM and relevant user hives, the file named in <code>ConfigPath</code>, and available process and DNS telemetry. Then I would enable or confirm value-write collection for the three paths. Sysmon Event 13 or MDE registry events can identify the writing process; native Event 4657 needs its SACL. I would compare a complete snapshot against a trusted same-build baseline and ask the system owner whether each foreign name is expected.</p>
+<p>Application control can prevent a user-writable directory from becoming an execution location, but it needs a real policy tested against that fleet. Removing or disabling CEIP is no substitute for protecting the registry ACLs or blocking untrusted code. The <a href="artifacts/regxml_review.py">offline reviewer</a>, <a href="artifacts/registry_event_review.py">write-event reviewer</a>, and <a href="artifacts/hunt_queries.md">hunt templates</a> make the detection side concrete without claiming a control has been deployed.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<h3>12.1 Indicators of Compromise (sanitized / illustrative)</h3>
+<p>The case-specific observable is a cluster of value names: <code>Token</code>, <code>ConfigPath</code>, <code>CacheMap</code>, and <code>SessionMap</code> under <code>Microsoft\SQMClient</code>; <code>SessionId</code> under <code>Microsoft\Wbem</code>; and <code>Upload</code> under <code>Classes\Installer</code>. The recorded <code>ConfigPath</code> pointed to <code>C:\Users\Public\svchost.exe</code>. The <code>Token</code>, <code>SessionId</code>, and <code>Upload</code> were described as 32, 12, and 34 decoded bytes. These are leads for this case, not a universal malware signature. I have no verified domain, IP, binary hash, or network packet to publish as a network IOC.</p>
+<h3>12.2 Sigma rule -- registry-resident implant configuration</h3>
+<p><a href="artifacts/registry_value_candidate.yml">The experimental Sigma selector</a> matches each exact key/value-name pair as a possible registry value-set event. Its claim is narrower than a general "schema-foreign" detector. It cannot compare a whole hive to a baseline, correlate all six values, or identify the writer by itself. PySigma parsed it locally. An owner still has to convert it for their backend, check field mapping, and review ordinary software that may use one of these names.</p>
+<h3>12.3 YARA rule -- dropper masquerade pattern</h3>
+<p>I have no dropper bytes for a useful content rule. My first YARA idea used scanner-specific <code>filepath</code> and <code>filename</code> externals to match a familiar executable name under Public. That is a file-location policy, and those externals are not portable across scanners. I have not published it as a validated binary detector. Process-creation telemetry and application-control policy are better places to test that location hypothesis until a sample is acquired.</p>
+<h3>12.4 SIEM detection queries</h3>
+<p><a href="artifacts/hunt_queries.md">The KQL and SPL templates</a> look for paired key and value-name writes, then return time, host, and initiating process fields without printing registry value data. KQL uses <a href="https://learn.microsoft.com/en-us/defender-xdr/advanced-hunting-deviceregistryevents-table">Microsoft's <code>DeviceRegistryEvents</code> schema</a>; SPL assumes Sysmon Event 13 fields in a local index. Neither query ran in a backend. My earlier ES|QL sketch filtered to SQMClient while claiming coverage of Wbem and Installer. I left that incomplete query out of the reusable set.</p>
+<h3>12.5 Log source and data pipeline requirements</h3>
+<p>The live path needs a registry sensor covering all three keys, a host identifier, event time, the target value path, and a writing process. Sysmon Event 13 can supply value-set events; Event 1 can help inspect a Public-path executable if it ran. MDE registry events offer another source. Native Event 4657 requires the right SACL. Old values may predate every event-retention window, so an offline hive snapshot is a second sensor, not a luxury.</p>
+<p>The <a href="artifacts/registry_event_review.py">event reviewer</a> expects normalized <code>host</code>, integer <code>event_id</code>, and <code>target_object</code> fields. The <a href="artifacts/fixtures/events.jsonl">invented event fixture</a> exercises a complete host, a benign host, and a one-value near miss. It does not infer a kill chain from the order of those lines. A real investigation would connect the writer to file provenance, execution, and network data before escalating.</p>
+<h3>12.6 Detection engineering notes</h3>
+<p>I would start at triage severity. One <code>Token</code> write under SQMClient is worth examining; it does not confirm an implant. The six-value constellation and an untrusted writer increase concern, but I have no fleet data to estimate false positives. The <a href="artifacts/test_registry_lab.py">synthetic tests</a> cover positive, benign, near-miss, malformed, and DTD inputs. The truncated XML test matters: a partial export cannot be treated as a clean host merely because the scanner has not reached the suspect key. No live telemetry, SIEM conversion, production sample, or detection-rate study was performed.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">solve flow above</a> shows the autorun dead end, three-key pivot, cipher answer, and remaining gap. This <a href="artifacts/defense_path.svg">defender cross-section</a> ties the same registry state to an offline baseline and live value-write monitoring. The star on the cipher node marks the reported grader result rather than a locally verified decrypt.</p>
+<p><img src="artifacts/defense_path.svg" alt="A clean autorun sweep leads through SQMClient, Wbem, and Installer. The graded ChaCha20-Poly1305 answer is reported accepted, while the C2 domain stays unknown. Offline baseline review and registry write monitoring are the defender checks."></p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<h3>Standards and frameworks</h3>
+<ul>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5</a>; <a href="https://cas8.docs.cisecurity.org/en/latest/source/Controls8/">CIS Controls 8</a> and <a href="https://cas8.docs.cisecurity.org/en/latest/source/Controls13/">13</a>.</li>
+</ul>
+<h3>MITRE</h3>
+<ul>
+<li><a href="https://attack.mitre.org/techniques/T1112/">ATT&amp;CK T1112</a>, <a href="https://attack.mitre.org/techniques/T1036/005/">T1036.005</a>, <a href="https://attack.mitre.org/techniques/T1027/013/">T1027.013</a>, <a href="https://attack.mitre.org/techniques/T1140/">T1140</a>, and <a href="https://attack.mitre.org/techniques/T1071/004/">T1071.004</a> for the observed or bounded mappings above.</li>
+<li><a href="https://capec.mitre.org/data/definitions/203.html">CAPEC-203</a> for a conditional registry-manipulation comparison.</li>
+</ul>
+<h3>Cryptographic specifications</h3>
+<ul>
+<li><a href="https://www.rfc-editor.org/rfc/rfc8439.html">RFC 8439, ChaCha20-Poly1305</a> and <a href="https://csrc.nist.gov/pubs/sp/800/38/d/final">NIST SP 800-38D, GCM</a>.</li>
+</ul>
+<h3>Windows internals</h3>
+<ul>
+<li><a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ns-wdm-_key_basic_information">Registry key last-write structure</a>, <a href="https://learn.microsoft.com/en-us/windows/security/operating-system-security/sysmon/sysmon-events">Sysmon events</a>, <a href="https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/event-4657">Security Event 4657</a>, and <a href="https://learn.microsoft.com/en-us/defender-xdr/advanced-hunting-deviceregistryevents-table">Defender <code>DeviceRegistryEvents</code> fields</a>.</li>
+</ul>
+<h3>STIX / STIG / CIS Benchmarks</h3>
+<ul>
+<li><a href="https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html">OASIS STIX 2.1</a>, <a href="https://public.cyber.mil/stigs/">DISA STIG library</a>, and <a href="https://www.cisecurity.org/benchmark/microsoft_windows_desktop">CIS Windows benchmarks</a>. No STIX package or STIG finding was asserted for this case.</li>
+</ul>
+<h3>Detection engineering</h3>
+<ul>
+<li><a href="https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-rules-specification.md">Sigma rule specification</a> for the experimental selector's format.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>

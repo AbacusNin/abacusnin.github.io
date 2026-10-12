@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 350" role="img" aria-labelledby="title desc">
+  <title id="title">Registry case path and defender checks</title>
+  <desc id="desc">A clean autorun sweep led to SQMClient values, two linked registry keys, and an AEAD shape. The graded cipher answer was accepted, while the C2 domain stayed unknown. Defenders can compare snapshots and monitor value writes.</desc>
+  <rect width="1120" height="350" rx="18" fill="#0d1320"/>
+  <g font-family="Arial, sans-serif" fill="#e9f0f5">
+    <text x="30" y="35" font-size="19" font-weight="700">From the registry lead to a testable defense</text>
+    <text x="30" y="58" font-size="12" fill="#9db0bf">The solve and the operational checks use different evidence.</text>
+  </g>
+  <defs><marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0 L7 3.5 L0 7 Z" fill="#44c7c3"/></marker></defs>
+  <g fill="#152339" stroke="#4b6577" stroke-width="1.5">
+    <rect x="30" y="85" width="200" height="93" rx="10"/>
+    <rect x="255" y="85" width="200" height="93" rx="10"/>
+    <rect x="480" y="85" width="200" height="93" rx="10"/>
+    <rect x="705" y="85" width="200" height="93" rx="10"/>
+    <rect x="930" y="85" width="160" height="93" rx="10"/>
+    <rect x="255" y="220" width="300" height="96" rx="10" stroke="#3ba5a1"/>
+    <rect x="575" y="220" width="300" height="96" rx="10" stroke="#3ba5a1"/>
+  </g>
+  <g stroke="#44c7c3" stroke-width="2" fill="none" marker-end="url(#arrow)">
+    <path d="M230 132 H249"/><path d="M455 132 H474"/><path d="M680 132 H699"/><path d="M905 132 H924"/>
+    <path d="M355 183 V213"/><path d="M555 268 H569"/>
+  </g>
+  <g font-family="Arial, sans-serif" font-size="14" fill="#e9f0f5">
+    <text x="47" y="112" font-weight="700">Autoruns clean</text>
+    <text x="47" y="137" font-size="12">Shift from launch keys</text>
+    <text x="47" y="154" font-size="12">to stored configuration</text>
+    <text x="272" y="112" font-weight="700">SQMClient</text>
+    <text x="272" y="137" font-size="12">Four case value names</text>
+    <text x="272" y="154" font-size="12">point to two more keys</text>
+    <text x="497" y="112" font-weight="700">Wbem + Installer</text>
+    <text x="497" y="137" font-size="12">12-byte and 34-byte</text>
+    <text x="497" y="154" font-size="12">blobs in the account</text>
+    <text x="722" y="112" font-weight="700">Cipher question</text>
+    <text x="722" y="137" font-size="12">AES-GCM rejected</text>
+    <text x="722" y="154" font-size="12">ChaCha accepted*</text>
+    <text x="947" y="112" font-weight="700">Still unknown</text>
+    <text x="947" y="137" font-size="12">C2 domain</text>
+    <text x="947" y="154" font-size="12">not decrypted</text>
+    <text x="272" y="248" font-weight="700" fill="#7de0d7">Offline review</text>
+    <text x="272" y="272" font-size="12">Compare the full value set</text>
+    <text x="272" y="290" font-size="12">with an approved host baseline</text>
+    <text x="592" y="248" font-weight="700" fill="#7de0d7">Live review</text>
+    <text x="592" y="272" font-size="12">Collect registry value writes</text>
+    <text x="592" y="290" font-size="12">and check the writing process</text>
+    <text x="930" y="331" font-size="11" fill="#9db0bf">*Reported grader result</text>
+  </g>
+</svg>

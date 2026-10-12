@@ -1,0 +1,25 @@
+title: SQMClient Case Value Names Written to Registry
+id: 5741df15-296d-4d19-b310-eb00752fe16d
+status: experimental
+description: Flags a value write matching one of the six registry names in this case. Each hit requires host and process review.
+date: 2026-10-11
+references:
+  - https://attack.mitre.org/techniques/T1112/
+logsource:
+  product: windows
+  category: registry_set
+detection:
+  selection:
+    TargetObject|endswith:
+      - '\SOFTWARE\Microsoft\SQMClient\Token'
+      - '\SOFTWARE\Microsoft\SQMClient\ConfigPath'
+      - '\SOFTWARE\Microsoft\SQMClient\CacheMap'
+      - '\SOFTWARE\Microsoft\SQMClient\SessionMap'
+      - '\SOFTWARE\Microsoft\Wbem\SessionId'
+      - '\SOFTWARE\Classes\Installer\Upload'
+  condition: selection
+falsepositives:
+  - Legitimate enterprise or vendor software using the same value names
+level: medium
+tags:
+  - attack.t1112
