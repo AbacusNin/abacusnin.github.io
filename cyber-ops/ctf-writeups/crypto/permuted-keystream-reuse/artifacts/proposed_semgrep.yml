@@ -1,0 +1,29 @@
+# Proposal retained from the case record. Syntax and detector behavior are unverified.
+# Do not use this rule as a blocking CI gate without local Semgrep validation and tuning.
+rules:
+  - id: homegrown-stream-cipher-key-reuse
+    languages: [python]
+    severity: ERROR
+    message: >-
+      Review key material from random.randbytes reused under a transform.
+      A permutation does not add independent key information.
+    patterns:
+      - pattern-either:
+          - pattern: |
+              $K = random.randbytes(...)
+              ...
+              $K = $XFORM($K)
+          - pattern: |
+              $K = random.randbytes(...)
+              ...
+              $F($K, ...)
+              ...
+              $F($XFORM($K), ...)
+    paths:
+      include: ["*.py"]
+  - id: prng-entropy-confined-to-low-bits
+    languages: [python]
+    severity: WARNING
+    message: >-
+      Review whether a small random low-bit addition leaves deterministic high bits exposed.
+    pattern: $X += random.getrandbits($N)
