@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Prefix That Gave Me the XOR Key - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="I had 44 hex characters, a known flag prefix, and no reason to guess 256 keys. XORing the prefix against the first ciphertext bytes gave me 0x42.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/xor-known-prefix/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Prefix That Gave Me the XOR Key">
+  <meta property="og:description" content="I had 44 hex characters, a known flag prefix, and no reason to guess 256 keys. XORing the prefix against the first ciphertext bytes gave me 0x42.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/xor-known-prefix/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Crypto / <span aria-current="page">The Prefix That Gave Me the XOR Key</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Prefix That Gave Me the XOR Key</h1>
+        <p class="lead">The archive opened without a password. The interesting part was the text file inside it: 44 hex characters hiding a 22-byte answer.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Recover a flag from a hex-encoded blob transformed with an unknown one-byte XOR key.</p>
+<p><strong>What I did.</strong> I identified the hex representation, decoded it to bytes, XORed the stated flag prefix against the opening bytes, then tested the resulting key across the whole blob.</p>
+<p><strong>The result.</strong> Seven prefix positions yielded 0x42, and a full one-byte decode produced a printable, flag-shaped message consistent with the prompt. The answer value is withheld.</p>
+<p><strong>The limit.</strong> The original archive, ciphertext, answer, and platform receipt are unavailable for independent replay. The local tests use an invented example.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Open the archive; Read the representation; Use the known prefix; Decode all bytes; Check the result">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Open the archive</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">One text file; no password prompt</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Read the representation</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">44 hex characters become 22 bytes</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Use the known prefix</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Seven positions suggest key 0x42</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Decode all bytes</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Printable message with flag structure</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Check the result</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Format, length, and prompt context</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Cryptography (single-byte XOR)</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Easy</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>xor, known-plaintext-attack, hex-encoding, string-obfuscation, malware-deobfuscation</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved (one-shot; self-validated against four checks)</td>
+</tr>
+<tr>
+<td>Recorded result</td>
+<td>A one-byte key of <code>0x42</code> decoded 22 bytes to a printable flag-shaped message</td>
+</tr>
+<tr>
+<td>Evidence boundary</td>
+<td>The original bytes and platform receipt are not shown; the executable examples use invented data</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/crypto/xor-known-prefix/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>Analytical Attack Chain (Overview)</h2>
+<pre><code class="language-mermaid">flowchart LR
+    A[Open archive] --&gt; B[Inspect 44 hex characters]
+    B --&gt; C[Decode 22 raw bytes]
+    C --&gt; D[Apply known prefix]
+    D --&gt; E[Recover candidate key 0x42]
+    E --&gt; F[Decode whole blob]
+    F --&gt; G[Check format and context]
+</code></pre>
+<p>The useful moment was recognizing that the prompt had already given me plaintext. I used that small piece of certainty before trying a wider search.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>The challenge archive was a normal ZIP containing one text file, <code>cipher.txt</code>. <code>unzip -l</code> showed a 45-byte member. The file held 44 hex characters plus a newline. The event supplied a flag-format prefix, so I had a candidate for the beginning of the plaintext even though the key was unknown.</p>
+<p>My task was to identify the representation, recover the one-byte transform, and read the answer. This was a puzzle, with no compromised host or attacker activity. The operational parallel is still worth exploring: malware sometimes stores configuration strings under a simple XOR transform and decodes them at runtime. An analyst with the file can often recover those strings statically, then decide whether they are useful indicators. The puzzle itself provided no C2 address, mutex, persistence key, or real malware sample.</p>
+<p>For that real-world parallel, the defender would have an authorized sample in an isolated analysis environment, perhaps with FLOSS, CAPA, YARA, and a hex viewer. Static recovery can save a detonation step. It does not establish that a recovered string was ever used on a network or host. The boundary here is between bytes stored in a file and behavior observed at runtime.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I started with the wrapper. <code>unzip -l</code> showed one 45-byte file, and extraction did not ask for a password. I did not spend time on ZIP password recovery. The text was 44 characters of <code>[0-9a-f]</code> followed by a newline. An even-length hex string was the plainest interpretation; <code>bytes.fromhex</code> gave 22 raw bytes.</p>
+<p>Some of those bytes were below <code>0x20</code>, so the raw decode was not directly readable ASCII. That made a printable-letter Caesar shift unlikely as the <em>whole</em> explanation. It did not mathematically rule out every alphabet transform or character encoding. The short length also gave me little basis for claims about EBCDIC, UTF-16, or UTF-32 from byte distribution alone. I kept the next test cheap.</p>
+<p>The event's stated flag prefix gave me seven known plaintext bytes. I XORed them with the first seven ciphertext bytes and got <code>0x42</code> at every position. That is strong evidence for a one-byte key over that window. It does not exclude a longer key whose observed positions happen to be the same. I tested <code>0x42</code> across all 22 bytes. The resulting text was printable, began with the expected prefix, had the expected brace structure, and made sense with the prompt's welcome theme. Those checks reinforce one another; they are not four independent proofs of platform acceptance.</p>
+<p>I had a 256-key brute-force fallback in mind, but the prefix made it unnecessary. I also left Hamming-distance period estimation and Kasiski-style analysis alone: 22 bytes are too little for a confident statistical result here. The archive had already opened, so <code>zip2john</code> and dictionary attacks had no role. The rejected detours matter because this challenge could have become harder through my own assumptions.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<h3>3.1 Hex decode and known-plaintext key recovery</h3>
+<p>The core operation was <code>K[i] = C[i] XOR P[i]</code> across the stated prefix. This runnable illustration uses <a href="artifacts/synthetic_cipher.hex">the invented 17-byte hex fixture</a>, not the original challenge bytes:</p>
+<pre><code class="language-python">ct = bytes.fromhex(&quot;040e0305391a0d101d071a030f120e073f&quot;)
+anchor = b&quot;FLAG{&quot;
+key_window = bytes(c ^ p for c, p in zip(ct, anchor))
+assert key_window == b&quot;BBBBB&quot;
+</code></pre>
+<p>The original solve used seven prefix bytes and found the same byte, <code>0x42</code>, seven times. The illustration has a five-byte anchor, so its assertion proves only its own fixture. <a href="artifacts/xor_anchor_scan.py">xor_anchor_scan.py</a> exposes a strict hex reader and prefix-key function for local reuse. It rejects an empty anchor or one longer than the ciphertext.</p>
+<h3>3.2 Full decode</h3>
+<p>I then applied the candidate byte to the whole decoded blob:</p>
+<pre><code class="language-python">plaintext = bytes(value ^ 0x42 for value in ct)
+assert plaintext == b&quot;FLAG{XOR_EXAMPLE}&quot;
+</code></pre>
+<p>That line is a synthetic round trip. In the challenge, the full 22-byte decode yielded a flag-shaped printable message. I have not published the original ciphertext or answer. A full decode checks the single-byte hypothesis beyond the known prefix; it remains separate from a platform acceptance receipt.</p>
+<h3>3.3 Recon one-liners</h3>
+<p>The initial commands were short: <code>unzip -l challenge.zip</code> to see the member, <code>unzip challenge.zip</code> to extract it, <code>wc -c cipher.txt</code> to check the 45-byte count, and <code>od -c</code> or a hex viewer to inspect the characters and newline. A strict hex parser is more useful than a loose character-class check once the representation is suspected, because it also rejects odd-length input and non-hex characters. The <a href="artifacts/xor_anchor_scan.py">linked tool</a> implements that check locally.</p>
+<h3>3.4 Fallback path prepared but not executed</h3>
+<p>Without a trustworthy plaintext prefix, I would try all 256 one-byte keys and rank outputs by file magic, valid structure, or readable text. A printable-ASCII score alone can over-rank benign or meaningless strings, especially for a short blob. I did not execute that fallback in this solve. Multi-byte repeating XOR would require a different test, ideally more ciphertext or another anchored region; I would not force a key-length estimate from 22 bytes.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>XOR is self-inverse: <code>(A XOR K) XOR K = A</code>. For a one-byte key, the same value transforms each byte. When I know one plaintext byte and its matching ciphertext byte, I can compute the key byte by XORing them. A longer known prefix lets me test whether the recovered key bytes repeat.</p>
+<p>In this puzzle, all seven recovered prefix positions agreed on <code>0x42</code>. The simplest working model was a constant one-byte key. I checked the model by decoding the rest of the blob, rather than declaring the period proven from seven matching positions. A repeating multi-byte key can share a constant opening run; an unknown transform could also mimic a short anchor by chance.</p>
+<p>For an unknown malware string, I would first look for a reliable anchor such as a file header, protocol prefix, or known configuration field. If there is none, a bounded 256-key scan is cheap, but the output still needs review. FLOSS can help recover obfuscated strings; CAPA describes capabilities it finds in a sample. Neither tool turns a recovered <code>http://</code> fragment into a verified C2 channel by itself.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit/Analysis Mechanics</summary>
+<p>The weakness here is a fixed, tiny transform applied to a message whose opening bytes were disclosed by the challenge format. For ciphertext <code>C</code> and known plaintext prefix <code>P</code>, the candidate keystream bytes are <code>K[i] = C[i] XOR P[i]</code>. Seven equal bytes suggested <code>K = 0x42</code>. Applying that byte to every ciphertext position made the complete message readable.</p>
+<pre><code class="language-text">44 hex characters + newline -&gt; 22 ciphertext bytes
+7 known prefix bytes       -&gt; 7 candidate key bytes, each 0x42
+22-byte one-key decode     -&gt; printable, flag-shaped text
+</code></pre>
+<p>That is an obfuscation failure, not a general break of stream ciphers. A secure one-time pad requires unpredictable, non-reused key material at least as long as the message. A constant one-byte XOR key provides none of that protection. My formatting and theme checks made the candidate persuasive for this puzzle; the platform's final acceptance is not documented here.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<p>The fastest part of this solve was deciding what the bytes <em>were</em> before trying to read what they <em>said</em>. A 45-byte text member became 22 ciphertext bytes once I accounted for its newline and decoded the 44 hex characters. From there, the stated flag format was useful evidence, not merely a submission rule. It gave me a seven-byte anchor and a direct algebraic test.</p>
+<p>I also learned how easily a short, successful decode can sound more conclusive than the record supports. Seven equal recovered key bytes support the one-byte model. The complete readable decode strengthens it. Neither observation proves that no longer key could have produced the same message, and the source record does not contain a platform acceptance receipt. I would retain the candidate and the checks in case notes, with the submission state labeled separately.</p>
+<p>The original solve used inline one-liners. That was enough to finish a small puzzle, but it left no reusable harness for another analyst. I turned the primitive into <a href="artifacts/xor_anchor_scan.py">a bounded local scanner</a> with <a href="artifacts/test_xor_anchor_scan.py">synthetic tests</a>. That is a follow-on proof of concept, not a tool claimed to have run during the event.</p>
+<table>
+<thead>
+<tr>
+<th>What I did here</th>
+<th>What I would carry into an investigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Checked the archive member and representation first</td>
+<td>Identify file type, length, encoding, and container structure before interpreting content</td>
+</tr>
+<tr>
+<td>Used the supplied flag format as plaintext</td>
+<td>Look for trustworthy protocol headers, file magic, or configuration fields</td>
+</tr>
+<tr>
+<td>Applied a candidate key to the whole blob</td>
+<td>Require full structural review and, where possible, independent behavioral corroboration</td>
+</tr>
+<tr>
+<td>Skipped ZIP cracking and 256-key search</td>
+<td>Take the simple, evidence-backed test before expanding the search space</td>
+</tr>
+<tr>
+<td>Recorded the rejected paths</td>
+<td>Give the next analyst enough context to avoid repeating them</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<p>The next technical step for me would be a longer, messier sample. A repeating-key XOR blob may need key-length hypotheses, Hamming-distance comparison, and per-position analysis. XOR-wrapped PE, PNG, or ZIP content may reveal itself through magic bytes rather than a flag prefix. File carving and format validation become more important as the output grows. The same byte-level reasoning also helps with binary protocols and mistakes involving reused stream-cipher keystreams, although those are different cryptographic problems.</p>
+<p>In a malware intake queue, I would use a bounded static pass to recover strings before spending sandbox time. FLOSS can expose candidate decoded strings, CAPA can add capability context, and YARA can find a <em>known</em> marker through one-byte XOR. A useful hunt question is whether a sample with sparse readable static strings also shows networking or persistence behavior elsewhere. That combination warrants review without being a malicious verdict on its own.</p>
+<p>The recovered values could support threat intelligence only after verification. A decoded domain could be a dormant configuration value, decoy, test endpoint, or active destination. I would retain the sample hash, extraction method, byte offsets, key hypothesis, and confidence, then seek runtime telemetry or independent reporting before promoting it to an indicator. The same anchor technique can help examine shared blobs or embedded-device protocols, but it does not establish actor identity or intent.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>These files are synthetic proofs of concept for applying this puzzle's method to a controlled intake workflow. <a href="artifacts/README.md">The artifact README</a> lists the commands, inputs, and limits. The <a href="artifacts/synthetic_cipher.hex">invented hex fixture</a> contains no challenge answer or live indicator. The <a href="artifacts/xor_anchor_scan.py">scanner</a>, <a href="artifacts/test_xor_anchor_scan.py">its tests</a>, <a href="artifacts/synthetic_xor_marker.yar">YARA rule</a>, <a href="artifacts/static_triage_process.yml">Sigma rule</a>, and <a href="artifacts/synthetic_xor_review_stix.json">STIX bundle</a> are linked here and again where I discuss their use.</p>
+<h3>8.1 Triage decision tree for unknown obfuscated blobs</h3>
+<pre><code class="language-text">Unknown artifact
+  |
+  +-- Identify container, length, and file type
+  |     ZIP member? Text representation? Binary magic?
+  |
+  +-- If text-like, decode a plausible representation with a strict parser
+  |     Hex, base64, URL encoding, or another supported format
+  |
+  +-- Inspect raw bytes and available context
+  |     Known prefix or file header? Try C[i] XOR P[i]
+  |     No reliable anchor? Try a bounded 256-key scan and rank candidates
+  |
+  +-- If one-byte XOR fails, revisit the hypothesis
+  |     Repeating key, compression, structured format, or another transform
+  |
+  +-- Validate the whole output
+        Structure, length, expected fields, and independent evidence
+</code></pre>
+<p>This order keeps the original tree's representation, magic-byte, simple-transform, and validation branches. A printable-byte score is only a triage aid. An EBCDIC or UTF hypothesis needs contextual evidence; it does not become likely merely because raw bytes are awkward to read.</p>
+<h3>8.2 Reusable primitive: known-plaintext single-byte XOR recovery</h3>
+<p>The key-recovery primitive is small enough to audit:</p>
+<pre><code class="language-python">def candidate_key(ciphertext: bytes, known_prefix: bytes) -&gt; int | None:
+    if not known_prefix or len(known_prefix) &gt; len(ciphertext):
+        raise ValueError(&quot;invalid known prefix&quot;)
+    recovered = bytes(c ^ p for c, p in zip(ciphertext, known_prefix))
+    return recovered[0] if len(set(recovered)) == 1 else None
+
+def xor_decode(ciphertext: bytes, key: int) -&gt; bytes:
+    return bytes(value ^ key for value in ciphertext)
+</code></pre>
+<p>Equality in the anchor window returns a <strong>candidate</strong> one-byte key, not proof of the entire schedule. <a href="artifacts/xor_anchor_scan.py">The runnable scanner</a> adds strict hex decoding, input limits, an optional anchor scan, and bounded output. <a href="artifacts/test_xor_anchor_scan.py">The tests</a> include the synthetic example, positive and negative markers, a near miss, a wrong prefix, and malformed input. The tool is for authorized local samples; it performs no network lookups or sample execution.</p>
+<h3>8.3 Solve-pattern checklist for XOR-obfuscated content</h3>
+<ul>
+<li>[ ] Preserve the source bytes and record the container, size, and representation.</li>
+<li>[ ] Decode hex, base64, or another representation with explicit error handling.</li>
+<li>[ ] Inspect byte values and file magic without overclaiming what a short sample excludes.</li>
+<li>[ ] Identify a reliable plaintext anchor and calculate the candidate key bytes.</li>
+<li>[ ] If the window is constant, test the one-byte model against the <em>entire</em> blob.</li>
+<li>[ ] If it differs, revisit the anchor or investigate a longer key with enough data.</li>
+<li>[ ] If no anchor exists, run a bounded 256-key search and review the ranked outputs.</li>
+<li>[ ] Check structure and context, then seek independent corroboration when available.</li>
+<li>[ ] Record key hypothesis, offsets, output, failed routes, and submission or validation status.</li>
+</ul>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<p>These mappings describe the malware analogue, not observed adversary behavior in a CTF file.</p>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>Mapping</th>
+<th>Why it belongs here</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MITRE ATT&amp;CK</td>
+<td><a href="https://attack.mitre.org/techniques/T1027/013/">T1027.013, Encrypted/Encoded File</a></td>
+<td>A candidate analogue for an adversary storing encoded or encrypted content in a file. The puzzle did not show an adversary.</td>
+</tr>
+<tr>
+<td>MITRE ATT&amp;CK</td>
+<td><a href="https://attack.mitre.org/techniques/T1140/">T1140, Deobfuscate/Decode Files or Information</a></td>
+<td>Applies if malware itself decodes content during execution; my offline decoding is defender analysis, not a T1140 observation.</td>
+</tr>
+<tr>
+<td>MITRE CAPEC</td>
+<td><a href="https://capec.mitre.org/data/definitions/97.html">CAPEC-97, Cryptanalysis</a></td>
+<td>Broad conceptual mapping for recovering an obfuscation key from known plaintext.</td>
+</tr>
+<tr>
+<td>MITRE CAPEC</td>
+<td>CAPEC-20, Encryption Brute Forcing</td>
+<td>Only a possible fallback; I did not brute-force the challenge key.</td>
+</tr>
+<tr>
+<td>MITRE D3FEND</td>
+<td><a href="https://d3fend.mitre.org/technique/d3f:FileContentRules/">D3-FCR, File Content Rules</a></td>
+<td>A content rule can inspect a sample for a known XOR-obfuscated string.</td>
+</tr>
+</tbody>
+</table>
+<p>STRIDE would be useful if I were threat-modeling a system that stores or loads these strings. OWASP Top 10 does not add a useful mapping to this artifact. I use control families below for the operational program rather than attaching granular NIST CSF labels to a 22-byte puzzle.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<p>The challenge supplied no domain, IP address, file hash for a live sample, or actor attribution. I therefore would not create a STIX <code>indicator</code> object that pretends one exists. <a href="artifacts/synthetic_xor_review_stix.json">The synthetic STIX 2.1 bundle</a> instead records an <code>attack-pattern</code>, a <code>course-of-action</code>, and their relationship for a demonstration workflow. It is a representation of the <em>method and response</em>, not an IOC feed. A production STIX indicator would need an actual observable, a defensible pattern, provenance, confidence, and lifecycle handling before TAXII distribution. TAXII is a transport for sharing such content; this exercise did not use a TAXII server.</p>
+<p>I would retain the decoded bytes as case evidence first. If later analysis finds a domain or URI, I would check whether it is a live endpoint, document the first and last observations, and record where the value came from. A syntactically valid decoded string alone is not enough to block a destination across an organization.</p>
+<p>No STIG finding follows from this puzzle. A specific STIG requirement needs a named platform, benchmark version, observed configuration, and test result. CIS Benchmarks likewise apply to particular configurations. The <a href="https://www.cisecurity.org/controls/CIS-controls-navigator">CIS Controls</a> offer a broader program mapping: Control 10 concerns malware defenses, while Control 13 concerns network monitoring. I do not claim that safeguard 10.2 (signature updates) or 10.5 (anti-exploitation features) mandates XOR deobfuscation.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>11a. Standards Mapping</h3>
+<p>The useful question is what a defender could put into a real sample-intake process, and which control objectives that process could support. A puzzle solve by itself does not satisfy a control.</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Control or function</th>
+<th>Operational connection and limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>SI-3, Malicious Code Protection</td>
+<td>A managed malware-analysis capability can complement malicious-code detection. This single script is not evidence that SI-3 is implemented.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>SI-4, System Monitoring</td>
+<td>Host and network telemetry can corroborate a recovered string if a sample later uses it.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>IR-4, Incident Handling</td>
+<td>A documented static-triage step can preserve evidence and guide escalation.</td>
+</tr>
+<tr>
+<td>CIS Controls v8.1</td>
+<td>Control 10, Malware Defenses</td>
+<td>The broader program home for sample intake and malware prevention; no safeguard directly requires this particular XOR method.</td>
+</tr>
+<tr>
+<td>CIS Controls v8.1</td>
+<td>Control 13, Network Monitoring and Defense</td>
+<td>Recovered and verified network indicators can inform monitoring, subject to false-positive review.</td>
+</tr>
+<tr>
+<td>CMMC 2.0 Level 2</td>
+<td>SI.L2-3.14.2, malicious-code protection</td>
+<td>A possible organizational context for malware defenses, not a compliance conclusion from the CTF.</td>
+</tr>
+</tbody>
+</table>
+<p>I leave SI-7 and RA-5 out of the direct mapping. Information-integrity and vulnerability-scanning controls may coexist with this workflow, but recovering an XOR string does not demonstrate them. <a href="https://csrc.nist.gov/pubs/sp/800/61/r3/final">NIST SP 800-61 Rev. 3</a> is the current incident-response reference for the playbook context; the older Rev. 2 citation in my source material has been superseded.</p>
+<h3>11b. Mitigation Realization</h3>
+<p>For an authorized sample queue, I would make static deobfuscation a bounded analysis stage. The intake record would carry a sample identifier and hash, source and custody notes, tool versions, execution time, output location, and analyst review state. FLOSS, CAPA, and YARA could each contribute a different signal: recovered strings, inferred capabilities, and a match to a <em>known</em> marker. Their outputs should remain separate until an analyst adjudicates them.</p>
+<pre><code class="language-text">Authorized sample intake
+  -&gt; hash and preserve the sample
+  -&gt; identify file type and enforce size/time limits
+  -&gt; run static string recovery and capability analysis
+  -&gt; scan for vetted content rules
+  -&gt; review candidate strings and record confidence
+  -&gt; escalate to dynamic analysis when the question requires behavior
+  -&gt; publish verified indicators with provenance and expiry
+</code></pre>
+<p>SI-3 and CIS Control 10 provide the malware-defense context. IR-4 provides the documented handoff and triage context. SI-4 and CIS Control 13 come into play when host or network telemetry can test a recovered indicator. A decoded string is not a substitute for runtime evidence, and a static pipeline is not a replacement for prevention controls. The small local scanner is deliberately offline, so it can be evaluated without contacting a suspicious endpoint.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<h3>12.1 IOCs (sanitized / illustrative)</h3>
+<p>There are <strong>no production IOCs in this challenge</strong>. The puzzle bytes yielded an answer, not an active C2 address, mutex, registry key, or malware hash. In a real case, possible outputs would include a decoded domain or URI, mutex, path, user-agent, or configuration marker. Each would need the sample hash, extraction offset, recovered key, validation method, and observation context. The <a href="artifacts/synthetic_xor_review_stix.json">synthetic STIX bundle</a> intentionally contains no fabricated indicator.</p>
+<h3>12.2 YARA rule: detect single-byte XOR obfuscation of a known C2 indicator</h3>
+<p>The <a href="artifacts/synthetic_xor_marker.yar">synthetic YARA rule</a> uses an invented marker, <code>lab-control.example</code>, inside a PE-shaped file and searches keys <code>0x01</code> through <code>0xff</code>. It demonstrates YARA's <a href="https://yara.readthedocs.io/en/stable/writingrules.html#xor-strings"><code>xor</code> string modifier</a> without naming an actual C2 endpoint. Before operational use, I would replace that marker with a vetted campaign-specific value and test known positive and benign corpora. The PE header condition narrows scope but does not make one string a high-confidence verdict.</p>
+<p>The key range deliberately excludes <code>0x00</code>, so plaintext occurrences of the marker are <strong>not</strong> covered by that string. If an analyst needs both plaintext and obfuscated variants, they should add a separate plaintext string or widen the design deliberately. YARA compilation and execution were unavailable in this local environment, so this rule is a reviewable proof of concept, not a tested detection release.</p>
+<h3>12.3 Sigma rule: detect static deobfuscation tooling execution</h3>
+<p>The <a href="artifacts/static_triage_process.yml">Sigma process rule</a> looks for <code>floss.exe</code> or <code>capa.exe</code> process creation on a Windows analyst workstation. I would use it as an <strong>informational measure of playbook activity</strong>: did static triage tooling run during intake? It does not indicate an attack, and I did not attach ATT&amp;CK T1140 to an analyst's legitimate process. It also misses renamed binaries, non-Windows execution, and tools invoked through another wrapper. A meaningful compliance or coverage metric would correlate this signal with authorized intake records rather than count every tool launch as success.</p>
+<h3>12.4 SIEM query: surface samples with high obfuscated-string density (Splunk SPL)</h3>
+<p>This SPL assumes an intake pipeline has already normalized FLOSS output into one event per sample with numeric counts. It does <strong>not</strong> assume a particular nested FLOSS JSON path. Field names and thresholds must be adjusted to the deployed schema.</p>
+<pre><code class="language-spl">index=malware_intake sourcetype=sample:static_triage
+| where isnotnull(sample_sha256) AND isnotnull(decoded_string_count) AND isnotnull(static_string_count)
+| eval decoded=tonumber(decoded_string_count), static=tonumber(static_string_count)
+| where decoded&gt;=0 AND static&gt;=0
+| eval decoded_ratio=decoded/(decoded+static+1)
+| where decoded&gt;=5 AND decoded_ratio&gt;=0.30
+| table _time sample_sha256 decoded static decoded_ratio tool_version review_status
+| sort -decoded_ratio
+</code></pre>
+<p>This is a <strong>review queue</strong>, not a maliciousness rule. Packers, benign software, and differences in tool output can all affect the ratio. I would validate the field extraction, establish a baseline from the actual intake population, and measure review yield before promoting a threshold.</p>
+<h3>12.5 Telemetry and data pipeline requirements</h3>
+<p>The static pipeline needs the sample hash, original file size and type, scan timestamp, tool version, recovered-string count, and rule matches. To measure analyst workflow with the Sigma rule, Windows process-creation telemetry needs an image path, command line when authorized, user, and parent process, along with an intake identifier to join against. To corroborate decoded network indicators, the environment needs relevant DNS, proxy, or endpoint network telemetry. None of those telemetry streams existed in the CTF file.</p>
+<p>The sample should stay in an isolated, access-controlled workspace. Output that contains candidate domains or paths should retain provenance and handling labels. A vendor's custom-rule support cannot be inferred from this YARA proof of concept; deployment depends on the actual product and version.</p>
+<h3>12.6 Detection engineering notes</h3>
+<p>A single XOR-obfuscated marker can collide with benign content, and a PE header alone is a weak second condition. I would tune with longer or multiple independently useful markers, file section context where supported, and corroborating sample behavior. I would test both obfuscated positives and benign files, including the plaintext-marker case, before setting severity. The bounded <a href="artifacts/xor_anchor_scan.py">scanner and tests</a> are useful for checking recovered bytes, while <a href="artifacts/synthetic_xor_marker.yar">the rule</a> addresses detection of a known marker. They answer different questions.</p>
+<p>The Sigma rule is deliberately low severity because it observes defender tooling. The SPL query should produce leads for analysis, not block files. A recovered URI should not enter an IOC feed until the analyst can explain why it is operationally relevant, when it was seen, and how to expire or retract it. That review loop is what turns an interesting static string into usable detection content.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">pre-read analysis flow</a> shows the short route from ZIP member to full decode. This layered view connects the same primitive to a possible defensive workflow without implying the puzzle contained malware or live IOCs.</p>
+<pre><code class="language-mermaid">flowchart TB
+    A[&quot;Puzzle evidence: hex text and known prefix&quot;] --&gt; B[&quot;Recover candidate 0x42 key&quot;]
+    B --&gt; C[&quot;Decode all 22 bytes and review structure&quot;]
+    C --&gt; D[&quot;Generalize to authorized sample intake&quot;]
+    D --&gt; E[&quot;FLOSS/CAPA for static context&quot;]
+    D --&gt; F[&quot;YARA XOR rule for a vetted marker&quot;]
+    E --&gt; G[&quot;Analyst reviews provenance and confidence&quot;]
+    F --&gt; G
+    G --&gt; H[&quot;Corroborate with host or network telemetry&quot;]
+    H --&gt; I[&quot;Publish verified indicators or close the lead&quot;]
+</code></pre>
+<p>The diagram's last two steps are operational requirements, not steps I performed in the CTF. The puzzle stopped after the readable full decode and its local checks.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://attack.mitre.org/techniques/T1027/013/">MITRE ATT&amp;CK T1027.013, Encrypted/Encoded File</a></li>
+<li><a href="https://attack.mitre.org/techniques/T1140/">MITRE ATT&amp;CK T1140, Deobfuscate/Decode Files or Information</a></li>
+<li><a href="https://capec.mitre.org/data/definitions/97.html">MITRE CAPEC-97, Cryptanalysis</a></li>
+<li><a href="https://d3fend.mitre.org/technique/d3f:FileContentRules/">MITRE D3FEND D3-FCR, File Content Rules</a></li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5, Security and Privacy Controls</a></li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/61/r3/final">NIST SP 800-61 Rev. 3, Incident Response Recommendations</a></li>
+<li><a href="https://www.cisecurity.org/controls/CIS-controls-navigator">CIS Critical Security Controls Navigator</a></li>
+<li><a href="https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html">OASIS STIX 2.1 specification</a></li>
+<li><a href="https://yara.readthedocs.io/en/stable/writingrules.html#xor-strings">YARA documentation, XOR strings</a></li>
+<li><a href="https://github.com/mandiant/flare-floss">Mandiant FLOSS</a> and <a href="https://github.com/mandiant/capa">Mandiant CAPA</a></li>
+<li><a href="https://sigmahq.io/docs/basics/rules.html">Sigma rule specification</a></li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>

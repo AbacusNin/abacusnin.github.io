@@ -1,0 +1,24 @@
+title: Static Deobfuscation Tool Execution on an Analyst Host
+id: 86a189fb-6585-420d-a281-c7632aebf3bc
+status: experimental
+description: Informational measure of FLOSS or CAPA execution on a designated Windows analyst host.
+references:
+  - https://github.com/mandiant/flare-floss
+  - https://github.com/mandiant/capa
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  selection:
+    Image|endswith:
+      - '\floss.exe'
+      - '\capa.exe'
+  condition: selection
+fields:
+  - Image
+  - CommandLine
+  - User
+  - ParentImage
+falsepositives:
+  - Expected analyst tool use
+level: informational

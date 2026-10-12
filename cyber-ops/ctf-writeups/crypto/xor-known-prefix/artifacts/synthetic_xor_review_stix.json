@@ -1,0 +1,41 @@
+{
+  "type": "bundle",
+  "id": "bundle--c7cb27db-55a6-45a3-9efb-612adf2e9f31",
+  "objects": [
+    {
+      "type": "attack-pattern",
+      "spec_version": "2.1",
+      "id": "attack-pattern--a988617b-c0f0-425c-b0fd-c3e1373e31da",
+      "created": "2026-10-12T00:00:00.000Z",
+      "modified": "2026-10-12T00:00:00.000Z",
+      "name": "Encoded strings in files",
+      "description": "Illustrative description of file-content obfuscation using a reversible byte transform. No sample or actor is asserted.",
+      "external_references": [
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1027.013",
+          "url": "https://attack.mitre.org/techniques/T1027/013/"
+        }
+      ]
+    },
+    {
+      "type": "course-of-action",
+      "spec_version": "2.1",
+      "id": "course-of-action--a7d52af2-c0d2-47b6-9d3b-44e13bf8b1c6",
+      "created": "2026-10-12T00:00:00.000Z",
+      "modified": "2026-10-12T00:00:00.000Z",
+      "name": "Offline static string review",
+      "description": "Review encoded strings in approved samples and corroborate any recovered indicator before operational use."
+    },
+    {
+      "type": "relationship",
+      "spec_version": "2.1",
+      "id": "relationship--16282861-df3e-4535-a4c4-ac4762176634",
+      "created": "2026-10-12T00:00:00.000Z",
+      "modified": "2026-10-12T00:00:00.000Z",
+      "relationship_type": "mitigates",
+      "source_ref": "course-of-action--a7d52af2-c0d2-47b6-9d3b-44e13bf8b1c6",
+      "target_ref": "attack-pattern--a988617b-c0f0-425c-b0fd-c3e1373e31da"
+    }
+  ]
+}
