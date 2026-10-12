@@ -699,5 +699,29 @@
     ],
     "status": "Solved-Verified",
     "url": "/cyber-ops/ctf-writeups/forensics/bitlocker-partial-recovery/"
+  },
+  {
+    "title": "The Image in a Thousand Local Uploads",
+    "category": "Forensics",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "pcap",
+      "http",
+      "reassembly",
+      "custom-framing",
+      "sha-256",
+      "png-carving",
+      "exfiltration",
+      "t1030"
+    ],
+    "summary": "A host capture held 1,000 small HTTP uploads to a loopback listener. I followed the index and four-byte SHA-256 check on each body, rebuilt the reported PNG, and found that its useful clue was visible in the pixels.",
+    "aliases": [
+      "loopback HTTP",
+      "chunked upload",
+      "PNG reconstruction"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/forensics/loopback-http-png-reassembly/"
   }
 ]

@@ -1,0 +1,8 @@
+{"time":"2026-01-01T10:00:00Z","method":"POST","host":"workstation-a","destination":"127.0.0.1:8080","path":"/upload","body_bytes":1024,"approved_service":false}
+{"time":"2026-01-01T10:00:12Z","method":"POST","host":"workstation-a","destination":"127.0.0.1:8080","path":"/upload","body_bytes":1022,"approved_service":false}
+{"time":"2026-01-01T10:00:24Z","method":"POST","host":"workstation-a","destination":"127.0.0.1:8080","path":"/upload","body_bytes":1019,"approved_service":false}
+{"time":"2026-01-01T10:00:26Z","method":"POST","host":"build-agent","destination":"127.0.0.1:8080","path":"/upload","body_bytes":1024,"approved_service":true}
+{"time":"2026-01-01T10:00:30Z","method":"GET","host":"workstation-b","destination":"127.0.0.1:8080","path":"/upload","body_bytes":1024,"approved_service":false}
+{"time":"2026-01-01T10:00:33Z","method":"POST","host":"workstation-c","destination":"127.0.0.1:9000","path":"/upload","body_bytes":20,"approved_service":false}
+{"time":"2026-01-01T10:00:34Z","method":"POST","host":"workstation-c","destination":"127.0.0.1:9000","path":"/upload","body_bytes":1000,"approved_service":false}
+{"time":"2026-01-01T10:00:35Z","method":"POST","host":"workstation-c","destination":"127.0.0.1:9000","path":"/upload","body_bytes":200000,"approved_service":false}

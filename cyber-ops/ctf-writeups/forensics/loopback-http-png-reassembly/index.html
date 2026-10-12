@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Image in a Thousand Local Uploads - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="A host capture held 1,000 small HTTP uploads to a loopback listener. I followed the index and four-byte SHA-256 check on each body, rebuilt the reported PNG, and found that its useful clue was visible in the pixels.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/loopback-http-png-reassembly/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Image in a Thousand Local Uploads">
+  <meta property="og:description" content="A host capture held 1,000 small HTTP uploads to a loopback listener. I followed the index and four-byte SHA-256 check on each body, rebuilt the reported PNG, and found that its useful clue was visible in the pixels.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/loopback-http-png-reassembly/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Forensics / <span aria-current="page">The Image in a Thousand Local Uploads</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Image in a Thousand Local Uploads</h1>
+        <p class="lead">A thousand POSTs looked noisy until I found a PNG header eight bytes into the first body.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Reconstruct the artifact in repeated local HTTP uploads and identify the protected subject shown in it.</p>
+<p><strong>What I did.</strong> I separated keep-alive requests, tested the eight-byte application header, ordered bodies by index, checked the recovered PNG, and inspected its rendered pixels.</p>
+<p><strong>The result.</strong> The challenge account reports 1,000 matching chunks, a valid PNG, and a visible repeated watermark that yielded the answer.</p>
+<p><strong>The limit.</strong> The matching capture and carved image were unavailable for this publication review. I tested the published tools against an invented PCAP, not against the challenge traffic or submission service.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Host capture; Keep-alive split; Body framing; Reassembly; Content review">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Host capture</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Local HTTP traffic to port 8080</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Keep-alive split</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Multiple POSTs in each TCP flow</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Body framing</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Index, SHA-256 prefix, PNG bytes</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Reassembly</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">1,000 reported chunks in index order</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Content review</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Visible watermark in rendered PNG</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Network Forensics / PCAP</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>pcap, http, reassembly, custom-framing, sha-256, png-carving, exfiltration, t1030</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved in the challenge account</td>
+</tr>
+<tr>
+<td>Material</td>
+<td>Host packet capture of HTTP requests to a local listener</td>
+</tr>
+<tr>
+<td>Goal</td>
+<td>Reconstruct the uploaded image and identify its subject</td>
+</tr>
+<tr>
+<td>Reported result</td>
+<td>1,000 indexed chunks passed the four-byte SHA-256 prefix check; a PNG carried a visible repeated watermark</td>
+</tr>
+<tr>
+<td>Independently checked here</td>
+<td>A synthetic PCAP with split headers, keep-alive, retransmission, three framed POSTs, PNG CRCs, and negative parser cases</td>
+</tr>
+<tr>
+<td>Boundary</td>
+<td>The challenge capture, carved image, answer, and platform receipt were unavailable for replay</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/loopback-http-png-reassembly/artifacts">browse the tools on GitHub</a> and <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/loopback-http-png-reassembly/fixtures">the invented fixtures</a>.</p>
+<h2>At-a-Glance Attack Chain</h2>
+<p>The capture establishes the local upload leg. The story proposes a later relay out of the host, but that second hop was outside the observed traffic. I keep the boundary visible in the diagram.</p>
+<pre><code class="language-mermaid">flowchart LR
+  A[Image bytes] --&gt; B[Indexed pieces]
+  B --&gt; C[SHA-256 prefix in each body]
+  C --&gt; D[HTTP POST to 127.0.0.1:8080]
+  D --&gt; E[Local listener observed]
+  E -. unobserved .-&gt; F[Possible off-host relay]
+</code></pre>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I was given a packet capture from the host of a protected asset. The conspicuous traffic was a long run of plaintext HTTP requests to a loopback listener. The challenge asked what was being moved and what it revealed about the protectee. The story cast the local listener as a staging point for later exfiltration. What I could analyze in the capture was narrower: the host-to-local-listener leg, its request bodies, and the image reconstructed from them.</p>
+<p>The local address matters. An egress firewall would not ordinarily see packets that stay on <code>127.0.0.1</code>. A host capture can. I needed to separate the repeated HTTP messages, work out the extra bytes in each body, and rebuild the file before I could read the clue. The useful content was not in a network header.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I began with a packet and port inventory. The recorded pass found TCP loopback traffic to port <code>8080</code> and HTTP request lines. A Scapy attempt ran into an IPv6-routing problem in the analysis environment, so the work switched to <code>dpkt</code>. That detour did not change the evidence. It did remind me to inspect the capture before committing to a library.</p>
+<p>My first request count was low. I had treated a TCP flow as one HTTP request, but these connections used keep-alive. The same flow carried successive requests. I walked the reassembled client bytes, found each <code>\r\n\r\n</code> header boundary, read <code>Content-Length</code>, and advanced by the declared body length. The naive first-line-per-flow approach had missed about 30% of the requests. <a href="artifacts/pcap_http_reassemble.py">The bounded offline parser</a> implements that split and rejects gaps or ambiguous HTTP framing instead of silently filling them.</p>
+<p>The first upload body had eight bytes before a PNG signature. Across bodies, the first four bytes looked like a big-endian index: <code>0</code>, <code>1</code>, <code>2</code>, and onward. I tried MD5, SHA-1, SHA-256, SHA-512, BLAKE2, CRC32, and Adler-32 against the next four bytes. The leading four bytes of <code>SHA-256(payload)</code> matched in the reported solve. I then checked every recorded body, sorted the payloads by index, and reconstructed the file. The account reports 1,000 distinct indices, all 1,000 short hash checks passing, and a PNG with an intact <code>IEND</code>.</p>
+<p>I checked textual PNG chunks first. The <code>iTXt</code> content was ordinary Adobe XMP material and did not carry the answer. Rendering the image exposed a repeated vertical watermark beside the stock-photo subject. That was the actual clue. The image and answer are not included here, so I cannot independently confirm the reported content from the current files.</p>
+<p>There was one more useful negative result. A later question assumed some chunk had arrived after a higher-numbered one. The recorded review checked request-line first byte, body first byte, and body last byte as three definitions of arrival. Each returned zero inversions across the 1,000 reported chunks. Without the matching capture, I cannot rerun that conclusion now. I keep it as a reported negative rather than inventing an index to satisfy the question.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<h3>3.1 PCAP inventory</h3>
+<p>The first pass counted transport and destination-port shape before parsing any application body. That is where port <code>8080</code> and the loopback scope emerged. In the public lab, <a href="artifacts/pcap_http_reassemble.py">pcap_http_reassemble.py</a> reads classic PCAP files with Ethernet or raw IPv4, groups client-to-listener TCP payloads, and reports captured data packets and client flows. It does not assume that any local POST reached an external destination.</p>
+<h3>3.2 HTTP request splitter (keep-alive aware)</h3>
+<p>The original failure was simple: one TCP flow can contain several HTTP/1.1 requests. <a href="artifacts/pcap_http_reassemble.py">The request splitter</a> works from sequence-checked TCP bytes and uses each request's <code>Content-Length</code>. It rejects an incomplete body, duplicate header, or unsupported <code>Transfer-Encoding</code>. <a href="https://www.rfc-editor.org/rfc/rfc9112.html">RFC 9112</a> describes both persistent connections and message framing. The <a href="fixtures/sample_loopback.pcap">invented capture</a> splits headers across packets, carries three POSTs on one flow, and repeats one TCP segment byte for byte. The parser finds three requests and one flow without counting the retransmission twice.</p>
+<h3>3.3 Custom-framing reassembler with integrity check</h3>
+<p>The reported body format is <code>[uint32 big-endian index][SHA-256(payload) first four bytes][payload]</code>. That is an application header, not the HTTP <code>Content-Length</code>. The <a href="artifacts/pcap_http_reassemble.py">reassembler</a> checks every short tag, rejects duplicate or missing indices, and joins the payloads from zero upward. It then checks PNG chunk boundaries and CRCs. This makes a wrong ordering, missing TCP byte, or corrupted chunk visible instead of producing a plausible-looking but incomplete image. The real 1,000-chunk result remains reported; the published test uses three invented chunks.</p>
+<h3>3.4 PNG metadata extractor</h3>
+<p>The source path enumerated <code>tEXt</code>, <code>zTXt</code>, and <code>iTXt</code>. The reported <code>iTXt</code> chunk led only to default XMP. The public parser lists PNG chunk types and counts textual chunks without displaying their contents. It validates <code>IHDR</code>, <code>IDAT</code>, <code>IEND</code>, file bounds, and CRCs first. I would only decode or decompress a text chunk under explicit size limits, because a malformed image is untrusted input. The <code>iTXt</code> detour was useful even though it was not where the answer lived.</p>
+<h3>3.5 Fallback: visual watermark inspection</h3>
+<p>I finally rendered the carved PNG and read the repeated vertical text at native resolution. A scaled thumbnail is useful for orientation, but tiny lettering can disappear there. On unfamiliar images I would keep the original immutable, render a bounded preview, and crop only the region I need. The <a href="fixtures/make_sample.py">synthetic fixture generator</a> makes a harmless one-pixel PNG for tests. It contains no watermark or challenge content.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<h3>4.1 Chunked exfiltration with integrity-tagged framing</h3>
+<p>Each body carries a position and a short check over its payload. The four-byte index tells a receiver where to put the piece. The first four bytes of SHA-256 catch accidental corruption and help confirm that I understood the framing. A random accidental collision has roughly one chance in <code>2^32</code> for one fixed comparison, assuming uniform digest output. The tag is not authenticated: anyone able to change a payload can compute a new prefix. It cannot establish who sent the bytes or whether a malicious sender altered them.</p>
+<h3>4.2 Why HTTP-over-loopback as a staging primitive</h3>
+<p>An implant can hand bytes to a local process over HTTP and let that other process decide what happens next. The capture supports the handoff to a local listener. It does not show a remote relay, tunnel, DNS channel, cloud SDK, or outbound connection carrying this image. In a real investigation I would join host process, socket, and egress records before calling the full chain exfiltration. A perimeter sensor alone could miss the local request entirely.</p>
+<h3>4.3 Why visible watermarking instead of metadata steganography</h3>
+<p>The reported answer was printed into the image pixels. My metadata pass did not find it. I had to look at the rendered artifact. That is an easy lesson to forget when a file has XMP and the analyst has a drawer full of steganography tools. The challenge gives no evidence of LSB or DCT hiding; the visible mark was enough.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit/Analysis Mechanics</summary>
+<p>The local HTTP messages expose the uploaded bytes. A strict TCP reconstruction supplies a contiguous client stream; <code>Content-Length</code> separates its requests. The first eight bytes of each selected body disclose an index and a SHA-256 prefix. Matching all short tags makes the framing hypothesis strong, though it does not authenticate a sender. Sorting payloads by index yields the reported PNG. Valid PNG chunk lengths and CRCs check the container, and rendering shows the clue.</p>
+<p>The source's example splitter appended TCP payloads as they appeared and could yield a short body if the capture ended early. That would be risky on reordered, retransmitted, or incomplete traffic. <a href="artifacts/pcap_http_reassemble.py">The published parser</a> uses TCP sequence numbers, tolerates identical retransmission, rejects conflicting overlap and gaps, and refuses incomplete HTTP or PNG data. It supports a bounded subset of classic PCAP and HTTP/1.1, as <a href="artifacts/README.md">the guide</a> explains. A failure means the case needs a fuller parser or closer inspection; it does not prove the traffic was benign.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<p>The first good move was finding the regular shape: many small POSTs to one path. The wrong move was equating a TCP connection with an HTTP request. Once I separated the requests, the body format became visible. Testing candidate hashes on several bodies was faster and safer than building a reassembler around an untested guess.</p>
+<p>I also had to stop looking for the answer in metadata after the XMP lead went cold. The pixels contained the clue. Finally, the order question was a reminder that a question's premise can be wrong. The recorded three-way timestamp check found no inversion. I would rather report that negative with its method than manufacture the number the question seemed to demand.</p>
+<p>The strongest limit is the missing capture. I can run a meaningful synthetic reproduction of keep-alive splitting, frame validation, PNG reconstruction, and negative cases. I cannot use that reproduction to claim a fresh verification of the 1,000 real bodies, watermark, or final answer.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<p>For an incident responder, this workflow is a small version of protocol reconstruction. Start with who spoke to whom and which sensor saw it. Rebuild transport bytes conservatively, split application messages, test a candidate header on the full set, and then inspect the resulting file as a file. Preserve the packet capture and any carved image separately with hashes and handling notes.</p>
+<p>For a hunt, the durable pattern is repeated similar-size POSTs from a process or host to one path, especially on a local listener that should not be present for that host role. User-agent strings can help prioritize, but legitimate software uses <code>curl</code> and <code>python-requests</code> too. I would correlate a burst with process identity, approved service inventory, and any later outbound flow. <a href="artifacts/post_burst_hunt.py">The offline burst hunter</a> works on normalized endpoint HTTP metadata and produces review leads without storing request bodies.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<h3>8.1 Triage decision tree</h3>
+<p>Identify the capture type and link layer. Count protocols and endpoints. If HTTP is present, reassemble each client TCP flow and split every request; then group by method, path, and body size. For repeated binary POSTs, inspect several body prefixes. Test any index or integrity hypothesis across the whole set before carving. The <a href="artifacts/README.md">lab guide</a> lists the supported capture formats and explicit stop conditions.</p>
+<h3>8.2 Reusable hash-sweep helper</h3>
+<p>The recorded sweep compared MD5, SHA-1, SHA-256, SHA-512, BLAKE2, CRC32, and Adler-32 prefixes and suffixes against the four mystery bytes. The all-chunk SHA-256-prefix match selected the right interpretation. In the <a href="artifacts/pcap_http_reassemble.py">published analyzer</a>, that conclusion is an explicit per-frame gate. I would repeat the broader sweep on another case rather than assume this family always uses SHA-256. A four-byte match on one body alone would be weak; agreement across 1,000 independent bodies is much stronger.</p>
+<h3>8.3 PNG carving and metadata extraction</h3>
+<p>The PNG is recovered from the ordered payloads, then parsed from its signature through <code>IEND</code>. <a href="artifacts/pcap_http_reassemble.py">The parser</a> validates each chunk CRC and reports dimensions and text-chunk count. The <a href="fixtures/sample_loopback.pcap">sample capture</a> reconstructs an invented 1-by-1 PNG. I kept output optional; an analyst can choose a new path with <code>--output</code>, and the tool refuses to overwrite an existing file. The challenge's large image and watermark are not in this fixture.</p>
+<h3>8.4 Solve-pattern checklist (custom-framed HTTP exfil)</h3>
+<p>I would record the capture hash and scope, isolate HTTP-bearing flows, reject TCP gaps, split every keep-alive request, identify the upload path, inspect body prefixes, validate candidate tags, order by application index, check container structure, and render the output. I would then ask which evidence actually shows off-host transfer. <a href="artifacts/test_loopback_lab.py">The synthetic tests</a> cover valid reconstruction, a bad tag, a TCP gap and conflicting overlap, malformed HTTP, a bad PNG CRC, arrival-order logic, and detection near misses.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<h3>9.1 ATT&amp;CK</h3>
+<p><a href="https://attack.mitre.org/techniques/T1030/">T1030 Data Transfer Size Limits</a> is a useful behavior analogy for the many similarly sized pieces. The local POSTs are observed staging, so I would only mark the technique as confirmed exfiltration after finding the outbound hop. <a href="https://attack.mitre.org/techniques/T1071/001/">T1071.001 Web Protocols</a> concerns command-and-control communication; HTTP on localhost alone does not prove a C2 channel. <a href="https://attack.mitre.org/techniques/T1048/003/">T1048.003</a> likewise needs evidence of unencrypted exfiltration beyond the host. The image does not prove <a href="https://attack.mitre.org/techniques/T1113/">T1113 Screen Capture</a> as its collection method, and an index plus hash is framing rather than <a href="https://attack.mitre.org/techniques/T1132/">T1132 Data Encoding</a> of C2 data. I keep those distinctions instead of turning every plausible upstream step into an observation.</p>
+<h3>9.2 D3FEND (counterpart defenses)</h3>
+<p><a href="https://next.d3fend.mitre.org/technique/d3f%3ANetworkTrafficAnalysis/">Network Traffic Analysis</a> fits the capture review, and <a href="https://next.d3fend.mitre.org/technique/d3f%3AProtocolMetadataAnomalyDetection/">Protocol Metadata Anomaly Detection</a> fits a baseline of repeated methods, paths, sizes, and intervals. Those techniques describe possible defensive work. The challenge did not establish that any organization deployed them.</p>
+<h3>9.3 CAPEC</h3>
+<p>The listed CAPEC interception and message-identifier patterns are not close enough to this observed upload to help a defender. I would describe the eight-byte frame directly instead. There is no demonstrated application vulnerability or named campaign that would make a CAPEC label more precise than the packet evidence.</p>
+<h3>9.4 Frameworks omitted</h3>
+<p>OWASP, ATLAS, CVSS, EPSS, and KEV do not add a finding here. This is a packet reconstruction exercise, without a demonstrated web vulnerability, AI system, or CVE. STRIDE Information Disclosure can be used in a future design review of a relay architecture, but the local capture alone does not document that architecture.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<h3>10.1 STIX 2.1 representation</h3>
+<p>I would keep the exact frame layout and any verified artifact hash in a protected case record. A generic <code>POST /upload</code> on <code>8080</code>, a programmatic user agent, or an ordinary PNG hash is weak shared intelligence without a confirmed external destination or repeat observation. The placeholder STIX objects in the case notes were illustrative, not a valid export ready for a TIP or TAXII server. I did not publish a bundle that could be mistaken for operational intelligence.</p>
+<h3>10.2 STIG and CIS</h3>
+<p>The source points to host firewall, audit logging, and network monitoring baselines. Those are sound areas to review. A specific STIG finding needs a verified product, version, scope, and rule text before it becomes an assessment claim. <a href="https://www.cisecurity.org/controls/cis-controls-navigator/v8">CIS Controls v8</a> includes 8.5 for detailed audit logs and 13.6 for network flow logs. Flow logs on a network device cannot see host-only loopback traffic; endpoint telemetry is needed for this leg.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>11.1 Standards mapping</h3>
+<p>NIST SP 800-53 SC-7 helps frame network boundaries, SI-4 monitoring, AU-2/AU-12 logging, and IR-4 incident handling. SC-8 addresses transmission confidentiality and integrity when policy requires them. Plaintext loopback HTTP made this exercise readable, but the capture does not by itself prove a policy violation or that TLS would stop an already executing implant. <a href="https://csrc.nist.gov/pubs/sp/800/61/r3/final">NIST SP 800-61 Rev. 3</a> is the current response guidance; the older Rev. 2 citation in my notes is superseded.</p>
+<h3>11.2 Mitigation realization</h3>
+<p>I would inventory approved local listeners, monitor process-to-loopback connections where the endpoint sensor supports it, and hunt for repeated uploads that do not fit the host's role. Egress controls matter for any actual relay, but I need separate evidence of that hop. A host firewall policy may constrain an unexpected listener; it should be tested against legitimate local development, agents, and IPC. For response, retain the original capture, identify the client and listener processes, collect their binaries and launch history, examine any external connections, then decide whether to contain them. A bare port number is not enough to close a case.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<h3>12.1 IOCs (sanitized, illustrative)</h3>
+<p>The local pattern was <code>POST /upload</code> to port <code>8080</code>, binary bodies, an index in bytes 0-3, a SHA-256 payload prefix in bytes 4-7, and a reconstructed PNG. Those are case descriptors, not a durable external IOC. The exact carved-file hash stays in protected case notes because the challenge image is unavailable here. A generic Adobe XMP packet and <code>BaseHTTP</code> server banner would be low-fidelity leads. None establishes the identity of a relay or exfil destination.</p>
+<h3>12.2 YARA - implant working-directory artifact</h3>
+<p>A file rule looking for a zero index followed by a PNG signature at offset eight could find a saved first-frame body. It would not match traffic that was never written as a file, and it could match a benign test fixture. The <a href="fixtures/sample_loopback.pcap">sample PCAP</a> gives a safe positive for the structure, while <a href="artifacts/pcap_http_reassemble.py">the analyzer</a> checks every body and its hash. I did not package the source's unvalidated YARA rule as a production detector.</p>
+<h3>12.3 YARA - Python implant collector script (heuristic)</h3>
+<p>The combination of <code>requests</code>, <code>hashlib</code>, a big-endian four-byte index, and <code>/upload</code> is a plausible source-code hunt. The capture does not include the collector script. The same strings can occur in tutorials and legitimate upload code, so this is a hypothesis for an authorized code corpus, not an observed implant signature. I would demand an actual sample and benign comparison set before deploying it.</p>
+<h3>12.4 Sigma - programmatic-UA HTTP POST from endpoint</h3>
+<p><a href="artifacts/programmatic_post_sigma.yml">The experimental Sigma candidate</a> finds one programmatic HTTP POST for host-role review. It cannot express the burst or prove exfiltration by itself. A perimeter proxy will not see the loopback leg; the rule needs a compatible endpoint HTTP sensor for that traffic, or it can be applied to a separately observed forwarded hop. The file passed a local pySigma parse. It was not converted to a production backend or tuned against real telemetry.</p>
+<h3>12.5 Sigma - local listener anomaly (Sysmon)</h3>
+<p>The source proposed a Sysmon Event ID 3 rule for an unexpected local listener. <a href="https://learn.microsoft.com/en-us/windows/security/operating-system-security/sysmon/sysmon-events">Microsoft's Sysmon event reference</a> identifies Event 3 as a network connection event. It does not establish that a process bound a listening socket. I did not publish that rule. A real listener hunt needs a socket bind/listen data source or periodic endpoint socket inventory joined to process identity and an approved-service list.</p>
+<h3>12.6 SIEM queries</h3>
+<p><a href="artifacts/detection_queries.md">The KQL and SPL templates</a> group normalized HTTP events by host, destination, path, minute, and body-size spread. <a href="artifacts/post_burst_hunt.py">The offline hunt</a> uses a rolling one-minute window and the same fields. Fixed time bins can split a burst, so analysts must test boundary behavior. These examples require an endpoint HTTP sensor for local traffic. They were not run in Splunk or Sentinel.</p>
+<h3>12.7 Log source and data pipeline requirements</h3>
+<p>The endpoint must supply HTTP method, target, byte count, time, and process or host identity for the local leg. Process creation and connection telemetry can help attribute the client, but network connection records alone do not carry the request body or listener-bind state. A network egress sensor sees only an actual off-host hop. Normalize service approvals from a maintained inventory and protect any captured image or request bodies as evidence. <a href="artifacts/README.md">The lab guide</a> gives exact schema and parser limits.</p>
+<h3>12.8 Detection engineering notes</h3>
+<p><a href="fixtures/sample_events.jsonl">The invented event fixture</a> has one alerting burst, an approved build-agent case, a GET, and a variable-size near miss. <a href="artifacts/test_loopback_lab.py">Six local test groups</a> cover that logic and the packet parser's corrupt, incomplete, and retransmitted cases. This proves the code's behavior on those examples. It does not measure false positives on a real fleet or make a three-request threshold suitable for production. Similar upload sizes are a review lead. External transfer needs separate evidence.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">solve flow above</a> tracks the reported reconstruction. <a href="artifacts/visibility_boundary.svg">The visibility diagram</a> marks where the packet evidence stops: the host capture reaches a local listener, and any off-host relay requires another source. That boundary also decides which detector can see which event.</p>
+<p><img src="artifacts/visibility_boundary.svg" alt="Host capture sees client HTTP POSTs to a loopback listener and reconstructs a PNG. A separate off-host forwarding hop is unobserved and would require endpoint or egress evidence."></p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://www.rfc-editor.org/rfc/rfc9112.html">RFC 9112, HTTP/1.1</a>, especially message length and persistent connections.</li>
+<li><a href="https://attack.mitre.org/techniques/T1030/">MITRE ATT&amp;CK T1030</a>, <a href="https://attack.mitre.org/techniques/T1071/001/">T1071.001</a>, <a href="https://attack.mitre.org/techniques/T1048/003/">T1048.003</a>, <a href="https://attack.mitre.org/techniques/T1113/">T1113</a>, and <a href="https://attack.mitre.org/techniques/T1132/">T1132</a> for mapping boundaries.</li>
+<li><a href="https://next.d3fend.mitre.org/technique/d3f%3ANetworkTrafficAnalysis/">MITRE D3FEND Network Traffic Analysis</a> and <a href="https://next.d3fend.mitre.org/technique/d3f%3AProtocolMetadataAnomalyDetection/">Protocol Metadata Anomaly Detection</a>.</li>
+<li><a href="https://learn.microsoft.com/en-us/windows/security/operating-system-security/sysmon/sysmon-events">Microsoft Sysmon event reference</a> for Event ID 3 scope.</li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/61/r3/final">NIST SP 800-61 Rev. 3</a> and <a href="https://www.cisecurity.org/controls/cis-controls-navigator/v8">CIS Controls v8</a>.</li>
+<li><a href="https://www.w3.org/TR/png-3/">PNG specification, W3C</a> for chunk layout and CRC checks.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>

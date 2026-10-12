@@ -1,0 +1,23 @@
+title: Programmatic HTTP POST for Host-Role Review
+id: 3a63e665-fbb5-4e9e-9d04-3702526e9b90
+status: experimental
+description: Single-request triage candidate for programmatic HTTP POSTs. Requires an endpoint HTTP sensor for loopback traffic; a perimeter proxy cannot see a local-only request.
+logsource:
+  category: proxy
+detection:
+  post:
+    http_method: POST
+  user_agent:
+    user_agent|startswith:
+      - 'python-requests/'
+      - 'Go-http-client/'
+      - 'curl/'
+      - 'Wget/'
+  condition: post and user_agent
+fields:
+  - src_host
+  - dst_host
+  - uri_path
+falsepositives:
+  - Authorized developer tools and automated agents
+level: low
