@@ -870,5 +870,22 @@
     "summary": "I had a million same-size PNGs and too little disk space to extract them. Hash frequency led me to one unusual tile; its tiny caption then exposed a flag-format trap.",
     "status": "Solved-Verified",
     "url": "/cyber-ops/ctf-writeups/forensics/asset-cache-frequency/"
+  },
+  {
+    "title": "The Key That Changed Shape but Stayed the Same",
+    "category": "Cryptography",
+    "difficulty": "Hard",
+    "date": "2026-10",
+    "tags": [
+      "stream-cipher",
+      "key-reuse",
+      "known-plaintext",
+      "homegrown-crypto",
+      "PRNG-misuse",
+      "SAST"
+    ],
+    "summary": "A lowercase cover message leaked four bits and two parity constraints per key byte. Reversing those same key bytes for the secret did nothing to hide the leak.",
+    "status": "Solved-Verified",
+    "url": "/cyber-ops/ctf-writeups/crypto/permuted-keystream-reuse/"
   }
 ]

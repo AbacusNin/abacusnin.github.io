@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Key That Changed Shape but Stayed the Same - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="A lowercase cover message leaked four bits and two parity constraints per key byte. Reversing those same key bytes for the secret did nothing to hide the leak.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/permuted-keystream-reuse/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Key That Changed Shape but Stayed the Same">
+  <meta property="og:description" content="A lowercase cover message leaked four bits and two parity constraints per key byte. Reversing those same key bytes for the secret did nothing to hide the leak.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/permuted-keystream-reuse/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Cryptography / <span aria-current="page">The Key That Changed Shape but Stayed the Same</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Key That Changed Shape but Stayed the Same</h1>
+        <p class="lead">The generator had a weak PRNG, but I did not need to attack it. The cover message gave me a cheaper way in.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Recover a 25-byte secret from a 50-byte lowercase cover ciphertext, a second ciphertext, and the source of a homegrown XOR stream cipher.</p>
+<p><strong>What I did.</strong> Read the generator, derive the known bits and parity equations, enumerate four key bytes per position, then test the wrapper and plaintext constraints.</p>
+<p><strong>The result.</strong> The case record reports a solved secret and checks against the recovered lowercase cover. A later audit corrected the reported candidate count.</p>
+<p><strong>The limit.</strong> The generator, ciphertexts, cover plaintext, and submission receipt are not available for independent replay. The linked code uses synthetic examples.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Measure the messages; Read the generator; Use the alphabet; Solve the parities; Reverse the bits; Audit confidence">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Measure the messages</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">50-byte cover; 25-byte secret</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Read the generator</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Parent, child, and bit reversal</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Use the alphabet</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Three known bits in both blocks</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Solve the parities</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Four parent keys per byte</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Reverse the bits</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Secret low nibble becomes known</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Audit confidence</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Separate evidence from language guesses</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Cryptography</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Hard</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>stream-cipher, key-reuse, known-plaintext, homegrown-crypto, PRNG-misuse, SAST</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved-Verified</td>
+</tr>
+<tr>
+<td>Recorded result</td>
+<td>A secret was recovered; the cover reconstruction and child parity were reported to check at all 25 positions</td>
+</tr>
+<tr>
+<td>Evidence boundary</td>
+<td>The challenge generator, ciphertext bytes, cover plaintext, and submission receipt are unavailable for independent replay</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/crypto/permuted-keystream-reuse/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I had the source of a homemade XOR stream cipher and two ciphertexts. The first covered a 50-byte message drawn from lowercase <code>a</code> through <code>z</code>. The second covered a 25-byte secret. The generator used a 25-byte parent key for the first half of the cover, derived a child block for the second half, and encrypted the secret with each parent key byte's bits reversed.</p>
+<p>The claim behind the construction was that both outputs looked random. The challenge was to recover the secret without an encryption oracle or a live service. I stayed with the published source and ciphertext relationship. If a design like this protected real data, the same analysis would belong in an application security review. This exercise does not establish a deployed product, an attacker, or an incident.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I started with the lengths: 50 bytes for the cover and 25 for the secret. That gave me <code>N=25</code> and a plausible <code>K || child(K)</code> layout. I read the generator before trying to predict its PRNG. The key came from Python's <code>random.randbytes</code>, which is a real cryptographic problem, but the cover alphabet and the child schedule exposed a shorter path. I did not perform Mersenne Twister state recovery or brute force the 25-byte key.</p>
+<p>My steps were these:</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>What I checked</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ST.1</td>
+<td>Ciphertext lengths</td>
+<td><code>50 / 25</code>, giving a 25-byte parent block and a 25-byte child block</td>
+</tr>
+<tr>
+<td>ST.2</td>
+<td>Generator source</td>
+<td>A lowercase cover, a child block made from parent-bit parities, and bit reversal for the secret</td>
+</tr>
+<tr>
+<td>ST.3</td>
+<td>Cover alphabet</td>
+<td>The top three bits of every cover plaintext byte are <code>011</code>, so the top three keystream bits are known</td>
+</tr>
+<tr>
+<td>ST.4</td>
+<td>Child schedule</td>
+<td>Its exposed high bits give three equations over pairs of parent-key bits</td>
+</tr>
+<tr>
+<td>ST.5</td>
+<td>Remaining freedom</td>
+<td>Four exact key candidates per byte before the narrower <code>a</code>-<code>z</code> range test</td>
+</tr>
+<tr>
+<td>ST.6</td>
+<td>Reversed key</td>
+<td>The known parent bits become the secret keystream's low nibble</td>
+</tr>
+<tr>
+<td>ST.7</td>
+<td>Independent wrapper check</td>
+<td>The reported candidate set reproduced the required prefix and suffix; five positions were forced</td>
+</tr>
+<tr>
+<td>ST.7a</td>
+<td>Uppercase and caret reading</td>
+<td>This branch failed the wrapper at eight positions, so I set it aside</td>
+</tr>
+<tr>
+<td>ST.8</td>
+<td>Language resolution</td>
+<td>The challenge's English leetspeak clue supplied the last choice in the recorded solve</td>
+</tr>
+<tr>
+<td>ST.9</td>
+<td>Later recount</td>
+<td>The full alphabet range test and explicit assumptions changed the claimed residual counts</td>
+</tr>
+</tbody>
+</table>
+<p>That wrapper check was useful because I derived the key candidates from the cover, before asking what a flag should look like. If I had used the wrapper to construct the candidates, seeing it again would have been a circular check. The solve stayed static; the source record reports validation by re-deriving the lowercase cover and child relation, not by running a live target.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>The original work used Python's standard library to turn the equations into per-position candidates. The important inputs are one cover ciphertext byte under <code>K[j]</code>, one under <code>child(K)[j]</code>, and the secret ciphertext byte under <code>reverse_bits(K[j])</code>. The output is a set of possible plaintext bytes, with an optional exact <code>a</code>-<code>z</code> range filter.</p>
+<p>Here is the compact version of the derivation used in the <a href="artifacts/keystream_lab.py">synthetic keystream lab</a>:</p>
+<pre><code class="language-python">known = (cover_parent_ct ^ 0x60) &amp; 0xE0
+parities = ((cover_child_ct ^ 0x60) &gt;&gt; 5) &amp; 7
+b5 = (known &gt;&gt; 5) &amp; 1
+b4 = b5 ^ (parities &amp; 1)
+known |= b4 &lt;&lt; 4
+
+for b0 in (0, 1):
+    for b2 in (0, 1):
+        b1 = b0 ^ ((parities &gt;&gt; 2) &amp; 1)
+        b3 = b2 ^ ((parities &gt;&gt; 1) &amp; 1)
+        key = known | (b3 &lt;&lt; 3) | (b2 &lt;&lt; 2) | (b1 &lt;&lt; 1) | b0
+        if 0x61 &lt;= (cover_parent_ct ^ key) &lt;= 0x7A:
+            candidate = secret_ct ^ reverse_bits(key)
+</code></pre>
+<p>The full lab makes its own 25-byte examples, generates lowercase covers, encrypts a synthetic <code>FLAG{...}</code> string, and checks that the true byte survives at every position. Its three fixed-seed trials passed locally. Each has <code>4^25 = 2^50</code> raw candidate combinations before the range filter. Those tests reproduce the mechanism; they do not replay this challenge's unavailable ciphertexts. The <a href="artifacts/README.md">lab guide</a> gives the inputs, expected outputs, and limits.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>XOR gives the whole opening. If <code>ciphertext = plaintext XOR keystream</code>, a known plaintext bit gives the matching keystream bit immediately. Every lowercase ASCII letter has top bits <code>011</code>. I did not need to know which letters the cover used. Its character class gave me three exact bits from every parent and child ciphertext byte.</p>
+<p>The generator's supposed rekeying reversed bits within each parent-key byte. That moves information but adds none. If I know bit 7 of a parent byte, I also know bit 0 of the reversed byte. The second encryption remains tied to the first even though the key bytes look different on a hex dump.</p>
+<p>The child schedule has its own problem. It puts four parities of parent-key bit pairs into a byte's high nibble, then adds <code>random.getrandbits(4)</code>. With the low nibble initially zero, that addition cannot carry into bit 4. The fresh bits never disturb the high bits that expose the parent's parities. The key source is also Python's Mersenne Twister. <a href="https://docs.python.org/3/library/random.html">Python warns that <code>random</code> is unsuitable for cryptographic use</a>. My recovery did not depend on predicting it.</p>
+<p>A true one-time pad requires independently random key material at least as long as each message and no reuse. This construction supplies enough output bytes to cover its messages, but that output is derived from the same parent material. Its lack of independent randomness and cross-message reuse defeat the one-time-pad argument. The extra child bytes are not 25 new independent key bytes.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit/Analysis Mechanics</summary>
+<p>Let parent byte <code>K[j]</code> have bits <code>b7 ... b0</code>, and let <code>C[j]</code> be its child byte. The cover gives <code>b7</code>, <code>b6</code>, and <code>b5</code> directly. Reading the second half of the cover gives these relations because the child high nibble stores pair parities:</p>
+<pre><code class="language-text">bit7(C[j]) = b0 XOR b1
+bit6(C[j]) = b2 XOR b3
+bit5(C[j]) = b4 XOR b5
+</code></pre>
+<p>I already know <code>b5</code>, so the last relation gives <code>b4</code>. That leaves <code>b0</code> and <code>b2</code> free; the other two low bits follow from the first two parity equations. There are exactly four parent-key bytes at each position before checking the full lowercase range. The child byte's low nibble does not reveal the remaining parent bits; those random bits still leave multiple possible child values.</p>
+<p>Bit reversal now turns the leak toward the secret. Known parent bits <code>b7..b4</code> land in output bits <code>0..3</code>. The secret plaintext's low nibble is fixed at every position. Its high nibble has four possible values. For <code>N=25</code>, the raw combination count is <code>4^25 = 2^50</code>, compared with <code>2^200</code> possible 25-byte plaintexts before using these constraints. The source's later recount places the result around <code>2^47</code> after enforcing <code>0x61..0x7A</code> rather than only the shared <code>011</code> prefix.</p>
+<p>The reported solve also worked backward from the recovered secret to a parent key, XORed the cover ciphertext, and obtained lowercase letters at all 25 parent positions. The child parity relation reportedly held at all 25 positions as well. Those are stronger checks than seeing a plausible flag wrapper. I cannot independently repeat them without the ciphertext bytes or generator output. The actual cover plaintext and secret bytes are not printed here.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<p>I almost had an easy story: the recovered text fit, so the remaining search space must have been tiny. My later count showed that I had blurred a cryptographic constraint with a language assumption. At solve time I described three <code>_</code> versus <code>o</code> choices and called the residue eight strings. That was too confident without stating which other characters I had already ruled out.</p>
+<table>
+<thead>
+<tr>
+<th>Constraint applied</th>
+<th style="text-align: right;">Free positions</th>
+<th style="text-align: right;">Candidate strings</th>
+<th>Basis</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bit leak, character set, and wrapper</td>
+<td style="text-align: right;">12</td>
+<td style="text-align: right;">4096</td>
+<td>Ciphertext structure and format</td>
+</tr>
+<tr>
+<td>Add the exact <code>a</code>-<code>z</code> range filter</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">1024</td>
+<td>Cover alphabet</td>
+</tr>
+<tr>
+<td>Assume lowercase leetspeak</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">4</td>
+<td>Convention, outside the cipher</td>
+</tr>
+<tr>
+<td>Require the clue's English reading</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">1</td>
+<td>Language interpretation</td>
+</tr>
+</tbody>
+</table>
+<p>The source's eight-string account and its later four-string table do not describe the same constraint set. I cannot make them equal by quietly changing the premises. What the artifacts force is the 4096 count under the first listed constraints and 1024 after the full alphabet range check. The last choices depend on how strictly I read "leetspeak" and English. The answer can be right while the confidence claim is wrong.</p>
+<p>The range filter was sitting there all along. Top bits <code>011</code> allow <code>0x60..0x7F</code>, but lowercase letters occupy only <code>0x61..0x7A</code>. I had stopped when the answer checked, rather than exhausting that simple constraint. Next time I want the candidate count next to each assumption before I declare a unique recovery.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<p>This exercise gave me practice treating a character class as partial known plaintext and propagating simple equations over GF(2). Similar habits help with fixed headers, protocol magic values, and structured fields in other weak cryptographic designs. The transferable move is to count the uncertainty after each constraint, then say which constraint came from observed bytes and which came from an analyst's guess.</p>
+<p>For a deployed application, I would start at the source and key lifecycle. A homegrown cipher protecting stored records can expose past data as well as future data, so an incident review would trace when the code first shipped and which ciphertexts were produced under it. That is a scoping plan, not a claim that this challenge represents an actual breach. Ordinary network or endpoint logs do not reveal that a bit permutation has reused key information. Code review and tests are the useful primary surfaces.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>I packaged the <a href="artifacts/keystream_lab.py">keystream lab</a> for the algebra, a <a href="artifacts/crypto_review.py">source review lead generator</a>, and <a href="artifacts/test_pocs.py">tests for both</a>. I also retained the source's <a href="artifacts/proposed_semgrep.yml">proposed Semgrep rules</a> with their unverified status marked in the file. The <a href="artifacts/README.md">README</a> explains what each accepts and what it cannot establish. The lab's <code>candidates()</code> function can be adapted to a different constrained alphabet by replacing its known-bit premise and the exact range check. A different key schedule needs fresh equations; copying these parity relations blindly would be wrong.</p>
+<p>My short triage list for a similar cipher is: measure ciphertext and block lengths; look for a constrained plaintext class; identify transforms of existing key material; inspect where any fresh randomness enters; write the resulting bit constraints; apply every range restriction the input supports; and record which final choices come from format or language. I would use an expected flag format as a separate falsification check only after deriving candidates from the ciphertext relationship.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>Fit in this case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MITRE ATT&amp;CK</td>
+<td>No observed enterprise adversary behavior. <a href="https://attack.mitre.org/techniques/T1600/001/">T1600.001</a> concerns an adversary weakening network-device encryption; its words "reduce key space" resemble the result here, but its scope does not fit this offline exercise.</td>
+</tr>
+<tr>
+<td>MITRE ATLAS / OWASP LLM Top 10</td>
+<td>No model, prompt, or ML application is involved.</td>
+</tr>
+<tr>
+<td>OWASP Top 10</td>
+<td><a href="https://top10.owasp.org/2021/A02_2021-Cryptographic_Failures/">A02:2021 Cryptographic Failures</a> would be relevant if this design protected application data. This is exercise code, so I do not assign a live finding.</td>
+</tr>
+<tr>
+<td>CWE</td>
+<td><a href="https://cwe.mitre.org/data/definitions/338.html">CWE-338</a> fits the <code>random</code> key source. <a href="https://cwe.mitre.org/data/definitions/331.html">CWE-331</a> is a broader fit for the confined fresh bits. <a href="https://cwe.mitre.org/data/definitions/323.html">CWE-323</a> describes nonce/key-pair reuse; the transformed stream-key reuse here is related but not the exact nonce scenario.</td>
+</tr>
+<tr>
+<td>CAPEC</td>
+<td><a href="https://capec.mitre.org/data/definitions/97.html">CAPEC-97 Cryptanalysis</a> describes the method at a broad level, without implying a real attacker in this exercise.</td>
+</tr>
+<tr>
+<td>STRIDE</td>
+<td>Information disclosure is the relevant design concern if the cipher is used on sensitive data.</td>
+</tr>
+<tr>
+<td>CVSS, EPSS, CISA KEV, cloud benchmarks</td>
+<td>No CVE, product deployment, exploitation record, or cloud service is in evidence, so I assign no score or cloud control.</td>
+</tr>
+<tr>
+<td>D3FEND</td>
+<td>I did not find a countermeasure node that would add clarity to a code-design defect with no observed attack telemetry.</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<p>There is no actor, infrastructure, observable IOC, or sharing partner in this case. I would not create a STIX indicator or TAXII feed for a source-code antipattern. The shareable unit is a review finding with its exact code location and test, handled in the development workflow. A STIG also needs a configured platform; none is provided here.</p>
+<p>For design guidance, <a href="https://csrc.nist.gov/pubs/sp/800/175/b/r1/final">NIST SP 800-175B Rev. 1</a> addresses approved cryptographic mechanisms, while <a href="https://csrc.nist.gov/pubs/sp/800/57/pt1/r5/final">NIST SP 800-57 Part 1</a> addresses key management. Those references guide a replacement design. They do not certify any library or implementation used in this exercise.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>11a. Standards Mapping (abbreviated)</h3>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>How I would use it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NIST SP 800-53 Rev. 5 SC-13</td>
+<td>Require an approved cryptographic mechanism appropriate to the data and environment. The homemade stream cipher needs replacement.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5 SC-12</td>
+<td>Review key generation, storage, rotation, and reuse rules. A reversible key transform supplies no independent key material.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5 SA-11</td>
+<td>Put crypto-touching changes through developer testing and security review before release.</td>
+</tr>
+<tr>
+<td><a href="https://cas8.docs.cisecurity.org/en/latest/source/Controls16/">CIS Controls v8 16.11</a></td>
+<td>Use vetted modules or services for encryption rather than a private primitive.</td>
+</tr>
+</tbody>
+</table>
+<h3>11b. Mitigation Realization</h3>
+<p>I would replace the construction with an authenticated-encryption implementation from a maintained library, such as AES-GCM or ChaCha20-Poly1305, and generate key material from a cryptographically secure source such as <code>secrets.token_bytes</code>. An AEAD key can encrypt multiple messages when its scheme's nonce rules are followed. The enforceable invariant is that the same key and nonce pair is never reused for two encryptions, with the library's size and lifecycle limits observed. Reversing or rotating an existing key does not count as a new key.</p>
+<p>For the development process, I would put a narrow source review check in CI and require a second reviewer for crypto changes. The reviewer should be able to answer where each new key bit comes from, what nonce discipline applies, and whether a test actually distinguishes repeated use from independent encryption. The linked AST checker is a local proof of concept, not a production gate.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>The source record proposed <a href="artifacts/proposed_semgrep.yml">two Semgrep patterns</a>: one for <code>random.randbytes</code> followed by reuse under a transform, and one for <code>random.getrandbits(n)</code> added to a value whose high bits are deterministic. It also reported that both patterns fired on one vulnerable sample, neither fired on a <code>secrets.token_bytes</code> plus AES-GCM control, and Bandit <code>B311</code> produced three findings. The rule text and those reported counts are useful leads, but the scan output and control fixture are unavailable here. I cannot present them as independently validated detector performance. The second pattern is particularly broad: low-bit addition alone does not prove a key-schedule weakness without tracking the surrounding data flow.</p>
+<p>I built a more limited <a href="artifacts/crypto_review.py">AST code reviewer</a> for a check I could run. It reads Python source, reports direct <code>random.randbytes</code> assignments, and adds a transformed-reuse lead when the same local scope calls <code>encrypt(key, ...)</code> and <code>encrypt(transform(key), ...)</code>. Its <a href="artifacts/test_pocs.py">tests</a> gave two findings on the vulnerable fixture, none on benign sampling plus a <code>secrets</code> key, and one weak-key finding on the near miss that encrypted only once. That is local syntax and logic coverage. It does not track aliases, call paths, real data flow, nonce handling, or production false-positive rates. Its output is for a reviewer, not an automatic security verdict.</p>
+<p>The source repository is the sensor; the relevant fields are file path, line, rule ID, and key variable name. A CI integration would need path scoping, triage ownership, a reviewed exception process, and tests against representative application code. Bandit <code>B311</code> can flag cryptographic use of <code>random</code>, but it also flags benign uses; I would tune it by context rather than treat every result as a breach. There is no case IOC or event stream from which a defensible KQL, SPL, or Sigma rule could identify this cipher design. A deployed application might have useful access logs for exposure scoping, but the flaw itself need not produce a distinct runtime event.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">analysis flow</a> follows the path I actually used: lengths, source, alphabet, parity, reversal, and confidence audit. The rejected uppercase/caret reading belongs near the wrapper check. For defense, I use this cross-section rather than suggesting a network kill chain:</p>
+<table>
+<thead>
+<tr>
+<th>Weakness or method</th>
+<th>Control</th>
+<th>Practical check</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Parent key reused after bit reversal</td>
+<td>SC-12 key management</td>
+<td>Trace where new key material enters and test repeated-encryption cases</td>
+</tr>
+<tr>
+<td>Mersenne Twister key generation</td>
+<td>SC-13 cryptographic protection</td>
+<td>Review key source and replace with a secure generator and vetted AEAD</td>
+</tr>
+<tr>
+<td>Known-alphabet cryptanalysis</td>
+<td>CIS 16.11 vetted components</td>
+<td>Retire the custom cipher; verify replacement design and nonce discipline</td>
+</tr>
+<tr>
+<td>Source-code pattern</td>
+<td>SA-11 developer testing</td>
+<td>Use the local AST lab as a review lead, then validate any production SAST rule</td>
+</tr>
+</tbody>
+</table>
+<p>The linked <a href="artifacts/README.md">review lab</a> is the concrete place to try the source check against a positive, benign, and near-miss fixture. A SIEM cannot repair the design.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://docs.python.org/3/library/random.html">Python <code>random</code> documentation</a> and <a href="https://docs.python.org/3/library/secrets.html"><code>secrets</code> documentation</a>, for generator selection.</li>
+<li><a href="https://top10.owasp.org/2021/A02_2021-Cryptographic_Failures/">OWASP Top 10 A02:2021 Cryptographic Failures</a>.</li>
+<li><a href="https://cwe.mitre.org/data/definitions/323.html">MITRE CWE-323</a>, <a href="https://cwe.mitre.org/data/definitions/331.html">CWE-331</a>, and <a href="https://cwe.mitre.org/data/definitions/338.html">CWE-338</a>.</li>
+<li><a href="https://capec.mitre.org/data/definitions/97.html">MITRE CAPEC-97 Cryptanalysis</a> and <a href="https://attack.mitre.org/techniques/T1600/001/">ATT&amp;CK T1600.001</a>, the latter for scope comparison only.</li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/175/b/r1/final">NIST SP 800-175B Rev. 1</a>, <a href="https://csrc.nist.gov/pubs/sp/800/57/pt1/r5/final">SP 800-57 Part 1 Rev. 5</a>, and <a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">SP 800-53 Rev. 5</a>.</li>
+<li><a href="https://cas8.docs.cisecurity.org/en/latest/source/Controls16/">CIS Controls v8 Safeguard 16.11</a>.</li>
+<li><a href="https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html">Bandit B311 documentation</a> for the reported scanner lead.</li>
+<li>Claude E. Shannon, "Communication Theory of Secrecy Systems," <em>Bell System Technical Journal</em> 28, no. 4 (1949): 656-715.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
