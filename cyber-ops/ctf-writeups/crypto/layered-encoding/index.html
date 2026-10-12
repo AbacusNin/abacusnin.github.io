@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The One Letter Hidden Under Three Encodings - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="Six encoding exercises moved from binary and octal to hex, Base64, and a three-layer stack. I traced a one-character discrepancy back through the outer hex representation.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/layered-encoding/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The One Letter Hidden Under Three Encodings">
+  <meta property="og:description" content="Six encoding exercises moved from binary and octal to hex, Base64, and a three-layer stack. I traced a one-character discrepancy back through the outer hex representation.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/layered-encoding/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Cryptography / <span aria-current="page">The One Letter Hidden Under Three Encodings</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The One Letter Hidden Under Three Encodings</h1>
+        <p class="lead">Four simple decodes taught me the shapes. The last two made me follow a single wrong character back through three layers.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Identify and decode six supplied strings. The final pair used hex around Base64 around octal, with a one-character plaintext discrepancy.</p>
+<p><strong>What I did.</strong> I checked alphabets and group widths, decoded one layer at a time, and compared the last pair at the byte level.</p>
+<p><strong>The result.</strong> My notes say all six decoded and identify a 31-to-78 outer-hex difference behind cell versus call. The local synthetic lab verifies the stack using invented strings.</p>
+<p><strong>The limit.</strong> The six exact inputs, complete outputs, and submission receipts are absent from this account. I cannot independently replay or confirm challenge acceptance.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Read the outer string; Hex to Base64; Base64 to octal; Octal to plaintext; Trace one character">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Read the outer string</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Check alphabet and grouping</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Hex to Base64</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Inspect the intermediate text</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Base64 to octal</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Keep the byte boundaries</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Octal to plaintext</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Compare the near match</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Trace one character</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Confirm what changed</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Attack Chain Overview</h2>
+<p>The final two exercises nested ordinary encodings. I read the hex pairs first. Those bytes spelled Base64 text; decoding that text produced space-separated octal values; the octal values spelled a sentence. The near-match in Challenge 5 made Challenge 6 more interesting than another mechanical decode. The direction matters: octal, then Base64, then hex to construct; hex, then Base64, then octal to read. The <a href="#analysis-flow">diagram above</a> follows my decode order.</p>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Cryptography / Encoding</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>encoding, obfuscation, binary, octal, hex, base64, multi-layer, data-encoding, malware-tradecraft, python</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Complete</td>
+</tr>
+<tr>
+<td>Recorded result</td>
+<td>Six strings decoded; the last pair exposed a one-character difference, <code>cell</code> versus <code>call</code></td>
+</tr>
+<tr>
+<td>Evidence boundary</td>
+<td>Exact inputs, full outputs, and acceptance receipts are absent from this account</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting the case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/crypto/layered-encoding/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<h3>Challenge Presentation</h3>
+<p>I worked through six strings with no keys or hints. The first four each used one representation: eight-bit binary groups, three-digit octal, hex pairs, and Base64. The last two wrapped octal text in Base64 and then represented those Base64 bytes as hex. My task was to recover the text, including a single-character discrepancy between the last pair. This account does not include the exact strings or complete answers. I can describe the steps and test the method with invented examples; I cannot replay the six challenge inputs.</p>
+<h3>Threat Model</h3>
+<p>I treated the supplied blobs as an exercise in obscuring text. A real operator might encode a command, configuration, or exfiltrated content so a plaintext string match misses it. That is an operational analogy, not an observed intrusion here. Common encoding also carries ordinary data every day. A Base64-looking string by itself says little about intent. The defender's useful question is whether the surrounding process, file, or message warrants decoding and investigation.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<h3>Initial Triage Methodology</h3>
+<p>I checked the character set and token width before choosing a decoder. Challenge 1 consisted of space-separated eight-character groups using <code>0</code> and <code>1</code>, so I treated each as a byte. Challenge 2's three-digit groups could initially have been decimal. The recurring <code>040</code> at word boundaries made octal a stronger reading because octal <code>040</code> is an ASCII space. Challenge 3 used two-character hex groups; <code>20</code> at word boundaries was the same space in base 16. Challenge 4 was one dense string ending in <code>==</code>, consistent with padded Base64. Those are clues to test, not proofs that an arbitrary string has only one possible interpretation.</p>
+<p>Challenges 5 and 6 started as hex pairs. I decoded them to Base64 text, decoded that to octal groups, then read the octal bytes as ASCII. My Challenge 5 reading had <code>cell</code> where the expected sentence read <code>call</code>. I did not switch schemes because the intermediate shapes and the rest of the sentence still held together. My notes put outer hex pair <code>31</code> in one string and <code>78</code> in the other at position 36. Those pairs encode the Base64 characters <code>1</code> and <code>x</code>. The complete strings are absent here, so I cannot verify that position or the full sentence from the challenge data. The local lab shows the same kind of layered correction with invented words.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<h3>One-Liner Triage Probes</h3>
+<p>These small probes fit the single-layer cases. I inspect the bytes after each command before deciding what to try next:</p>
+<pre><code class="language-bash">printf '%s' '4d 54 49 30' | tr -d ' ' | xxd -r -p
+python3 -c &quot;print(''.join(chr(int(x, 2)) for x in '01001000 01101001'.split()))&quot;
+python3 -c &quot;print(''.join(chr(int(x, 8)) for x in '110 151'.split()))&quot;
+</code></pre>
+<p>The first line yields <code>MTI0</code>, which is another encoded-looking string. A printable result can still be an intermediate layer. I also tried <code>base64 -d | strings</code> as a quick probe. That pipeline may hide undecodable or nonprintable bytes, so I would keep the raw bytes for a forensic record and make decoding errors visible. An <code>=</code> suffix is a useful Base64 clue but not a validity check.</p>
+<h3>Single-Layer Decoders</h3>
+<p>My Python functions converted binary and octal tokens with <code>int(group, base)</code>, used <code>bytes.fromhex()</code> for hex, and used <code>base64.b64decode()</code> for Base64. I added mirror encoders for lab validation. The <a href="artifacts/decode_lab.py">bounded decoding aid</a> keeps those four paths, requires an explicit scheme, checks group width and canonical Base64, and rejects malformed input. The examples <code>01001000 01101001</code>, <code>110 151</code>, <code>48 69</code>, and <code>SGk=</code> all read <code>Hi</code> in the <a href="artifacts/test_pocs.py">local tests</a>. None came from the challenge strings.</p>
+<h3>Multi-Layer Decoder (Challenges 5 and 6)</h3>
+<p>The decisive order was:</p>
+<pre><code class="language-python">base64_text = bytes.fromhex(hex_text.replace(' ', '')).decode('ascii')
+octal_text = base64.b64decode(base64_text, validate=True).decode('ascii')
+plaintext = ''.join(chr(int(token, 8)) for token in octal_text.split())
+</code></pre>
+<p>I inspect each intermediate value before moving on. My <code>inspect_layers</code> function printed raw and intermediate previews; <code>encode_hex_b64_oct</code> constructed a matching test string. The linked lab keeps a bounded <code>decode_stack()</code> and an <code>encode_stack()</code> for invented ASCII fixtures. It never evaluates, imports, or executes decoded text. A failed ASCII check stops instead of replacing a byte with <code>?</code> and silently changing evidence.</p>
+<h3>Byte-Level Diff Utility</h3>
+<p>My <code>diff_hex_ciphertexts</code> compared space-delimited pairs, reported unequal lengths, and listed each differing position with hex and ASCII values. That is the right starting point for the <code>31</code> versus <code>78</code> difference. I would follow the changed Base64 character through its four-character group and compare the resulting octal bytes. An outer byte change need not always produce exactly one final character change. It can also make Base64 invalid or affect more than one decoded byte. This path is a particular case, not a general law.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<h3>Encoding vs. Encryption: A Critical Distinction</h3>
+<p>These exercises use public, keyless encodings. Reversing them needs the representation, not a secret. Encryption has a key-dependent security claim that encoding lacks. I kept this distinction in mind when assessing the threat model: a string hidden from a simple signature can still be read by anyone who recognizes its layers.</p>
+<h3>The Four Encoding Schemes</h3>
+<p><code>H</code> is ASCII decimal 72, binary <code>01001000</code>, octal <code>110</code>, and hex <code>48</code>. A space is decimal 32, octal <code>040</code>, and hex <code>20</code>. These repeated values made useful cross-checks in the first three exercises. Base64 packs input bytes into six-bit symbols using the alphabet <code>A-Z</code>, <code>a-z</code>, <code>0-9</code>, <code>+</code>, and <code>/</code>. Padding depends on the input length: no <code>=</code> for a multiple of three bytes, <code>==</code> for one leftover byte, and <code>=</code> for two. The exact alphabet and padding rules are defined in <a href="https://www.rfc-editor.org/rfc/rfc4648">RFC 4648</a>.</p>
+<h3>Multi-Layer Stack Construction</h3>
+<p>For the last pair, the construction path was plaintext to octal groups, octal text to Base64, and Base64 text to hex pairs. I reversed that order. The intermediate text is part of the evidence: it tells me whether I have peeled off the intended layer or forced a plausible-looking result through a permissive decoder.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit/Analysis Mechanics</summary>
+<h3>Invariant Violated</h3>
+<p>There was no cryptographic secret to break. The exercise relied on the reader stopping at the outer representation. Once I recognized hex pairs, each next layer exposed another familiar shape. I had called these strings <code>ciphertext</code> in my notes. More precisely, they are encoded text.</p>
+<h3>Layer Identification Logic</h3>
+<p>My decision tree starts with grouping: eight-bit <code>0/1</code> tokens suggest binary, three-digit <code>0-7</code> tokens suggest octal, two-digit <code>0-9a-f</code> pairs suggest hex, and a padded four-character-block alphabet suggests Base64. I test a candidate by decoding strictly and checking the result. A string can satisfy multiple surface patterns, especially a short hex string that also fits a Base64 alphabet. I do not let the first regex choose a final answer without inspecting the decoded bytes. My first auto-detector tried binary, octal, hex, Base64url, then Base64. Its permissive replacement decoding and automatic recursion could turn ambiguous or malformed input into a confident-looking answer. The linked aid makes me select each layer.</p>
+<h3>Single-Byte Error Propagation</h3>
+<p>I noted an outer difference of <code>31</code> (<code>1</code>) versus <code>78</code> (<code>x</code>) at pair 36 and traced it to octal <code>145</code> versus <code>141</code>, or <code>e</code> versus <code>a</code>, yielding <code>cell</code> and <code>call</code>. This is plausible because a change in one Base64 symbol affects a bounded part of one decoded group. I cannot recheck the precise position and words without the exact challenge strings. I would retain both versions and a byte-level diff in a real evidence package rather than correcting the input in place.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<h3>What the Exercise Validated</h3>
+<p>The first four strings gave me a quick vocabulary of shapes. On the last pair, that vocabulary let me notice that the hex output was still structured text. The <code>040</code> and <code>20</code> space values were good sanity checks. They did not replace strict decoding or a check of the final sentence.</p>
+<h3>Gaps and Inefficiencies Surfaced</h3>
+<p>I briefly considered decimal for the octal groups. Checking whether each token fell in the octal range and whether <code>040</code> aligned with spaces settled that. The multi-layer case needed deliberate intermediate inspection. An automatic decoder can be useful for triage, but it should expose every step and stop on malformed bytes rather than smoothing them away.</p>
+<h3>Transferable Principles</h3>
+<table>
+<thead>
+<tr>
+<th>In the exercise</th>
+<th>In a real investigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Read alphabet and width first</td>
+<td>Choose a decoder and keep the unmodified input</td>
+</tr>
+<tr>
+<td>Strip the outer layer, then inspect</td>
+<td>Preserve each transform and its exact output</td>
+</tr>
+<tr>
+<td>Compare the near-match byte for byte</td>
+<td>Explain a discrepancy without silently repairing evidence</td>
+</tr>
+<tr>
+<td>Build a mirror encoding fixture</td>
+<td>Test a decoder without claiming the fixture is case evidence</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<h3>Individual Practitioner Skill Development</h3>
+<p>The next things I would practice are Base64url, custom alphabets, compressed data before Base64, and encoded values inside JSON or scripts. XOR changes the problem because a key or key-recovery step enters the picture. The shared habit is to keep byte boundaries and record each transform.</p>
+<h3>Security Operations (SOC, IR, Threat Hunting)</h3>
+<p>A process command line, script block, file, or message body gives the encoding some context. I would start with a suspicious process or workflow, decode a bounded copy, and compare the result with known behavior. A PowerShell encoded command is one practical hunting entry point, but legitimate administration uses it too. The linked <a href="artifacts/process_hunt.py">process-event triage script</a> tests an invented JSONL event model. It returns a review marker without printing the decoded command. A SOC would need its own field mapping, access controls, baselines, and response process.</p>
+<h3>Intelligence Operations (SIGINT, IO/IW, OSINT, Attribution)</h3>
+<p>Encoding alone cannot tell me an actor's sophistication, identity, or purpose. I considered low-resource actors and commodity tooling as possible contexts, but these six strings did not establish either. If I collected a real artifact, I would preserve the outer form, document the decode chain, and attach the recovered bytes to the specific collection point and timestamp. That gives another analyst a way to test the claim.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<h3>Encoding Identification Decision Tree</h3>
+<p>My checklist covered token width, alphabet, Base64 padding, Base64url, compression, and custom alphabets. I keep it as a triage guide: inspect, choose a candidate, decode strictly, and stop when the output lacks a defensible next layer. A decoded string that happens to be printable is not automatically the final answer.</p>
+<h3>Auto-Detection and Decode Pipeline</h3>
+<p>I first sketched <code>identify_encoding()</code> and <code>auto_decode()</code> with a maximum depth of eight. The regex order can misclassify short strings, and <code>errors='replace'</code> discards byte evidence. Its Base64url branch repairs padding without confirming the format. I replaced that sketch with an <a href="artifacts/decode_lab.py">explicit, bounded decoder</a> for the four exercised schemes and at most four analyst-selected layers. The <a href="artifacts/test_pocs.py">tests</a> cover positive round trips and malformed near misses. The <a href="artifacts/README.md">README</a> states its input and output, limits, and how to adapt it.</p>
+<h3>CTF Encoding Triage Checklist</h3>
+<p>Before decoding, I note the character set, grouping, padding, and expected output type. During decoding, I save each intermediate value. Afterward, I check whether the result reads coherently and whether a second source or known format confirms it. For a near match, I compare the raw inputs before assuming a transcription error. That sequence preserves the mistake if the apparent typo turns out to be meaningful.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<h3>MITRE ATT&amp;CK</h3>
+<p>I mapped the exercise to <a href="https://attack.mitre.org/techniques/T1027/">T1027, Obfuscated Files or Information</a> and <a href="https://attack.mitre.org/techniques/T1132/001/">T1132.001, Standard Encoding</a> as possible real-world applications. The six strings do not establish a malware file or encoded C2 traffic. T1132 specifically covers command-and-control information. <a href="https://attack.mitre.org/techniques/T1140/">T1140</a> describes adversary deobfuscation or decoding during execution; my analyst-side decode is not an observation of that technique. T1027.001, Binary Padding, did not appear. T1059.001, PowerShell, belongs to the defensive example below only if a PowerShell process is actually present.</p>
+<h3>MITRE D3FEND</h3>
+<p>I considered Dynamic Analysis, File Content Rules, and Script File Analysis. File or script inspection can help once the encoded text is located. Dynamic execution is unnecessary for these text exercises and should require a separate isolated analysis decision for an unknown real payload. No D3FEND technique was deployed or measured here.</p>
+<h3>CAPEC</h3>
+<p>I considered CAPEC-267, CAPEC-116, and CAPEC-86 as adjacent ideas. None is shown by these six decoding tasks: no executable was hidden in a non-executable file, no attack excavation behavior was observed, and there was no web query injection. I would map a real case only after the artifact and adversary action justify a pattern. I also considered OWASP, STRIDE, CACAO, and OpenC2; the six text decodes do not supply the application, architecture, or response workflow needed to apply them.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<h3>STIX 2.1 Representation</h3>
+<p>I sketched an attack-pattern, indicator, and course-of-action object with redacted UUIDs and fixed example timestamps. Those placeholders do not make valid publishable STIX intelligence. A generic PowerShell <code>-enc</code> pattern is a behavior to hunt, not a campaign IOC. I would only make a STIX bundle after tying an observed artifact to its collection point, time, confidence level, and valid identifiers, then validating it against the <a href="https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html">STIX 2.1 specification</a>. No TAXII feed or exchange occurred.</p>
+<h3>STIG Applicability</h3>
+<p>I considered Windows 10, Windows Server 2019, and application-development STIG findings around PowerShell logging and protected data. I have no target system, version, benchmark release, or assessed setting here. For a real Windows fleet I would select the exact current benchmark first, then verify logging policy and actual events. Encoding does not substitute for confidentiality controls.</p>
+<h3>CIS Benchmarks</h3>
+<p>I connected log collection/review, malware protection, and secure development to this scenario. Those are reasonable control areas. I would verify the current safeguard text and the organization's inventory before claiming a specific CIS implementation or compliance result. This case did not measure a deployed control.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>11a. Standards Mapping</h3>
+<p>I considered NIST SP 800-53 SI-3, SI-7, AU-2, and AU-12, plus CIS Controls 8.2, 10.1, and 16.1. For this case they are planning references: collect the events needed to see the relevant process or script, inspect suspicious content safely, and keep audit records. I did not assess a system or collect implementation evidence. A policy that says "decode" is not a functioning detection pipeline.</p>
+<h3>11b. Mitigation Realization</h3>
+<p>For a PowerShell example, I would first verify process command-line collection and script logging on the actual host. Sysmon Event ID 1 and Windows Security Event ID 4688 can provide process creation context when configured, but their event fields and capture policy differ. PowerShell 4103/4104 data can help with script investigation; I would test what the environment actually records rather than assume every layer or every deobfuscated string appears in logs. AMSI may inspect script content through the host integration. That alone does not guarantee an encoded command will appear in the telemetry I have.</p>
+<p>I sketched a Sysmon XML excerpt, a Sigma rule, and an SPL query. The XML's wildcard <code>CommandLine</code> condition would broaden collection beyond the stated encoded-command filter. The Sigma regex and SPL assumed field names and syntax without a tested backend; the SPL used <code>urldecode()</code> where Base64 and UTF-16LE decoding were required. I would keep the collection policy separate from the hunt and validate any backend query with local events. The linked <a href="artifacts/process_hunt.py">JSONL process-event detector</a> demonstrates the narrower predicate and <a href="artifacts/test_pocs.py">its tests</a> include a positive, a benign process, and malformed or absent arguments. It is a local proof of concept, not a deployed Sysmon, Sigma, or Splunk rule.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<h3>Indicators of Compromise (Illustrative / Sanitized)</h3>
+<p>I considered a <code>powershell -enc</code> pattern, long Base64 text in HTTP, a hypothetical registry path, and a hex-pair pattern. They are examples of places to look. No malicious file, registry value, host, domain, command line, or network transaction was retained as an IOC. A long Base64 string is common in benign material. I would require process ancestry, destination, decoded content, or other behavior before escalating.</p>
+<h3>YARA Rule</h3>
+<p>My proposed YARA looked for bytes <code>4D 20 54 20</code>, a padded Base64 run, or repeated <code>040</code> tokens. Those bytes could match a particular spaced hex spelling of <code>MT</code>, but I did not test the rule against the six inputs or a benign sample set. Its mixed conditions do not establish the stated three-layer stack. I kept the detection idea and withheld a YARA file until actual representative file samples and negative controls support a rule.</p>
+<h3>Log Source and Telemetry Requirements</h3>
+<p>For the process hunt, I need image name, full command line, event identity, and a timestamp from a process-creation sensor. Script content requires an enabled PowerShell logging source and appropriate access controls. HTTP logs often contain URI and metadata but not a POST body; TLS can hide payload content from a network observer. I would not assume Zeek supplies body fields or that all email tenants share a retention period. I would document each sensor's actual fields, sampling, and retention before writing a query.</p>
+<h3>Detection Engineering Notes</h3>
+<p>The local detector selects PowerShell or pwsh with an encoded-command switch, checks strict Base64, and decodes UTF-16LE in memory. It emits only event ID, image, decoded length, and a review flag. The <a href="artifacts/README.md">guide</a> gives the event schema and tuning limits. A legitimate encoded administrative command remains a false positive for malicious activity. A renamed process, quoting variation, or different PowerShell abbreviation can evade this narrow predicate. The synthetic <a href="artifacts/test_pocs.py">tests</a> prove the code's behavior on those fixtures, not its field mapping or accuracy in a production SIEM.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">analysis flow above</a> shows the three-layer decode and the point where I compared the two readings. I also connected an encoded artifact to possible controls: process collection, script inspection, and an encoding-aware hunt. Those are operational follow-ups, not controls shown running in this CTF. For a real case I would draw the same chain with the actual sensor and event fields in place of generic boxes.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://www.rfc-editor.org/rfc/rfc4648">RFC 4648: Base16 and Base64 encoding</a></li>
+<li><a href="https://attack.mitre.org/techniques/T1027/">MITRE ATT&amp;CK T1027</a>, <a href="https://attack.mitre.org/techniques/T1132/001/">T1132.001</a>, and <a href="https://attack.mitre.org/techniques/T1140/">T1140</a></li>
+<li><a href="https://d3fend.mitre.org/">MITRE D3FEND</a> and <a href="https://capec.mitre.org/">CAPEC</a></li>
+<li><a href="https://doi.org/10.6028/NIST.SP.800-53r5">NIST SP 800-53 Rev. 5</a> and <a href="https://www.cisecurity.org/controls/v8">CIS Controls v8</a></li>
+<li><a href="https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon">Microsoft Sysmon</a> and <a href="https://sigmahq.io/sigma-specification/specification/sigma-rules-specification.html">Sigma rule specification</a></li>
+<li><a href="https://yara.readthedocs.io/en/stable/">YARA documentation</a> and <a href="https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html">STIX 2.1 specification</a></li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>

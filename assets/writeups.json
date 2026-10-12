@@ -904,5 +904,31 @@
     "summary": "One RSA signature failed its public check. That failure exposed a factor of the modulus, letting me reconstruct the private key and decrypt the challenge ciphertext.",
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/crypto/rsa-crt-fault/"
+  },
+  {
+    "title": "The One Letter Hidden Under Three Encodings",
+    "category": "Cryptography",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "encoding",
+      "obfuscation",
+      "binary",
+      "octal",
+      "hex",
+      "base64",
+      "multi-layer",
+      "data-encoding",
+      "malware-tradecraft",
+      "python"
+    ],
+    "summary": "Six encoding exercises moved from binary and octal to hex, Base64, and a three-layer stack. I traced a one-character discrepancy back through the outer hex representation.",
+    "aliases": [
+      "layered decoding",
+      "encoded payload triage",
+      "base16"
+    ],
+    "status": "Complete",
+    "url": "/cyber-ops/ctf-writeups/crypto/layered-encoding/"
   }
 ]
