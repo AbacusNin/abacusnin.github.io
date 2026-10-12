@@ -392,5 +392,22 @@
     "summary": "A lowercase cover message leaked four bits and two parity constraints per key byte. Reversing those same key bytes for the secret did nothing to hide the leak.",
     "status": "Solved-Verified",
     "url": "/cyber-ops/ctf-writeups/crypto/permuted-keystream-reuse/"
+  },
+  {
+    "title": "The Signature That Gave Away Its Key",
+    "category": "Cryptography",
+    "difficulty": "Hard",
+    "date": "2026-10",
+    "tags": [
+      "RSA",
+      "CRT",
+      "fault attack",
+      "signing oracle",
+      "key recovery",
+      "Bellcore"
+    ],
+    "summary": "One RSA signature failed its public check. That failure exposed a factor of the modulus, letting me reconstruct the private key and decrypt the challenge ciphertext.",
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/crypto/rsa-crt-fault/"
   }
 ]

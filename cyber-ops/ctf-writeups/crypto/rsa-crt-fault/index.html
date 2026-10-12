@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Signature That Gave Away Its Key - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="One RSA signature failed its public check. That failure exposed a factor of the modulus, letting me reconstruct the private key and decrypt the challenge ciphertext.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/rsa-crt-fault/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Signature That Gave Away Its Key">
+  <meta property="og:description" content="One RSA signature failed its public check. That failure exposed a factor of the modulus, letting me reconstruct the private key and decrypt the challenge ciphertext.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/rsa-crt-fault/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Cryptography / <span aria-current="page">The Signature That Gave Away Its Key</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Signature That Gave Away Its Key</h1>
+        <p class="lead">Three short messages went into the signing service. Two signatures checked out. The one on `0x03` changed the whole plan.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Recover the encrypted flag from a TCP signing oracle that exposes an RSA public key and occasionally returns a faulty CRT signature.</p>
+<p><strong>What I did.</strong> Check each response with the public exponent, take a GCD from the faulty signature, reconstruct the private exponent, and decrypt the target ciphertext.</p>
+<p><strong>The result.</strong> The case record reports factor recovery and a valid flag string. The toy lab independently reproduces the mathematical failure with invented parameters.</p>
+<p><strong>The limit.</strong> The 2048-bit modulus, faulty signature, ciphertext, service transcript, and grading receipt are unavailable for challenge replay. Defensive tests use synthetic events.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Connect with Python; Probe 2, 3, and 5; Take one GCD; Rebuild the key; Decrypt the ciphertext; Test the guard">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Connect with Python</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Banner provides n and e</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Probe 2, 3, and 5</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Signature on 3 fails verification</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Take one GCD</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">A prime factor of n emerges</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Rebuild the key</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Compute d from the two factors</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Decrypt the ciphertext</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Recorded result is a flag string</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Test the guard</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Reject a faulty result before return</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Cryptography</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Hard</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>RSA, CRT, fault attack, signing oracle, key recovery, Bellcore</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved</td>
+</tr>
+<tr>
+<td>Recorded result</td>
+<td>A faulty signature on message 3 yielded a factor of a 2048-bit modulus; reconstructed key decrypted a flag-shaped plaintext</td>
+</tr>
+<tr>
+<td>Evidence boundary</td>
+<td>The service transcript, full public parameters, faulty signature, ciphertext, plaintext, and grading receipt are unavailable for independent challenge replay</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/crypto/rsa-crt-fault/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I had a TCP signing service and an encrypted flag ciphertext. The service's banner gave me a 2048-bit RSA modulus <code>n</code> and public exponent <code>e = 65537</code>. It accepted a hexadecimal message and returned a signature. There was no authentication in the challenge interface. The ciphertext was encrypted under the same RSA key pair, so a recovered private exponent would open it.</p>
+<p>The production analogue is a signing API or hardware security module front end that uses RSA's Chinese Remainder Theorem optimization and returns a bad computation without checking it first. That is a conditional design scenario, not evidence of a compromised production signer. The case's objective was concrete: find a mathematical failure in the oracle output, recover the key, and decrypt the ciphertext.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<h3>2.1 Transport Layer</h3>
+<p>The exercise environment had no <code>netcat</code>, and installing it was not available. I used a short Python socket client to read the banner, send one newline-terminated hex message, and capture the reply. My first client used short sleeps and a timeout to drain responses. That fit this small text service, but a reusable client needs byte and time bounds and the service's exact prompt.</p>
+<h3>2.2 Initial Banner Capture</h3>
+<p>The banner exposed <code>n</code>, <code>e</code>, and <code>message (hex):</code>. I kept the public parameters beside each response so the verification check used the key for that session. The retained case notes do not include the full values or a transcript, so the challenge operation is reported here from the solve record.</p>
+<h3>2.3 Oracle Characterization</h3>
+<p>I sent <code>0x02</code>, <code>0x03</code>, and <code>0x05</code>. For raw textbook RSA, a returned signature <code>s</code> on representative <code>m</code> should satisfy <code>pow(s, e, n) == m % n</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Message</th>
+<th>Recorded public check</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0x02</code></td>
+<td>Valid</td>
+</tr>
+<tr>
+<td><code>0x03</code></td>
+<td>Invalid</td>
+</tr>
+<tr>
+<td><code>0x05</code></td>
+<td>Valid</td>
+</tr>
+</tbody>
+</table>
+<p>That middle result was the entire opening. It was one bad signature among three probes, not a high-volume attack. A network-volume threshold would have missed the observed sequence.</p>
+<h3>2.4 Methodology Note: Initial Hypothesis and Pivot</h3>
+<p>At first I expected the raw signing function to serve as a decryption oracle. In textbook RSA both operations apply <code>x^d mod n</code>, so submitting the ciphertext might have returned the plaintext. I also prepared multiplicative blinding if a direct ciphertext request was blocked. I did not need either path. I briefly considered the bad signature a copy or transport error; checking all three against the same public invariant made the fault impossible to dismiss as a merely odd-looking response.</p>
+<p>The direct-decryption and blinding paths are recorded as prepared alternatives, not completed attacks. The one actually used was factor recovery from the faulty output.</p>
+<h3>2.5 Exploitation</h3>
+<p>I computed <code>gcd(pow(s_faulty, e, n) - 3, n)</code>. The case record reports a nontrivial factor. Dividing <code>n</code> by it gave the other factor, and their product checked back against <code>n</code>. From there I calculated <code>d = e^-1 mod ((p-1)(q-1))</code> and decrypted the ciphertext. The recorded plaintext had the expected flag form. The actual 2048-bit numbers and result are not available for my replay.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<h3>3.1 Python TCP Client (netcat substitute)</h3>
+<p>My challenge client sent a hex string followed by a newline and parsed a line containing <code>sig = 0x...</code>. Its shape was simple:</p>
+<pre><code class="language-python">with socket.create_connection((host, port), timeout=10) as sock:
+    banner = read_until_prompt(sock, max_bytes=16384, timeout=5)
+    sock.sendall((message_hex + &quot;\n&quot;).encode(&quot;ascii&quot;))
+    response = read_until_prompt(sock, max_bytes=16384, timeout=5)
+</code></pre>
+<p>My challenge client used a sleep-and-drain helper rather than <code>read_until_prompt</code>; the bounded form above shows what I would take into another engagement. No target host, port, or live service is included in the linked lab.</p>
+<h3>3.2 Oracle Characterization - Detect Faulty Signatures</h3>
+<p>The check was one line, applied to every pair <code>(m, s)</code>:</p>
+<pre><code class="language-python">def valid_raw_rsa_signature(m: int, s: int, e: int, n: int) -&gt; bool:
+    return pow(s, e, n) == m % n
+</code></pre>
+<p>The challenge script parsed <code>sig = 0x...</code> from text and printed VALID or FAULTY for each probe. A failed check by itself does not prove a one-sided CRT fault; I needed the next GCD to distinguish a useful residue fault from arbitrary corruption.</p>
+<h3>3.3 Full Exploit - Factor Recovery to Plaintext</h3>
+<p>The decisive sequence was:</p>
+<pre><code class="language-python">from math import gcd
+
+factor = gcd(pow(s_faulty, e, n) - m_faulty, n)
+if factor in (1, n):
+    raise ValueError(&quot;No nontrivial factor from this response&quot;)
+other = n // factor
+assert factor * other == n
+d = pow(e, -1, (factor - 1) * (other - 1))
+plaintext_integer = pow(ciphertext, d, n)
+</code></pre>
+<p>I printed only a prefix of each factor and the decrypted bytes during the solve. The <a href="artifacts/rsa_fault_lab.py">toy RSA fault lab</a> runs this complete sequence on invented small primes, including the check that a valid signature produces no useful factor. It does not hold the challenge key or ciphertext.</p>
+<h3>3.4 Fallback - Multiplicative Blinding</h3>
+<p>This branch was ready but unused. If a raw-RSA service refuses a ciphertext <code>c</code> while still signing arbitrary representatives, choose <code>r</code> with <code>gcd(r, n) == 1</code>, submit <code>c' = c * r^e mod n</code>, and unblind the returned <code>s'</code> with <code>r^-1 mod n</code>. The result equals <code>c^d mod n</code> for raw RSA. It depends on the exact oracle semantics and fails as a general shortcut for padded RSA signature schemes. In this case, the fault made that route unnecessary. The <a href="artifacts/rsa_fault_lab.py">toy lab</a> includes and tests these two functions on invented integers.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<h3>4.1 RSA Fundamentals</h3>
+<p>An RSA modulus is <code>n = p*q</code>, where <code>p</code> and <code>q</code> are large primes. With public exponent <code>e</code>, the private exponent <code>d</code> satisfies <code>e*d = 1 mod phi(n)</code> for <code>phi(n) = (p-1)(q-1)</code>. Raw public and private operations are exponentiation modulo <code>n</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Operation in this raw challenge</th>
+<th>Formula</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Encrypt</td>
+<td><code>c = m^e mod n</code></td>
+</tr>
+<tr>
+<td>Decrypt</td>
+<td><code>m = c^d mod n</code></td>
+</tr>
+<tr>
+<td>Sign</td>
+<td><code>s = m^d mod n</code></td>
+</tr>
+<tr>
+<td>Public check</td>
+<td><code>s^e mod n == m mod n</code></td>
+</tr>
+</tbody>
+</table>
+<p>These are the challenge's textbook operations. A production signature scheme encodes the message and checks the full signature scheme; it does not sign an arbitrary user-supplied integer this way.</p>
+<h3>4.2 RSA-CRT Optimization</h3>
+<p>CRT performs the private operation modulo the smaller factors: <code>sp = m^dp mod p</code>, <code>sq = m^dq mod q</code>, with <code>dp = d mod (p-1)</code> and <code>dq = d mod (q-1)</code>. It recombines them using <code>q^-1 mod p</code>. That saves work, but it introduces a fault boundary. If one residue is correct and the other is wrong, the returned value can reveal the factor associated with the correct half.</p>
+<h3>4.3 Textbook RSA Is Not a Signature Scheme</h3>
+<p>The first weakness is the raw interface itself. With no padding or operation separation, signing and decryption both apply the private exponent, and RSA's multiplicative structure permits blinding tricks. <a href="https://www.rfc-editor.org/rfc/rfc8017">RFC 8017</a> specifies schemes such as RSASSA-PSS and RSAES-OAEP with different encodings and purposes. I would use separate keys for signing and encryption and a maintained implementation of the selected schemes. PKCS#1 v1.5 signatures remain in use in some systems, but that is a compatibility decision with its own review, not a reason to expose raw RSA.</p>
+<h3>4.4 The Bellcore/Lenstra Fault Attack</h3>
+<p>This is the Bellcore/Lenstra fault result. Suppose the <code>q</code> residue is wrong but the <code>p</code> residue is right. The faulty result <code>s'</code> still satisfies <code>(s')^e = m mod p</code> but fails modulo <code>q</code>. So <code>p</code> divides <code>(s')^e - m</code>, while <code>q</code> does not. The GCD with <code>n</code> returns <code>p</code>. The attack needs one useful faulty output, not a fast way to factor a sound 2048-bit RSA modulus.</p>
+<p>In the challenge the fault's cause was not established. Hardware fault injection, transient faults, and software defects are possible sources in real implementations, but the case record only establishes an invalid output and a successful GCD recovery.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit Mechanics</summary>
+<h3>5.1 Detection</h3>
+<p>The recorded checks were <code>pow(s_2,e,n)==2</code>, <code>pow(s_3,e,n)!=3</code>, and <code>pow(s_5,e,n)==5</code>. I treated the result on 3 as a candidate fault and tested the specific mathematical consequence. That separates a signal from an arbitrary parser mistake.</p>
+<h3>5.2 Factor Recovery</h3>
+<p>For the faulty signature on 3, <code>gcd(pow(s_3,e,n)-3,n)</code> reportedly produced a nontrivial factor. The subtraction can be negative; Python's <code>gcd</code> handles that. A GCD of 1 or <code>n</code> would mean this response did not isolate one prime, and I would go back to the transcript or collect another sample.</p>
+<h3>5.3 Private Key Reconstruction</h3>
+<p>I divided <code>n</code> by the factor, checked <code>p*q == n</code>, and computed <code>d</code> from <code>phi(n)</code>. Those consistency checks matter because a malformed parse could also lead to an invalid but unhelpful signature.</p>
+<h3>5.4 Decryption</h3>
+<p>I applied <code>pow(ciphertext, d, n)</code> and converted the integer to bytes. The solve notes report a valid flag string. That result supports the factor recovery, though no exact ciphertext or grading receipt was retained for independent confirmation here.</p>
+<h3>5.5 Why Validation Would Have Prevented This</h3>
+<p>The signing service should check the raw RSA representative before returning a CRT output:</p>
+<pre><code class="language-python">if pow(signature, e, n) != encoded_representative:
+    log_fault_without_key_or_message()
+    raise CryptoFaultDetected(&quot;signature withheld&quot;)
+return signature
+</code></pre>
+<p>For RSA-PSS, <code>encoded_representative</code> is the encoded block produced by the scheme; comparing directly with the original message integer would be wrong. The service must use a vetted library and reject before response serialization. An <code>assert</code> is not a reliable production guard because optimized Python can remove assertions. The linked <a href="artifacts/rsa_fault_lab.py">lab</a> demonstrates an explicit exception blocking the toy fault before it escapes.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<h3>6.1 What the Exercise Validated</h3>
+<p>The small probes were cheap, and checking them was cheaper. I could have chased the signing-as-decryption route because the service shape suggested it. Instead, the invariant turned one unexpected reply into a testable hypothesis. The GCD and recovered plaintext supplied the follow-through. I want that order in future work: capture the output, run the public checks on every sample, then choose the attack path.</p>
+<h3>6.2 What the Exercise Surfaced</h3>
+<p>I initially gave the bad reply too little weight and spent time thinking about transport errors. The missing <code>netcat</code> also cost time until I switched to Python sockets. Both were local workflow issues, unrelated to RSA. My receive loop had loose time and byte bounds; the client sketch above makes those limits explicit.</p>
+<h3>6.3 Transferable Principles</h3>
+<table>
+<thead>
+<tr>
+<th>What happened here</th>
+<th>What I would carry forward</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Two signatures checked and one failed</td>
+<td>Check every returned object against an independent invariant</td>
+</tr>
+<tr>
+<td>A single bad output yielded a factor</td>
+<td>Treat a cryptographic self-check failure as a key-exposure event</td>
+</tr>
+<tr>
+<td>A direct-decryption idea was prepared but unused</td>
+<td>Keep alternate hypotheses labeled as alternatives</td>
+</tr>
+<tr>
+<td>Python replaced a missing command-line client</td>
+<td>Carry a small bounded transport probe for authorized testing</td>
+</tr>
+<tr>
+<td>A toy guard blocks the fault before return</td>
+<td>Place validation at the trusted signing boundary</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<h3>7.1 Individual Practitioner Skill Development</h3>
+<p>The useful skill here was recognizing an implementation failure in a sound mathematical primitive. It sits beside padding-oracle work and side-channel analysis, but this case specifically needed a one-sided CRT fault and an unguarded response. The method does not imply that ordinary RSA moduli can be factored from any invalid signature.</p>
+<h3>7.2 Security Operations (SOC, IR, Threat Hunting)</h3>
+<p>The highest-value operational signal would be an internal output-validation failure. The signer should withhold the result, log a key identifier and fault event, and alert the key owner. If a faulted signature may have left the service, responders should assume that key could be recoverable, contain signing operations, rotate or revoke it, and review issued artifacts and downstream trust. The exact response depends on whether the key signed software, certificates, tokens, or something else.</p>
+<p>Low-variance small-message traffic is a weaker hunt lead. The challenge used only three probes, and normal health checks can look the same. Connection logs cannot tell whether the RSA representatives were small after TLS. Application logs need to record a safe length or class, client identity, and fault outcome; they should not log private key material or full sensitive messages.</p>
+<h3>7.3 Intelligence Operations</h3>
+<p>If a real signing key were compromised, its public key fingerprint could help scope certificates, signed binaries, or issued tokens that rely on it. That is a conditional correlation task. No actor, campaign, certificate, or key fingerprint was provided in this exercise, so there is no campaign attribution or shareable case IOC.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<h3>8.1 RSA Oracle Triage Decision Tree</h3>
+<p>My triage path is short: record <code>n</code> and <code>e</code>; identify the signature encoding; collect a few authorized test responses; verify each with the correct scheme; and, for a raw-RSA failure, test whether <code>gcd(s^e-m,n)</code> is nontrivial. If all raw checks pass, the direct-decryption and blinding ideas are separate questions about what the interface accepts. If the service returns <code>(r,s)</code> pairs instead of RSA integers, move to the signature scheme actually in use rather than applying RSA arithmetic. The original decision tree also mentioned repeated ECDSA <code>r</code>; that is an adjacent nonce-reuse check, not part of this solve.</p>
+<h3>8.2 RSA Analysis Primitives (Abstracted)</h3>
+<p>The <a href="artifacts/rsa_fault_lab.py">toy fault lab</a> contains the reusable arithmetic in runnable form: public verification, <code>gcd</code> factor recovery, <code>d</code> reconstruction, synthetic decryption, and explicit pre-return blocking. Its fixed primes are deliberately tiny. The <a href="artifacts/test_pocs.py">tests</a> check that a valid signature does not yield a factor and that the guard rejects a corrupted CRT result. Those functions illustrate the failure mode; they are not cryptographic library code for an application.</p>
+<h3>8.3 Oracle Engagement Checklist</h3>
+<p>Before I trust a conclusion, I want the banner and key recorded, the response parser checked against the exact protocol, each submitted message paired with its returned signature, and every public invariant result saved. I also want to note authentication and rate limits, which path I actually used, and whether a challenge answer was accepted. If I move to a live service outside a CTF, the test scope and rate are part of the engagement plan. This record supports the factor route and a decrypted flag string; it does not contain the original service transcript.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<h3>9.1 MITRE ATT&amp;CK</h3>
+<p>I considered T1190, T1552.004, T1600/T1600.001, and T1606.001/.002. <a href="https://attack.mitre.org/techniques/T1190/">T1190 Exploit Public-Facing Application</a> is a plausible analogue if a public signing service had this defect. <a href="https://attack.mitre.org/techniques/T1552/004/">T1552.004 Private Keys</a> describes finding exposed key material, whereas this key was calculated from a faulty operation. <a href="https://attack.mitre.org/techniques/T1600/001/">T1600.001 Reduce Key Space</a> concerns weakening encryption on network devices; nobody changed a network device here. T1606's web-cookie and SAML-token subtechniques are possible downstream uses only if the recovered key serves those systems. None is observed in the challenge.</p>
+<h3>9.2 MITRE D3FEND</h3>
+<p>The defender actions are clear even where a taxonomy ID adds little: restrict who can call the signer, verify each cryptographic result before release, audit faults, and scope the key's use if a fault occurs. I considered certificate analysis, credential verification, inbound session volume analysis, network isolation, and remote authentication protocol analysis. Certificate review and session analysis would be conditional on a deployed service. I do not label a local toy guard as a validated D3FEND control.</p>
+<h3>9.3 MITRE CAPEC</h3>
+<p><a href="https://capec.mitre.org/data/definitions/97.html">CAPEC-97 Cryptanalysis</a> is a broad match for recovering secret material from a flawed construction. I also considered CAPEC-463 Padding Oracle and CAPEC-624 Hardware Fault Injection. No padding oracle or physical injection was observed, so those are adjacent techniques only. <a href="https://capec.mitre.org/data/definitions/475.html">CAPEC-475 Signature Spoofing by Improper Validation</a> concerns a verifier accepting a spoofed signature; this case concerns a signer releasing its faulty output. I would not treat it as a direct parent of the failure. STRIDE can still frame the design risk as information disclosure during review; OWASP's web-app categories add little to this raw-TCP case.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<h3>10.1 STIX 2.1 Representation</h3>
+<p>I sketched STIX attack-pattern, indicator, and course-of-action objects during analysis. The indicator idea used a challenge port and an unsupported payload-count property; neither is a portable observation of CRT failure. There is no actual IOC to exchange, and no TAXII collection was used. If an organization sees a real leaked signature, it can share an incident record or a validated analytic with its own schema. An illustrative attack-pattern description might explain the method, but it must not imply an actor or observed campaign.</p>
+<h3>10.2 CIS Controls v8</h3>
+<p>The useful <a href="https://cas8.docs.cisecurity.org/en/latest/source/Controls16/">CIS 16.11</a> connection is to use vetted cryptographic components. I also considered safeguards for data at rest and in transit, configuration, alerting, and network-flow collection. Those are deployment-dependent supporting controls; none substitutes for checking the RSA-CRT output before return. I would first establish the actual key role and application architecture, then map the supporting controls to that environment.</p>
+<h3>10.3 STIG Reference</h3>
+<p>I considered platform and application STIG identifiers and a FIPS 140-3 module requirement. This challenge has no declared government system, CUI boundary, operating system baseline, or validated module identity. I cannot turn those references into a compliance finding here. For a real deployment, I would check the current applicable STIG release and the exact module, version, operating environment, and approved mode before making a FIPS claim. A certificate page fetched by a CI script does not prove that the deployed signer uses that validated configuration.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>11.1 Standards Mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Reference</th>
+<th>Case-specific use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NIST SP 800-53 SC-12, SC-13</td>
+<td>Manage signing keys and select a vetted cryptographic implementation.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 SC-17</td>
+<td>Relevant if this key participates in a certificate infrastructure; none is shown.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 SI-10, SI-7</td>
+<td>Validate allowed inputs and the integrity of returned cryptographic results; distinguish input checks from output fault checks.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 AU-6</td>
+<td>Review and alert on signing fault events without logging secrets.</td>
+</tr>
+<tr>
+<td>NIST SP 800-57 / SP 800-131A</td>
+<td>Guide key lifecycle and algorithm choices for an actual system.</td>
+</tr>
+<tr>
+<td>CIS 16.11</td>
+<td>Use a vetted signing component rather than private RSA-CRT code.</td>
+</tr>
+<tr>
+<td>CMMC SC.L2-3.13.11</td>
+<td>Conditional on an actual CUI/CMMC scope; the CTF provides none.</td>
+</tr>
+</tbody>
+</table>
+<h3>11.2 Mitigation Realization</h3>
+<h4>SC-13 / SI-10 - Cryptographic Output Validation</h4>
+<p>The root fix is an explicit check inside the signer, before any bytes leave it. On failure, discard the result and record a fault event. The <a href="artifacts/rsa_fault_lab.py">toy lab</a> demonstrates that blocking point. A real service should use its cryptographic library's scheme-aware verification and fault handling rather than copy the toy CRT implementation into production.</p>
+<h4>SC-12 / SC-17 - Key Management and Separation</h4>
+<p>I would keep signing and encryption keys separate, with permitted operations enforced by the key store. That removes the extra consequence this puzzle gives the attacker: factoring the signing key also decrypts the challenge ciphertext. A production policy needs ownership, rotation, access review, and an incident path for a suspected leak. A sample policy using 3072-bit keys and annual rotation would need review against the actual system and current requirements.</p>
+<h4>SI-7 - Integrity Verification</h4>
+<p>Dependency and module provenance matter. A CI check that only searches a configuration file for a CMVP ID and a webpage for "Active" would not establish the module binary, version, platform, and approved mode actually deployed. I would verify those against the vendor and <a href="https://csrc.nist.gov/projects/cryptographic-module-validation-program/validated-modules">NIST CMVP</a> evidence during procurement and release review. I would still test the application's rejection of a faulted result; module status alone does not prove this application boundary works.</p>
+<h4>AU-6 - Detection via SIEM</h4>
+<p>The <a href="artifacts/signing_audit.py">signing audit detector</a> and <a href="artifacts/signing_fault.yml">Sigma seed</a> use an application-emitted <code>fault_validation_failed</code> event. That event is the best alert candidate. Three small-message requests within ten minutes generate a weaker review lead. The original network-only threshold of more than 50 connections would not have caught the three-probe solve.</p>
+<h4>CMMC SC.L2-3.13.11 - FIPS-Validated Cryptography</h4>
+<p>If a real system has a CMMC obligation, the owner would document the applicable boundary and verify its module evidence and configuration. No certification or CMMC control satisfaction is established by this exercise, the local code, or a public certificate listing.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<h3>12.1 Detection Data Sources</h3>
+<p>I considered Zeek <code>conn.log</code>, TLS certificate logs, Sysmon network events, Windows object access, Linux auditd, HSM operation logs, application logs, and PKI issuance logs. They serve different questions. Connection logs can show a client reached a signer, but cannot see small raw messages or invalid signatures inside TLS. Application or HSM telemetry can expose validation failures and operation counts. Host and PKI records can help scope key use after an alert. Windows EID 4662 is not a generic private-key read detector without the right audited object and provider.</p>
+<p>The linked <a href="artifacts/README.md">audit guide</a> defines the synthetic fields: timestamp, client ID, key ID, event kind, and message bit length. It deliberately excludes raw requests and signatures. The case itself supplied no such production logs.</p>
+<h3>12.2 Sigma Rule - Signing Service Enumeration</h3>
+<p>An early Sigma sketch assumed more than 20 tiny messages, although this solve used three, and its aggregation syntax needed work. The <a href="artifacts/signing_audit.py">tested local event-stream check</a> uses three <code>message_bits &lt;= 3</code> requests from one client/key inside ten minutes as a lead. Its benign health-check fixture produces the same lead, so it should never be treated as a stand-alone exploit verdict. The test suite shows a near miss outside the window produces none.</p>
+<h3>12.3 YARA Rule - Identifying Fault Exploit Tooling</h3>
+<p>I considered a YARA rule matching strings such as <code>from math import gcd</code>, a <code>gcd(pow(...)-m,n)</code> expression, and an RSA decryption call. That could identify an analyst's toy script as readily as adversarial tooling. It offers little help for a service leaking faulty signatures, and I did not validate it against a file set. The operational artifact targets the signer's fault event.</p>
+<h3>12.4 SIEM Query - Splunk SPL</h3>
+<p>My first SPL idea grouped Zeek flows by the challenge port, counted connections, and treated <code>orig_bytes</code> as payload variance. Connection byte counts do not tell us which representatives were signed, and the three observed probes fall below that threshold. For a real Splunk deployment I would ingest the application event and query <code>kind=fault_validation_failed</code> by <code>key_id</code>, <code>client_id</code>, and time. The log schema must be mapped before writing a production SPL expression; none is available here.</p>
+<h3>12.5 SIEM Query - Microsoft Sentinel (KQL)</h3>
+<p>I had also sketched a KQL query using <code>CommonSecurityLog</code> and <code>RequestClientApplication</code> as a stand-in for payload variance. That field does not measure RSA message diversity. In Sentinel I would first map the signer's own event to a custom table, then alert on validation failures and use small-message frequency only for context. No Sentinel table or backend conversion was available to test this query.</p>
+<h3>12.6 Detection Engineering Notes</h3>
+<p>The <a href="artifacts/test_pocs.py">local tests</a> cover a positive sequence, a benign health check, a near miss, a valid-signature negative, and a fault that the signer blocks. The <a href="artifacts/signing_fault.yml">Sigma rule</a> is YAML-parsed but has no backend conversion or live telemetry test. The synthetic event detector is local logic, not production accuracy. TLS hides message content from a passive network sensor, and many legitimate tests use small representatives. The alert worth engineering first is a signer-side output failure, followed by key containment and exposure review.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">analysis flow</a> shows the three-probe pivot, GCD, key reconstruction, and guard test. The defensive cross-section is:</p>
+<table>
+<thead>
+<tr>
+<th>Failure or risk</th>
+<th>Control</th>
+<th>Observable artifact</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Raw signing/decryption under one key</td>
+<td>Separate keys and vetted schemes</td>
+<td>Key-usage policy and implementation review</td>
+</tr>
+<tr>
+<td>Faulty CRT output leaves the service</td>
+<td>Scheme-aware pre-return verification</td>
+<td><code>fault_validation_failed</code> application event</td>
+</tr>
+<tr>
+<td>Public signing endpoint accepts anonymous probes</td>
+<td>Authentication, rate limits, and client review</td>
+<td>Client/key request audit</td>
+</tr>
+<tr>
+<td>A key may already be exposed</td>
+<td>Rotation, revocation, issued-artifact review</td>
+<td>Incident timeline and key-use inventory</td>
+</tr>
+</tbody>
+</table>
+<p>My first layered diagram placed T1600.001, T1552.004, and CAPEC-475 at the threat layer. Section 9 explains why those IDs are not exact matches. The control and detection relationships above keep the useful design lesson without converting loose analogies into observed techniques.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li>Boneh, DeMillo, and Lipton, "On the Importance of Checking Cryptographic Protocols for Faults," EUROCRYPT 1997; Lenstra, "Memo on RSA Signature Generation in the Presence of Faults," 1996.</li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc8017">RFC 8017, PKCS #1: RSA Cryptography Specifications Version 2.2</a>.</li>
+<li><a href="https://csrc.nist.gov/pubs/fips/186-5/final">NIST FIPS 186-5, Digital Signature Standard</a>, <a href="https://csrc.nist.gov/pubs/fips/140-3/final">FIPS 140-3</a>, and <a href="https://csrc.nist.gov/projects/cryptographic-module-validation-program/validated-modules">CMVP validated modules</a>.</li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5</a>, <a href="https://csrc.nist.gov/pubs/sp/800/57/pt1/r5/final">SP 800-57 Part 1 Rev. 5</a>, and <a href="https://csrc.nist.gov/pubs/sp/800/131/a/r2/final">SP 800-131A Rev. 2</a>.</li>
+<li><a href="https://cas8.docs.cisecurity.org/en/latest/source/Controls16/">CIS Controls v8 Safeguard 16.11</a>.</li>
+<li><a href="https://attack.mitre.org/techniques/T1190/">MITRE ATT&amp;CK T1190</a>, <a href="https://attack.mitre.org/techniques/T1552/004/">T1552.004</a>, <a href="https://attack.mitre.org/techniques/T1600/001/">T1600.001</a>, and <a href="https://attack.mitre.org/techniques/T1606/">T1606</a> for the qualified mappings in Section 9.</li>
+<li><a href="https://capec.mitre.org/data/definitions/97.html">MITRE CAPEC-97</a>, <a href="https://capec.mitre.org/data/definitions/463.html">CAPEC-463</a>, <a href="https://capec.mitre.org/data/definitions/475.html">CAPEC-475</a>, and <a href="https://capec.mitre.org/data/definitions/624.html">CAPEC-624</a>.</li>
+<li><a href="https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html">OASIS STIX 2.1 specification</a> for the qualified discussion in Section 10.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
