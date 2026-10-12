@@ -1,0 +1,11 @@
+{
+  "protected_tracks": [
+    {
+      "sac": 10,
+      "sic": 1,
+      "track_number": 256,
+      "expected_mode_s": "A1B2C3",
+      "allowed_peers": ["synthetic-radar-a"]
+    }
+  ]
+}

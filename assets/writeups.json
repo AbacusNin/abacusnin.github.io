@@ -519,5 +519,27 @@
     ],
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/crypto/gl2-affine-crib/"
+  },
+  {
+    "title": "The Plot That Became a Protected Track",
+    "category": "Forensics",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "ASTERIX CAT048",
+      "track-correlation abuse",
+      "data-origin authentication",
+      "spoofing",
+      "sensor-fusion integrity",
+      "protocol forging"
+    ],
+    "summary": "I used a known CAT048 record shape and a protected track's correlation key to make an unauthenticated radar plot change the scope's latest-track decision.",
+    "aliases": [
+      "radar feed",
+      "protected track",
+      "Mode-S address"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/forensics/cat048-track-spoofing/"
   }
 ]

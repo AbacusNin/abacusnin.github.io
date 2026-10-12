@@ -1,0 +1,4 @@
+{"event_id":"benign","sac":10,"sic":1,"track_number":256,"mode_s":"A1B2C3","classification":"normal","authenticated_peer":"synthetic-radar-a"}
+{"event_id":"unauthorized-peer","sac":10,"sic":1,"track_number":256,"mode_s":"0BADFF","classification":"spoof","authenticated_peer":"synthetic-radar-b"}
+{"event_id":"near-miss-tuple","sac":10,"sic":2,"track_number":256,"mode_s":"0BADFF","classification":"spoof","authenticated_peer":"synthetic-radar-b"}
+{"event_id":"source-gap","sac":10,"sic":1,"track_number":256,"mode_s":"A1B2C3","classification":"normal","authenticated_peer":null}
