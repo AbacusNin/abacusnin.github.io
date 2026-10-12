@@ -1,0 +1,13 @@
+# Embedded BPF object inventory
+
+`embedded_bpf_inventory.py` is an offline defensive proof of concept. It examines an ELF64 little-endian host file, finds structurally valid embedded ELF objects with `EM_BPF`, reports their section names and minimum file lengths, and marks a review lead when an embedded object has a `raw_syscalls/sys_enter` or `sys_exit` tracepoint section. It never executes the host, loads BPF, reads kernel state, or reconstructs a secret.
+
+Run `python -B embedded_bpf_inventory.py host_binary`. Add a reviewed, exact host digest with `--allow-sha256 HEX` to suppress a known approved file. Run `python -B -m unittest test_embedded_bpf_inventory.py` for synthetic positive, benign, wrong-architecture, approved-hash, and truncated-header checks. The tests write an invented ELF in this folder and remove it after each case.
+
+**Input and output:** a local host ELF from an endpoint or repository artifact inventory. `host_sha256` is the file digest; `embedded_bpf_objects[].file_offset` is the secondary ELF magic offset; `minimum_elf_bytes` ends at the last declared section or section table; `rodata_bytes` and `tracepoint_sections` come from validated section headers. `review_lead` means an unapproved file contains a syscall-tracepoint BPF object. It does not mean maliciousness. The consumer must map local file paths, host identity, signature/provenance, and authorized observability software. The `event_type` field allows the companion [Sigma rule](embedded_bpf_inventory.sigma.yml) to select this normalized JSON event after ingestion.
+
+The parser caps input at 32 MiB, considers at most 128 ELF magic candidates and 128 sections per object, and rejects malformed section ranges. It supports only ELF64 little-endian files with a section table. A stripped or packed object with no section names can evade this approach. Many legitimate libbpf loaders embed their BPF object. Use a local allowlist and investigation context rather than treating a structural hit as an IOC.
+
+**Validation:** synthetic tests passed and the private case binary produced one embedded BPF syscall-tracepoint object with an 800-byte rodata section. The Sigma rule parsed with pySigma, but no backend conversion, EDR integration, fleet inventory, or production precision test was run. The tool is a static file reviewer and does not measure BPF load/attach events.
+
+`stix-behavior-example.json` is an illustrative STIX 2.1 attack-pattern, course-of-action, and relationship bundle. It makes no malware or actor attribution. JSON syntax and local object references were checked; full STIX schema validation and TAXII exchange were not performed.
