@@ -450,5 +450,27 @@
     ],
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/osint/commons-portrait-provenance/"
+  },
+  {
+    "title": "The Slashes That Looked Like Morse",
+    "category": "Crypto",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "homophonic substitution",
+      "monoalphabetic cryptogram",
+      "Morse red herring",
+      "frequency analysis",
+      "pattern cribbing",
+      "classical cryptography"
+    ],
+    "summary": "I started with Morse and binary, then treated each slash token as a cipher symbol. That cracked most of a homophonic cryptogram, but the prompt had to settle one ambiguous word.",
+    "aliases": [
+      "two-symbol cipher",
+      "slash and backslash cryptogram",
+      "Morse decoy"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/crypto/two-symbol-cryptogram/"
   }
 ]

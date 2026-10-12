@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Slashes That Looked Like Morse - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="I started with Morse and binary, then treated each slash token as a cipher symbol. That cracked most of a homophonic cryptogram, but the prompt had to settle one ambiguous word.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/two-symbol-cryptogram/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Slashes That Looked Like Morse">
+  <meta property="og:description" content="I started with Morse and binary, then treated each slash token as a cipher symbol. That cracked most of a homophonic cryptogram, but the prompt had to settle one ambiguous word.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/two-symbol-cryptogram/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Crypto / <span aria-current="page">The Slashes That Looked Like Morse</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Slashes That Looked Like Morse</h1>
+        <p class="lead">The file looked eager to be read as Morse. The slashes were only pretending to be dots and dashes.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Decode a short slash-and-backslash message and submit its lowercase phrase in the event&#x27;s flag wrapper.</p>
+<p><strong>What I did.</strong> I checked the bytes, tried Morse in both directions and several binary readings, then used repeated tokens and a thematic crib to recover the phrase.</p>
+<p><strong>The result.</strong> My case record reports a rejected dictionary fill followed by an accepted answer selected with the prompt&#x27;s theme.</p>
+<p><strong>The limit.</strong> The exact ciphertext, recovered phrase, flag, and submission transcript are withheld, so I cannot independently replay the case result.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Input; First read; Pivot; Crib; Gap; Prompt">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Input</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Slash tokens, one to four marks each</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">First read</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Morse and binary checks fail</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Pivot</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Treat each token as one cipher symbol</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Crib</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Use repeats and shared tokens</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Gap</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Several middle-word fills remain</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Prompt</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Theme selects the reported answer</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Cryptography</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>homophonic substitution, monoalphabetic cryptogram, Morse red herring, frequency analysis, pattern cribbing, classical cryptography</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved</td>
+</tr>
+<tr>
+<td>Challenge</td>
+<td>500-point collegiate CTF, short text file and a pop-culture-themed prompt</td>
+</tr>
+<tr>
+<td>Goal</td>
+<td>Submit the decoded lowercase phrase without spaces inside the event's flag wrapper</td>
+</tr>
+<tr>
+<td>Reported result</td>
+<td>First dictionary guess rejected; theme-guided answer accepted</td>
+</tr>
+<tr>
+<td>Evidence limit</td>
+<td>Exact ciphertext and platform transcript are not available here for replay</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proof of concept for inspecting a two-symbol message: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/crypto/two-symbol-cryptogram/artifacts">browse the tool, guide, and synthetic tests on GitHub</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I had a short text file for a 500-point collegiate cryptography challenge. It contained forward slashes, backslashes, and spaces. Each space-delimited token held one to four marks. The prompt gave me a pop-culture theme, and the task was to return a short lowercase English phrase in the event's flag wrapper, with no spaces inside the phrase.</p>
+<p>That tiny alphabet made the file look like Morse. It was a good first guess, and it was wrong. This was a static puzzle with no attacker, victim, host, or network traffic. The operational discussion later in this page concerns methods someone could adapt to analyzing opaque messages; it does not describe an incident in the challenge.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I inspected the file as bytes before I tried to read it. That established the two marks, the single-space token separators, a fixed number of tokens, and lengths from one through four. I have not retained the actual byte count or token count in this public record, so I cannot put numbers on them now.</p>
+<p>I tried <code>/</code> as dot and <code>\</code> as dash, then reversed them. Both Morse readings produced invalid letter groups and output that did not read as English. I also tried treating the marks as bits: different group widths and offsets, reversed bit order, and a single-byte XOR sweep. None of those tested readings produced the expected phrase. A stream's length missing a clean byte boundary is a clue, but it cannot alone rule out binary; padding and offsets exist.</p>
+<p>The spaces finally became useful when I stopped treating each mark as a bit. I treated each entire token as one cipher symbol and assigned stable abstract IDs in order of appearance. Repeated tokens now stood out. A long opening word suggested a thematic crib; that assignment propagated through tokens shared with a short word and the ending. The record says this recovered most of the phrase.</p>
+<p>The middle word was the snag. Some of its tokens were local to that region, leaving multiple fills compatible with the recovered mapping. I picked one by dictionary fit and submitted it. The platform rejected it. I went back to the prompt, used its theme to choose another compatible word, and the case record reports that submission was accepted. Those submission results are reported observations; the transcript and exact candidate strings are not available for an independent check.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>The original solve used byte inspection, two Morse polarities, binary trial readings, an abstract token pattern, a dictionary search, and candidate consistency checks. The source describes using an English word list and <code>wordfreq</code> for candidate analysis but does not retain a command, ranking output, or version for those steps. I can describe their role without claiming a reproducible score.</p>
+<p>For an authorized copy of a similar file, I would start with the same simple checks:</p>
+<pre><code class="language-sh">wc -c cipher.txt
+od -c cipher.txt
+</code></pre>
+<p>I made a <a href="artifacts/two_symbol_audit.py">standalone two-symbol analyzer</a> for that first pass. It accepts a slash-and-backslash file, validates the token format, prints a stable numeric token pattern, and tries Morse with either mark as the dot. An optional candidate check enforces <strong>one token to one letter</strong> across the whole message and rejects wrong lengths. Optional, analyst-supplied word lengths identify tokens confined to one proposed word segment. The <a href="artifacts/README.md">usage guide</a> explains the commands and the <a href="artifacts/test_two_symbol_audit.py">synthetic tests</a> check the behavior. These new files have only been run against invented inputs; they do not recover the withheld challenge phrase.</p>
+<p>One correction matters here. Mapping distinct tokens to distinct temporary IDs shows the <strong>ciphertext's repeated-token positions</strong>. It does not give me a complete plaintext letter pattern in a homophonic cipher. Two different tokens can represent the same letter. I therefore test a candidate in the token-to-letter direction and allow several tokens to map to one letter. A <code>zip</code>-based check also needs an explicit length check, since <code>zip</code> silently stops at the shorter input.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>Morse uses dots and dashes, so two marks in groups of one to four invite that reading. I compared both mark assignments with the <a href="https://www.itu.int/rec/R-REC-M.1677-1-200910-I/">ITU-R international Morse table</a>. An invalid A-Z group defeats a strict letter-by-letter Morse interpretation. Non-English output is weaker evidence by itself; the assignment or spacing could still be wrong. A binary interpretation also needs a chosen bit order, grouping, alignment, and possibly padding. The attempted settings failed here, but that is narrower than a proof against every binary encoding.</p>
+<p>In a simple monoalphabetic substitution, one plaintext letter has one cipher symbol. A homophonic substitution can use several cipher symbols for the same plaintext letter, which spreads out the counts that ordinary frequency analysis uses. The repeated-token scaffold remains visible: identical tokens must decode consistently, and a token shared by two positions links those positions. Distinct tokens need not decode to distinct letters.</p>
+<p>Here is an invented example, separate from the challenge data. The word <code>banana</code> could be written with <code>b</code> as <code>/\</code>, <code>n</code> as <code>/\\</code>, and the three <code>a</code> positions alternating between <code>//</code> and <code>\\</code>:</p>
+<pre><code class="language-text">plaintext: b   a   n    a   n    a
+tokens:    /\  //  /\\   \\  /\\   //
+</code></pre>
+<p>The example is deliberately small. It shows why counting distinct tokens as distinct plaintext letters can mislead me, while the repeated <code>/\\</code> token still links the two <code>n</code> positions.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>The spaces marked token boundaries, so I could inventory complete symbols without guessing a fixed number of marks per character. I reduced each distinct token to a stable numeric ID and looked at where the same ID recurred. I also used the prompt's theme to test a long opening-word crib. The record reports that its token assignments were compatible with other positions and helped fix a short word and the ending.</p>
+<p>The interior word did not become unique from that propagation. The source calls its symbols local to the word and also says some letters were fixed through shared symbols. Those statements cannot both be literally true for every token in that word. The defensible reading is that <strong>some</strong> positions had shared-token constraints while other positions remained local. Its reported second/fifth-letter repeat narrowed the shape, but the public record does not include the ciphertext or a complete segmentation to verify that exact position. I would need the token stream and word boundaries before claiming a unique pattern match.</p>
+<p>My first fill passed the internal consistency check but failed on the platform. That failure separated a valid substitution from the intended answer. The pop-culture hint supplied the missing choice, and the case record says the next submission was accepted. A consistency check is necessary, not sufficient: it detects a token mapped to two different letters, but it cannot tell me that only one English phrase or themed answer fits.</p>
+<p>The mechanism exploited by the solve was leakage of token repetition and cross-position constraints. Homophones can flatten frequency, yet a short message with stable token values and a strong crib can still reveal a frame. I cannot quantify how much frequency was flattened, or reconstruct the exact mapping, because the token stream is withheld.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned</summary>
+<p>The most useful mistake was the rejected middle word. I had treated a cipher-consistent dictionary fill as if it were the answer. Now I ask whether another fill could satisfy the same token mapping before I submit. If local tokens leave a segment open, I label that uncertainty and look for an external constraint. Here the prompt's flavor text carried that constraint.</p>
+<p>I would also keep the first-pass work in this order: record the actual bytes, test the obvious encodings in both directions, preserve their failed outputs, and only then move to a substitution model. The Morse shape was persuasive enough to waste time if I had not checked it directly. A failed decode should narrow a hypothesis, not vanish from the record.</p>
+<p>The other lesson is about language. A temporary abstract symbol pattern is still useful, but in a homophonic cipher it cannot enforce a one-to-one relationship between distinct tokens and letters. I need to propagate the constraints I really have, then ask what remains unresolved.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Operational Extrapolation</summary>
+<h3>Individual Practitioner Development</h3>
+<p>This exercise gave me practice separating an attractive encoding guess from a tested one. I also got a useful confidence habit out of the wrong submission: report a candidate as consistent, ambiguous, or externally confirmed, depending on the evidence. I can use the <a href="artifacts/two_symbol_audit.py">analyzer</a> on another permitted sample to inventory symbols and spot local tokens before I try a themed fill. Its synthetic tests are a starting check, not proof that it solves arbitrary homophonic ciphers.</p>
+<h3>Security Operations</h3>
+<p>The challenge supplied no application, endpoint, or network telemetry. I have no event fields from which to build a credible KQL, SPL, or Sigma alert, and there was no observed attack to hunt. In an authorized investigation of an opaque message embedded in logs, an analyst could extract the message and run the same offline triage as an <strong>analysis aid</strong>. That would require a real sensor, preserved message bytes, a lawful collection scope, and separate evidence linking the message to a security event. The tool does not monitor a system or decide whether content is malicious.</p>
+<h3>Intelligence Operations</h3>
+<p>An intelligence analyst might encounter short symbolic text in a seized document or open source. This method would help test whether it behaves like a tokenized substitution. The result would still need source provenance, context, and alternate readings. This challenge contains no collection operation, source attribution, or signal that supports a real-world intelligence finding.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The <a href="artifacts/two_symbol_audit.py">two-symbol analyzer</a> is the reusable proof of concept. It reads a bounded UTF-8 file containing only <code>/</code>, <code>\</code>, and single-space separators. It reports token counts, a stable ID sequence, Morse outputs under both polarities, and optional candidate-consistency findings. When I supply proposed word lengths, it also reports which token IDs occur only within each proposed segment. The boundaries come from the analyst, since the token separators alone do not identify words.</p>
+<p>The <a href="artifacts/README.md">README</a> records inputs, output fields, limits, and commands. The <a href="artifacts/sample_stream.txt">invented sample stream</a> shows the input shape. The <a href="artifacts/test_two_symbol_audit.py">synthetic test suite</a> covers a compatible homophonic candidate, ordinary Morse, a wrong-length candidate, a conflicting token assignment, malformed input, and a local-token near miss. The local tests check the program's logic. They do not verify the original solve, dictionary uniqueness, production telemetry, or any SIEM conversion.</p>
+<p>My working checklist for a new case is: inventory bytes and token lengths; try both Morse polarities; document the binary groupings actually attempted; assign stable token IDs; test cribs with one-way token consistency; mark positions that lack cross-message constraints; enumerate plausible fills; use the prompt or another independent source to settle the remaining choice; and distinguish a reported platform result from an independently replayed one.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Applicability and Mapping</summary>
+<p>I checked for an ATT&amp;CK technique before making a mapping. This challenge showed a static cryptogram, no adversary operation, and no target. It therefore supplies no observed ATT&amp;CK behavior. CAPEC, D3FEND, STRIDE, OWASP, and CWE also need an attack pattern, defensive mechanism, system, or software weakness that this puzzle did not provide. The classical-cryptography label describes the method without making a framework finding.</p>
+<p>In a separate operational case, decoding an encoded message could be one step in analyzing an intrusion. I would map the <strong>observed intrusion behavior</strong> from that case, with its own evidence, rather than map this puzzle's use of slashes to a technique ID. I have no such behavior here.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intelligence and Standards Integration</summary>
+<p>The file contains no infrastructure, malware, account, hash, or victim indicator. I cannot make a STIX indicator or TAXII exchange out of the flag phrase. The ITU-R Morse recommendation helps me test the decoy, but says nothing about a threat campaign.</p>
+<p>If a real case yielded a decoded message, I would keep the original bytes, extraction location, collection time, exact transform, alternative decodes, and confidence together. A derived phrase without that chain can be mistaken for a confirmed actor statement. Nothing in this challenge authorizes a claim about an actor or campaign.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<p>No protected system or control failed in this exercise. There is no basis for a NIST SP 800-53, CIS, STIG, CMMC, or sector-control assessment, and there is no mitigation to claim as deployed. The reusable action is an analyst workflow: preserve the message, test competing encodings, and record uncertainty before using a decoded phrase in a report. That process would need an organization's own evidence-handling rules if used on real data.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>The challenge artifact was the short two-symbol file and its prompt. Neither is an IOC. The rejected guess and reported accepted answer are puzzle outcomes, not production detections. With no event source or malicious behavior, publishing KQL, SPL, Sigma, or YARA here would give a rule an unsupported purpose.</p>
+<p>The <a href="artifacts/two_symbol_audit.py">analyzer</a> is an offline triage tool. A real workflow could save an opaque message from an authorized source, run the analyzer, and attach its JSON output to an investigation record. The useful fields are the original file's provenance, the mark alphabet, token ID pattern, Morse checks, optional segmentation, and any candidate conflicts. A positive-looking pattern would start review; it would not alert on compromise. The <a href="artifacts/test_two_symbol_audit.py">synthetic tests</a> check positive, benign, and near-miss inputs locally, with no measured false-positive rate in live content.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow diagram above</a> keeps the two pivots in view. Morse and binary were reasonable starts but failed in the tested forms. Token repetition gave me a scaffold, and the theme resolved a word the cipher did not uniquely determine. The graphic ends at the reported accepted answer. It does not supply the withheld tokens, exact phrase, or submission proof.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<table>
+<thead>
+<tr>
+<th>Ref</th>
+<th>Source</th>
+<th>Use and limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R1</td>
+<td><a href="https://www.itu.int/rec/R-REC-M.1677-1-200910-I/">ITU-R M.1677-1, International Morse code</a></td>
+<td>Official letter-code reference for the two Morse polarity tests. It does not validate this case's unavailable input.</td>
+</tr>
+<tr>
+<td>R2</td>
+<td><a href="https://github.com/dwyl/english-words">dwyl english-words</a></td>
+<td>Source-listed dictionary for candidate cribbing; the exact query and output are not retained.</td>
+</tr>
+<tr>
+<td>R3</td>
+<td><a href="https://pypi.org/project/wordfreq/">wordfreq on PyPI</a></td>
+<td>Source-listed English frequency aid; no score or run log is retained.</td>
+</tr>
+</tbody>
+</table>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
