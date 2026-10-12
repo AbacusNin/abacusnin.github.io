@@ -1,0 +1,12 @@
+line	address	class	action
+2	192.0.2.17	documentation	do_not_enrich
+3	198.51.100.42	documentation	do_not_enrich
+4	203.0.113.9	documentation	do_not_enrich
+5	198.18.0.25	benchmark	do_not_enrich
+6	10.3.2.1	private	local_context_only
+7	100.64.1.2	shared	local_context_only
+8	169.254.4.5	link_local	local_context_only
+9	8.8.8.8	unclassified	review_before_enrichment
+10	192.0.0.9	unclassified	review_before_enrichment
+11	198.20.0.1	unclassified	review_before_enrichment
+12		invalid	check_source

@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Chat Named the Target - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="I put five Chinese-language chat screenshots in order, checked the IPs before chasing them, and found that the conversation itself named the only target with both a brand and city.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/osint/chat-indicator-validity/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Chat Named the Target">
+  <meta property="og:description" content="I put five Chinese-language chat screenshots in order, checked the IPs before chasing them, and found that the conversation itself named the only target with both a brand and city.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/osint/chat-indicator-validity/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / OSINT / <span aria-current="page">The Chat Named the Target</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Chat Named the Target</h1>
+        <p class="lead">The IP addresses looked like the obvious lead. A quick range check sent me back to the conversation.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Identify the intended next target from five screenshots of a private group chat.</p>
+<p><strong>What I did.</strong> I inventoried the images, checked metadata, reconstructed their timeline, translated the target discussion, and classified every reported IP against its address range.</p>
+<p><strong>The result.</strong> The single entity named with both a brand and a city matched the requested answer format. The case record reports that the submitted answer was accepted.</p>
+<p><strong>The limit.</strong> The screenshots, target, and submission transcript are withheld. The translation and accepted answer cannot be independently reviewed from this public page.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Five images; Timeline; Translation; IP check; Selection; Result">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Five images</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Hash, inventory, and check metadata</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Timeline</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Sort by visible chat timestamps</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Translation</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Read the target discussion</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">IP check</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Classify example and benchmark ranges</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Selection</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Find the one brand and city pair</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Result</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Operator-reported acceptance</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>OSINT (open-source intelligence)</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>OSINT, foreign-language source exploitation, screenshot/image analysis, indicator-validity triage, reserved IPv4 ranges, threat-actor chatter</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved</td>
+</tr>
+<tr>
+<td>Available material</td>
+<td>Five portrait screenshots of a Simplified Chinese group chat</td>
+</tr>
+<tr>
+<td>Goal</td>
+<td>Identify the intended target as a brand and city pair</td>
+</tr>
+<tr>
+<td>Reported result</td>
+<td>A submitted answer in the requested format was accepted</td>
+</tr>
+<tr>
+<td>Verification boundary</td>
+<td>No original screenshots or submission transcript are displayed here</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for indicator intake and translation review: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/osint/chat-indicator-validity/artifacts">browse the offline tools and worksheet on GitHub</a> and <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/osint/chat-indicator-validity/fixtures">their invented test input and expected results</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I had five phone screenshots from a private group chat. An outside account had been added by mistake, captured the conversation, and was removed. The messages were in Simplified Chinese. My job was to name the next intended target as a brand and city pair. I had no host to examine, no credentials, and no live network task.</p>
+<p>The chat described two people discussing tooling from an outside supplier and a script that had supposedly found vulnerable hosts. That made the IP addresses tempting. The exercise still hinged on reading what the speakers said. Their messages showed claimed intent. I had no evidence that anyone scanned or attacked a real organization.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I began by hashing and inventorying the images. All five were portrait screenshots. The EXIF check came up empty, so I had no device or location metadata to work with. I then used the timestamps inside the screenshots. The filenames were out of order; the visible times put the exchange into a conversation of about 27 minutes on one morning. I did not infer a timezone from the pictures.</p>
+<p>I translated the discussion and tracked who named which prospective target. One speaker said an outside supplier had delivered tooling and a script had produced a list of vulnerable IPs. The speakers attached organization stories to those addresses and debated which target to pick. I kept their claims separate from verified ownership of the addresses.</p>
+<p>Before I tried to geolocate any IP, I checked its range. The address set reported in this case fell within the three documentation blocks and the benchmarking block described in Section 4. That ended the IP-to-organization path. I went back to the conversation and asked which candidate met the required brand-plus-city format. One did. The speakers also preferred that target over a larger unnamed alternative.</p>
+<p>The first dead end was EXIF. The more important one was apparent IP attribution. Both were cheap to close, and neither required a lookup against a live third-party service. The exact address list and answer-bearing chat bubbles are withheld here, so the range classification and translation are case-recorded observations rather than independently reproducible results on this page.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>I used file hashing, an image viewer, a metadata check, and Python's <code>ipaddress</code> module. I enlarged the relevant chat bubbles and read the words in the images. I also noted the gap between two screenshots where one speaker's confirmation was missing.</p>
+<p>My image inventory followed this pattern. It recorded each file's hash, dimensions, and EXIF tag count. In the challenge, the five images were portrait-oriented and every EXIF count was zero.</p>
+<pre><code class="language-python">from hashlib import sha256
+from pathlib import Path
+from PIL import Image
+
+for path in sorted(Path(&quot;imgs&quot;).glob(&quot;*.jpg&quot;)):
+    with Image.open(path) as image:
+        print(path.name, sha256(path.read_bytes()).hexdigest(), image.size, len(image.getexif()))
+</code></pre>
+<p>Here is the core of the address test, using invented values from the <a href="fixtures/sample_ips.txt">offline fixture</a>:</p>
+<pre><code class="language-python">from ipaddress import ip_address, ip_network
+
+blocks = [ip_network(cidr) for cidr in (
+    &quot;192.0.2.0/24&quot;, &quot;198.51.100.0/24&quot;, &quot;203.0.113.0/24&quot;, &quot;198.18.0.0/15&quot;
+)]
+print(any(ip_address(&quot;203.0.113.9&quot;) in block for block in blocks))  # True
+</code></pre>
+<p>The linked <a href="artifacts/reserved_ip_filter.py">IPv4 intake filter</a> turns that one-off test into a bounded offline tool. It reads one address per line and labels documentation, benchmark, private, shared, link-local, and loopback values. The <a href="artifacts/README.md">guide</a> defines its input and output. It makes no network requests and does not say an unclassified address is safe, malicious, or currently routed.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>An IP can be syntactically valid and still be useless for identifying a public victim. <a href="https://www.rfc-editor.org/rfc/rfc5737.html">RFC 5737</a> sets aside <code>192.0.2.0/24</code>, <code>198.51.100.0/24</code>, and <code>203.0.113.0/24</code> for examples. <a href="https://www.iana.org/assignments/iana-ipv4-special-registry/">IANA's IPv4 special-purpose registry</a> lists those blocks and <code>198.18.0.0/15</code>, used for benchmarking, as not globally reachable. A geolocation result for one of these example values would not establish the organization named in a chat.</p>
+<p>I do not apply that conclusion to every special-purpose address. The same IANA registry includes globally reachable special-purpose entries, including <code>192.0.0.9</code>. A private address can also matter greatly inside a local network. The category and the source context determine how an analyst should handle a value. My narrow filter marks known examples and benchmark values before public enrichment; it keeps the source record intact.</p>
+<p>The other concept is source order. The screenshots had to be read by their visible timestamps, then translated as a conversation. A cropped image, a missing message, or an ambiguous character can change who a pronoun refers to. The <a href="artifacts/translation_review_template.md">translation review worksheet</a> records the visible wording, timestamp, interpretation, and gap separately for exactly that reason.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>I solved this by analyzing the five screenshots. Roughly a dozen distinct IPs appeared as supposed scan findings. The case record says every extracted address landed in a documentation or benchmark range. Membership in those exact CIDR blocks is a deterministic check once the address has been transcribed correctly. It says nothing about whether the speakers actually ran a scan.</p>
+<p>With those addresses set aside as public attribution leads, I compared the entities the speakers described. An unnamed restaurant, an unnamed hospital, and an unnamed large foreign company could not supply both fields the flag required. One entity had a brand and a city. A later message named that preferred brand, although a confirming message from the other speaker fell between captures. I could still select the single pair that fit the requested shape without inventing the missing bubble.</p>
+<p>The case record reports that the formatted answer was submitted and accepted. I do not print the pair or the screenshots here. Acceptance supports the challenge answer, but it does not turn the invented address attributions into facts about real hosts or verify a real threat actor's intent.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned</summary>
+<p>The quick checks mattered more than a big OSINT search. EXIF gave me nothing. The range test kept me from building a story around example addresses. The useful evidence was the sequence of statements in the chat, and I only saw that sequence after putting the images in time order.</p>
+<p>I would keep two separate notes in a live investigation: what the speaker claimed, and what independent evidence supports. Here, the speakers' target preference was useful for the puzzle. It was not an incident report. The missing screenshot gap also mattered; I marked it instead of smoothing it into a complete conversation.</p>
+<table>
+<thead>
+<tr>
+<th>Exercise observation</th>
+<th>Operational use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Example and benchmark addresses appeared as target leads</td>
+<td>Check IOC validity before public enrichment or attribution</td>
+</tr>
+<tr>
+<td>The chat images were out of order</td>
+<td>Preserve image hashes and reconstruct the source timeline</td>
+</tr>
+<tr>
+<td>One answer-bearing message was missing</td>
+<td>Record the gap and lower confidence in the surrounding interpretation</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Operational Extrapolation</summary>
+<h3>Individual Practitioner Development</h3>
+<p>This case practiced two skills together: reading a foreign-language source and testing whether the technical-looking details deserved attention. A next exercise would add IPv6 and the rest of the IANA special-purpose registry to the intake policy, then have a second reader review the decisive translation. The <a href="artifacts/reserved_ip_filter.py">current filter</a> is deliberately an IPv4 subset.</p>
+<h3>Security Operations</h3>
+<p>A threat-intelligence intake queue could run a range check before it sends IPs to public enrichment or creates block actions. It should retain known documentation and benchmark values as source text and keep them out of external victim or attacker IOC lists. Private and shared addresses need local context. The <a href="artifacts/reserved_ip_filter.py">testable filter</a> demonstrates those decisions with <a href="fixtures/sample_ips.txt">positive, benign, boundary, and invalid examples</a>. It has no live feed connection, SIEM field mapping, or production accuracy claim.</p>
+<h3>Intelligence Operations</h3>
+<p>I would preserve each screenshot, its hash, visible time, language, and any uncertain translation. The <a href="artifacts/translation_review_template.md">review worksheet</a> is a small way to keep source wording apart from the analyst's interpretation. A stated preference can inform an intent assessment. Attribution or warning to a real organization would require independent corroboration. This puzzle supplies none.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The <a href="artifacts/reserved_ip_filter.py">reserved IP filter</a> reads a bounded UTF-8 list of IPv4 values and emits tab-separated line number, normalized address, class, and suggested action. It uses only Python's standard library. The <a href="fixtures/sample_ips.txt">invented list</a> and <a href="fixtures/expected_triage.tsv">expected output</a> show the data contract. The <a href="artifacts/test_reserved_ip_filter.py">four test groups</a> check the documentation and benchmark positives, private and local values, boundary near misses, invalid input, and line limits. The <a href="artifacts/README.md">guide</a> records what an unclassified value does and does not mean.</p>
+<pre><code class="language-sh">python -B artifacts/reserved_ip_filter.py fixtures/sample_ips.txt
+cd artifacts
+python -B -m unittest -v test_reserved_ip_filter.py
+</code></pre>
+<p>The <a href="artifacts/translation_review_template.md">translation review record</a> is the manual companion. It asks for the visible excerpt, literal translation, working interpretation, reviewer, and any image gap. Neither file contains the private chat or a real indicator feed. An intake team would need to connect the tool to its own workflow before using it as a control.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Applicability and Mapping</summary>
+<p>The chat says a script found vulnerable hosts. That claim resembles <a href="https://attack.mitre.org/techniques/T1595/">MITRE ATT&amp;CK T1595, Active Scanning</a> at a narrative level. No scan trace or target system was available, so I cannot mark the technique as observed. The speakers also said an outside supplier delivered tooling. <a href="https://attack.mitre.org/techniques/T1588/">T1588, Obtain Capabilities</a> is a loose narrative fit. The source description does not establish that the item was malware, so the more specific T1588.001 mapping would overstate it.</p>
+<p>The challenge gave no defended system or web application to assess. I did not assign OWASP, STRIDE, D3FEND, or a control identifier to the pictured conversation. My operational proposal is an indicator-intake check, described on its own terms in Sections 11 and 12.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intelligence and Standards Integration</summary>
+<p>I have no real IOC set to package as STIX or distribute by TAXII. Turning the documentation and benchmark examples into STIX Indicators would falsely present them as actionable infrastructure. The exercise supplies no campaign evidence. The useful standard here is the <a href="https://www.iana.org/assignments/iana-ipv4-special-registry/">current IANA special-purpose registry</a> for address classification. It should be checked again when an operational policy is updated.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<p>The screenshots do not show an organization's controls or a system configuration. I cannot rate a NIST, CIS, STIG, or sector-specific requirement from them. I can describe a practical control proposal: at IOC intake, keep the raw source mention, classify the address, and stop known example or benchmark values before external enrichment and automated blocking. Send private or shared values to a local-context review. Log the decision and policy version so an analyst can reverse it.</p>
+<p>The <a href="artifacts/reserved_ip_filter.py">offline filter</a> supplies only the classification step. A real deployment would need a maintained registry, an owner, IPv6 rules, source-field mapping, audit logs, and a way to handle exceptions. None of those were implemented in this challenge.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>The five screenshots contain no endpoint, DNS, firewall, or EDR telemetry from a victim. A Sigma rule, KQL query, or SPL search for an attack would require invented event fields. The defensible analytic is an indicator-quality gate: classify extracted IPs before enrichment, preserve the surrounding text, and queue uncertain cases for review. The <a href="fixtures/sample_ips.txt">fixture</a> exercises example and benchmark positives, ordinary unclassified addresses, <code>192.0.0.9</code> as a special-purpose near miss, and an invalid value. The <a href="fixtures/expected_triage.tsv">expected result</a> makes the decision inspectable.</p>
+<p>The gate has a known limit. Its explicit list stops at common IPv4 categories. An <code>unclassified</code> result is not evidence of routability or maliciousness. Production validation would require a current registry snapshot, real intake schemas, an exception workflow, and tests that prove no analyst evidence is silently discarded. The local tests verify only the script and invented fixture.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow above</a> shows the decision point that changed my path: I checked the address ranges before geolocating, then returned to the translated conversation. The exact screenshots and answer are withheld. The safe <a href="fixtures/sample_ips.txt">invented input</a> and <a href="fixtures/expected_triage.tsv">expected classification</a> let a reader inspect that decision without implying those IPs came from the chat.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://www.iana.org/assignments/iana-ipv4-special-registry/">IANA IPv4 Special-Purpose Address Space</a>: current classification and global-reachability fields in Sections 4, 8, and 12.</li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc5737.html">RFC 5737, IPv4 Address Blocks Reserved for Documentation</a>: TEST-NET-1, TEST-NET-2, and TEST-NET-3 in Sections 4 and 5. This RFC is Informational.</li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc2544.html">RFC 2544, Benchmarking Methodology for Network Interconnect Devices</a>: the benchmarking block in Sections 4 and 5.</li>
+<li><a href="https://attack.mitre.org/techniques/T1595/">MITRE ATT&amp;CK T1595, Active Scanning</a> and <a href="https://attack.mitre.org/techniques/T1588/">T1588, Obtain Capabilities</a>: narrative-only mappings in Section 9.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>

@@ -563,5 +563,27 @@
     ],
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/forensics/drawn-green-lsb/"
+  },
+  {
+    "title": "The Chat Named the Target",
+    "category": "OSINT",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "OSINT",
+      "foreign-language source exploitation",
+      "screenshot/image analysis",
+      "indicator-validity triage",
+      "reserved IPv4 ranges",
+      "threat-actor chatter"
+    ],
+    "summary": "I put five Chinese-language chat screenshots in order, checked the IPs before chasing them, and found that the conversation itself named the only target with both a brand and city.",
+    "aliases": [
+      "Chinese chat translation",
+      "documentation IP addresses",
+      "target selection"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/osint/chat-indicator-validity/"
   }
 ]
