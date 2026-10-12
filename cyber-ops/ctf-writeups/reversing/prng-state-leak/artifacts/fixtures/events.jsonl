@@ -1,0 +1,15 @@
+{"ts":"2026-01-01T12:00:00Z","source_ip":"192.0.2.10","session_id":"case","operation":"getFragment"}
+{"ts":"2026-01-01T12:00:00.100Z","source_ip":"192.0.2.10","session_id":"case","operation":"submitProposal"}
+{"ts":"2026-01-01T12:00:00.200Z","source_ip":"192.0.2.10","session_id":"case","operation":"submitProposal"}
+{"ts":"2026-01-01T12:00:00.300Z","source_ip":"192.0.2.10","session_id":"case","operation":"submitProposal"}
+{"ts":"2026-01-01T12:00:00.400Z","source_ip":"192.0.2.10","session_id":"case","operation":"submitProposal"}
+{"ts":"2026-01-01T12:00:01Z","source_ip":"192.0.2.20","session_id":"fast-client","operation":"getStatus"}
+{"ts":"2026-01-01T12:00:01.100Z","source_ip":"192.0.2.20","session_id":"fast-client","operation":"submitProposal"}
+{"ts":"2026-01-01T12:00:01.200Z","source_ip":"192.0.2.20","session_id":"fast-client","operation":"submitProposal"}
+{"ts":"2026-01-01T12:00:01.300Z","source_ip":"192.0.2.20","session_id":"fast-client","operation":"submitProposal"}
+{"ts":"2026-01-01T12:00:01.400Z","source_ip":"192.0.2.20","session_id":"fast-client","operation":"submitProposal"}
+{"ts":"2026-01-01T12:00:02Z","source_ip":"192.0.2.30","session_id":"near-miss","operation":"getFragment"}
+{"ts":"2026-01-01T12:00:08Z","source_ip":"192.0.2.30","session_id":"near-miss","operation":"submitProposal"}
+{"ts":"2026-01-01T12:00:08.100Z","source_ip":"192.0.2.30","session_id":"near-miss","operation":"submitProposal"}
+{"ts":"2026-01-01T12:00:08.200Z","source_ip":"192.0.2.30","session_id":"near-miss","operation":"submitProposal"}
+{"ts":"2026-01-01T12:00:08.300Z","source_ip":"192.0.2.30","session_id":"near-miss","operation":"submitProposal"}
