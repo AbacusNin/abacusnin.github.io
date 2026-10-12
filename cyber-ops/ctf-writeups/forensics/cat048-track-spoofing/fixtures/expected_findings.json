@@ -1,0 +1,19 @@
+{
+  "findings": [
+    {
+      "event_id": "unauthorized-peer",
+      "track": [10, 1, 256],
+      "reasons": [
+        "unexpected_authenticated_peer",
+        "registered_identity_mismatch",
+        "suspicious_classification"
+      ]
+    },
+    {
+      "event_id": "source-gap",
+      "track": [10, 1, 256],
+      "reasons": ["provenance_unavailable"]
+    }
+  ],
+  "finding_count": 2
+}

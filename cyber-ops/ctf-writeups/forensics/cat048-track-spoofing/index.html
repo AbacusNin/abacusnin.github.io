@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Plot That Became a Protected Track - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="I used a known CAT048 record shape and a protected track&#x27;s correlation key to make an unauthenticated radar plot change the scope&#x27;s latest-track decision.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/cat048-track-spoofing/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Plot That Became a Protected Track">
+  <meta property="og:description" content="I used a known CAT048 record shape and a protected track&#x27;s correlation key to make an unauthenticated radar plot change the scope&#x27;s latest-track decision.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/cat048-track-spoofing/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Forensics / <span aria-current="page">The Plot That Became a Protected Track</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Plot That Became a Protected Track</h1>
+        <p class="lead">The scope did not ask whether a plot came from its radar. It asked whether three fields matched a track it already knew.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Make one protected track enter the required classification and release the scope&#x27;s sealed export by sending a CAT048 block to its ingest.</p>
+<p><strong>What I did.</strong> I decoded the sample feed, read the correlation and release rules, patched a known-good record, checked its fields offline, then timed the submitted block against the live refresh.</p>
+<p><strong>The result.</strong> The case record reports that the corrected plot was accepted, the classification latched, and the export released after a short burst.</p>
+<p><strong>The limit.</strong> The retained capture verifies the fixed record layout. It contains no TCP peer identity or post-merge state; the live submission and export transcript were not available for replay.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 560" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Capture; Join key; Oracle; Plot; Merge; Race; Defense">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Capture</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Decode CAT048 block and FSPEC</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Join key</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Read SAC, SIC, track number</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Oracle</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Read all release conditions</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Plot</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Patch a known-good record</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Merge</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Latest matching plot overwrites state</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Race</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Send near export evaluation</text>
+<line x1="180" y1="463" x2="180" y2="482" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="485" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="509" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Defense</text><text x="18" y="529" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Bind origin and check identity</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Network protocol manipulation / sensor-data integrity</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>ASTERIX CAT048, track-correlation abuse, data-origin authentication, spoofing, sensor-fusion integrity, protocol forging</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved</td>
+</tr>
+<tr>
+<td>Available material</td>
+<td>CAT048 sample capture, ingest and correlation rules, scope map, and a reference TCP client</td>
+</tr>
+<tr>
+<td>Goal</td>
+<td>Change the protected track's classification and release its sealed export</td>
+</tr>
+<tr>
+<td>Reported result</td>
+<td>Corrected plot accepted; required state latched; export released</td>
+</tr>
+<tr>
+<td>Verification boundary</td>
+<td>Sample layout checked locally; operator submission and scope result remain case-record reports</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for examining this failure mode: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/cat048-track-spoofing/artifacts">browse the offline CAT048 tools and hunt on GitHub</a> and <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/cat048-track-spoofing/fixtures">the invented fixtures</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>The exercise put a protected corridor track on a radar scope and gave me a plain TCP ingest that accepted ASTERIX Category 048 plots. I had sample records, a scope map, the ingest's correlation rules, and a small client showing how to send one framed block. I needed to change that track's state so the scope would release a sealed export. The answer was a state transition, then the export, rather than a number to calculate locally.</p>
+<p>The simulated attacker was any network peer that could reach the listener. The operator trusted the fused display. The protected assets were the corridor track's identity and the export gate tied to its classification. The trust boundary ran from an unauthenticated TCP connection into the track store. The store merged a plot on <code>(SAC, SIC, track number)</code> without tying those claimed fields to a verified sensor. This is the adversarial behavior the challenge modeled; no real aircraft or operational radar was involved.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I started with the sample feed. CAT048 blocks announced Category 48 with byte <code>0x30</code>, then a two-byte big-endian block length. I walked those lengths and decoded records under their FSPEC, the bitmap that says which fields follow. The sample contained four 177-byte blocks, six 29-byte records in each. All 24 records used <code>FD D2</code> as their FSPEC and the same SAC/SIC. This gave me a concrete, accepted-looking layout to work from. The protected track number came from the scope map; the source identifiers came from the sample and ingest description. The binary capture alone did not identify the TCP sender or prove how the scope merged a later plot.</p>
+<p>The ingest rules were the turning point. A plot with the same <code>(SAC, SIC, track number)</code> replaced the latest Mode-S address, callsign, Mode-3/A code, position, SPI, and status fields shown for that track. I considered a shorter record, then kept the full sample FSPEC because the case record says the ingest rejected nonconforming blocks. I cloned a known-good shape and changed only the correlation tuple and the fields the release gate checked. I decoded the result again before sending it.</p>
+<p>My first read of the release rule was too narrow. I had focused on one identity field. The export endpoint's response spelled out a combined condition: Mode-S address, Mode-3/A code, and the SPI bit all had to match the gate's required state. I corrected the record and used the reference client's one-block-per-connection framing. A live feed kept refreshing the track, so the forged plot needed to be the latest observation when the export evaluated it. The case record reports that a short burst just before reading the export won that timing race, latched the state, and released the export. I can verify the sample format offline; I cannot replay that operator interaction from the retained capture.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>My small decoder followed the FSPEC's User Application Profile order, then printed SAC, SIC, track number, Mode-3/A, Mode-S address, callsign, and SPI. The <a href="artifacts/cat048_subset.py">offline subset builder and decoder</a> preserves the useful part of that method. It handles the exact <code>FD D2</code> layout observed in the sample and rejects a different FSPEC or malformed block length. The <a href="fixtures/benign_cat048.hex">invented benign block</a> and <a href="fixtures/forged_example.hex">invented changed block</a> show the same correlation tuple with different identity and SPI fields. The <a href="artifacts/README.md">tool guide</a> explains its inputs, output, and scope.</p>
+<p>Two encodings were worth checking by hand before I trusted a record:</p>
+<pre><code class="language-python"># Four octal digits, three bits per digit; upper flag bits stay zero.
+mode3a = int(&quot;7500&quot;, 8).to_bytes(2, &quot;big&quot;)
+
+# Eight identification characters, six bits each.
+code = (ord(ch) - 64) if &quot;A&quot; &lt;= ch &lt;= &quot;Z&quot; else ord(ch)
+</code></pre>
+<p>The source's sender used <code>socket.create_connection</code> and <code>sendall</code> with an already framed block, one connection per block. I keep the host and port out of this article. The linked proof of concept does not send anything; it builds or decodes local bytes. Running <code>python -B cat048_subset.py</code> from the artifacts folder prints a synthetic two-record block. The fixed-layout parser also decoded all 24 records of the challenge sample. That supports the wire-format analysis, while service acceptance and export release remain reported outcomes.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p><a href="https://www.eurocontrol.int/publication/cat048-eurocontrol-specification-surveillance-data-exchange-asterix-part4">EUROCONTROL's CAT048 specification</a> defines Monoradar Target Reports. A block carries a category byte, its total length, and one or more records. Each record starts with FSPEC. A set bit says a data item is present; the User Application Profile supplies its order and size. The low FX bit extends FSPEC to another octet. In this sample, <code>FD D2</code> selected source identifier <code>I048/010</code>, time <code>I048/140</code>, target descriptor <code>I048/020</code>, position <code>I048/040</code>, Mode-3/A <code>I048/070</code>, flight level <code>I048/090</code>, Mode-S address <code>I048/220</code>, aircraft identification <code>I048/240</code>, track number <code>I048/161</code>, and track status <code>I048/170</code>.</p>
+<p>Mode-3/A is four octal digits packed into 12 bits. Treating <code>7500</code> as decimal would make the wrong bytes. The aircraft identification item packs eight six-bit characters into six bytes. Letters use codes 1 through 26; digits retain codes 48 through 57; spaces use 32. The SPI bit is in the first target-report descriptor octet. These details matter because a valid-looking FSPEC does not rescue a field encoded at the wrong offset or in the wrong base.</p>
+<p>The scope's correlation rule was separate from CAT048 itself. It joined on <code>(SAC, SIC, track number)</code> and treated a matching report as a fresh observation. A tuple can be a useful join key when the source is already trusted. Here, a peer could claim the tuple and choose the new identity fields. The source claim did the work that authentication should have done. The sample capture proved the record shape and common source codes; the map identified the protected track. Neither artifact recorded an authenticated peer for the received plot.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>I needed five fields to line up. <code>I048/010</code> carried the claimed SAC/SIC, and <code>I048/161</code> carried the protected track number, so the store would join the plot to the existing track. <code>I048/220</code> carried the Mode-S sentinel used by the classifier. <code>I048/070</code> carried the required Mode-3/A squawk. The SPI bit in <code>I048/020</code> completed the release condition. Other fields stayed in the known-good layout to keep offsets and lengths stable. The <a href="fixtures/benign_cat048.hex">invented benign block</a> and <a href="fixtures/forged_example.hex">changed example</a> show the field-level difference without publishing a challenge target value.</p>
+<p>The ingest accepted whichever plot most recently matched the correlation key. That made timing part of the exploit. A genuine sensor continued to refresh the protected track, and its next plot could replace my changed fields on the display. The case record says I sent a short burst immediately before requesting the export. It reports that the corrected combination latched the compromise classification and released the sealed export. I do not infer a permanent track takeover from that result. The exact reply and transport log are not present in the retained case materials.</p>
+<p>The offline decode was an important but bounded check. It showed that the patched record had the intended tuple, Mode-S address, Mode-3/A code, and SPI bit under the same parser used for the sample. Its FSPEC remained <code>FD D2</code>; its record stayed 29 bytes. Those observations reduce encoding mistakes. They cannot guarantee that an independent ingest accepts a packet or that its business logic releases an export. The source-reported operator result supplies that separate end-to-end outcome.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned</summary>
+<p>The export response was more useful than my first guess. I initially changed too little because I read the classifications separately and assumed one value would trip the gate. Once the endpoint stated the combined requirement, I had a precise target for the record. I would read that response before patching bytes next time.</p>
+<p>Cloning a record that already parsed gave me a safer starting point than inventing a minimal FSPEC. Decoding my changed bytes before sending caught field placement errors without using a live attempt. The last wrinkle was time: a latest-plot decision is a race against the ordinary feed. A short, well-timed burst explained why a single valid plot could appear to work and then vanish. The general failure mode is source identity inferred from an easily repeated correlation key.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Operational Extrapolation</summary>
+<h3>Individual Practitioner Development</h3>
+<p>This case exercised binary framing, bit fields, octal encoding, and offline checks against a service with its own acceptance rules. I would extend the lab by decoding more UAP layouts and measuring how the parser responds to malformed FSPECs. That is a proposed next exercise. The published <a href="artifacts/cat048_subset.py">subset tool</a> deliberately stops at the one observed layout rather than claiming full CAT048 coverage.</p>
+<h3>Security Operations</h3>
+<p>The defensive question is whether a protected track's identity changed and whether the plot came from a source authorized to make that change. A production ingest would need to log the authenticated peer, claimed SAC/SIC, track number, raw pre-merge fields, merge decision, and resulting committed state. I would compare those events with a protected-track registry and route mismatches to an operator before downstream actions. The <a href="artifacts/track_integrity_check.py">offline track check</a> exercises that idea on invented normalized events. It needs a trusted peer field from the transport gateway; an attacker-supplied label is not provenance.</p>
+<h3>Intelligence Operations</h3>
+<p>The same fusion problem can arise in other telemetry systems, but this record contains no campaign or actor to attribute. Distinguishing an injected plot from a sensor fault would require per-source raw data, authenticated source identity, and timing around the merge. The challenge's sample binary lacks those observations. I would preserve them in a real investigation before making an attribution claim.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The <a href="artifacts/cat048_subset.py">CAT048 subset tool</a> builds and decodes one fixed 29-byte record shape under FSPEC <code>FD D2</code>. It accepts a source tuple, track number, Mode-S address, Mode-3/A code, callsign, and SPI; it fills unrelated time, position, and flight-level fields with invented values. Its output is a framed byte block or a decoded field dictionary. It needs only Python 3 and has no network feature. The <a href="fixtures/benign_cat048.hex">benign fixture</a> and <a href="fixtures/forged_example.hex">changed fixture</a> are synthetic. The parser accepts local captures up to 1 MiB and rejects unsupported layouts.</p>
+<p>The <a href="artifacts/track_integrity_check.py">track-integrity checker</a> reads a <a href="fixtures/protected_registry.json">protected-track registry</a> and <a href="fixtures/ingest_events.jsonl">normalized ingest events</a>. It emits reasons for unexpected authenticated peers, Mode-S mismatches, suspect classifications, and missing provenance. The <a href="fixtures/expected_findings.json">expected output</a>, <a href="artifacts/test_cat048_lab.py">tests</a>, and <a href="artifacts/README.md">guide</a> make the proposed detection logic reproducible. The three tests cover a changed protected plot, an ordinary authorized plot, a same-number plot under a different source tuple, a provenance gap, and malformed records. These are defensive proofs of concept; no production feed or SIEM backend has been tested.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Applicability and Mapping</summary>
+<table>
+<thead>
+<tr>
+<th>Behavior in this simulated attack</th>
+<th>Framework</th>
+<th>Mapping</th>
+<th>Why it fits</th>
+<th>Boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Inserted plot changed data the scope used for a decision</td>
+<td>MITRE ATT&amp;CK</td>
+<td><a href="https://attack.mitre.org/techniques/T1565/002/">T1565.002, Transmitted Data Manipulation</a></td>
+<td>The lab demonstrates manipulation of data as it enters a consumer</td>
+<td>Technique analogy; no observed real-world actor</td>
+</tr>
+<tr>
+<td>Claimed sensor identity on an unauthenticated channel</td>
+<td>CWE</td>
+<td><a href="https://cwe.mitre.org/data/definitions/940.html">CWE-940</a></td>
+<td>Source of communication was not verified before a security-relevant merge</td>
+<td>Simulated design weakness</td>
+</tr>
+<tr>
+<td>Trusted a claimed plot without proof of authenticity</td>
+<td>CWE</td>
+<td><a href="https://cwe.mitre.org/data/definitions/345.html">CWE-345</a></td>
+<td>The application relied on unauthenticated data</td>
+<td>Simulated design weakness</td>
+</tr>
+<tr>
+<td>Allowed the ingest to change a protected state with no peer authentication</td>
+<td>CWE</td>
+<td><a href="https://cwe.mitre.org/data/definitions/306.html">CWE-306</a></td>
+<td>The critical merge path lacked authentication in the challenge rules</td>
+<td>Simulated design weakness</td>
+</tr>
+<tr>
+<td>Forged a sensor observation</td>
+<td>CAPEC</td>
+<td><a href="https://capec.mitre.org/data/definitions/194.html">CAPEC-194, Fake the Source of Data</a></td>
+<td>The constructed report impersonated a legitimate sensor plot</td>
+<td>Attack-pattern fit in the lab</td>
+</tr>
+<tr>
+<td>Claimed a source and changed track state</td>
+<td>STRIDE</td>
+<td>Spoofing and tampering</td>
+<td>The trust boundary accepted a false origin and new values</td>
+<td>Threat-model description</td>
+</tr>
+</tbody>
+</table>
+<p>The HTTP export was an outcome and an oracle, not the primary input weakness. I would not force an OWASP web category onto the CAT048 ingest. STIG and sector-specific mappings need a real system and scope. This exercise does not establish those.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intelligence and Standards Integration</summary>
+<p>This single lab has no campaign, malicious infrastructure, or indicator-sharing context for STIX/TAXII. The sentinel Mode-S value was a classifier input for this particular scope. Its invented stand-in, <code>0BADFF</code>, appears only in the synthetic fixture and is not a real-world IOC. A protected-track identity change or untrusted peer is a better behavior to monitor than a hard-coded address string. EUROCONTROL's <a href="https://www.eurocontrol.int/publication/cat048-eurocontrol-specification-surveillance-data-exchange-asterix-part4">CAT048 specification</a> supplies the wire-format reference. It does not define this scope's correlation or release policy.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>Standards Mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Reference</th>
+<th>Proposed realization</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://doi.org/10.6028/NIST.SP.800-53r5">NIST SP 800-53 Rev. 5 IA-3</a>, device identification and authentication</td>
+<td>Give each sensor an authenticated channel identity and bind its claimed SAC/SIC to that identity before merge</td>
+<td>Proposed</td>
+</tr>
+<tr>
+<td>NIST SC-8, transmission confidentiality and integrity</td>
+<td>Protect the feed in transit, such as with per-sensor mutually authenticated transport, and reject failed integrity checks</td>
+<td>Proposed</td>
+</tr>
+<tr>
+<td>NIST SI-10, information input validation</td>
+<td>Validate CAT048 structure and registered identity before a protected-track update; format checks alone do not authenticate origin</td>
+<td>Proposed</td>
+</tr>
+<tr>
+<td>NIST SC-16, transmission of security attributes</td>
+<td>Carry and preserve the verified source attribute with each plot through the merge decision</td>
+<td>Supporting proposal</td>
+</tr>
+<tr>
+<td><a href="https://www.cisecurity.org/controls/cis-controls-navigator/v8">CIS Controls v8 Control 4</a>, secure configuration</td>
+<td>Restrict the ingest listener to the intended segment and authorized sensors</td>
+<td>Proposed</td>
+</tr>
+<tr>
+<td>CIS Control 13, network monitoring and defense</td>
+<td>Log source-binding failures and protected-track identity changes for triage</td>
+<td>Proposed</td>
+</tr>
+</tbody>
+</table>
+<h3>Mitigation Realization</h3>
+<p>No production control was implemented or assessed in the challenge. Network allowlisting reduces exposure but cannot substitute for message-origin checks at the merge boundary. A real deployment would also need sensor credential ownership, rotation, replay handling, and a safe fail-closed path when origin verification fails. The <a href="artifacts/track_integrity_check.py">synthetic hunt</a> demonstrates only one monitoring layer.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>The useful detection point is before the merge. A normalized event needs the transport-authenticated peer, claimed SAC/SIC, track number, Mode-S address, classification, and a protected-track registry. The <a href="artifacts/track_integrity_check.py">checker</a> flags a protected plot from an unexpected peer, a Mode-S address that differs from the registry, or an application classification of spoof, hijack, or compromised. If the peer was never authenticated, it reports a provenance gap. The <a href="fixtures/ingest_events.jsonl">four invented events</a> include a positive, a benign event, a same-number near miss under another SAC/SIC, and the missing-peer case. The <a href="fixtures/expected_findings.json">expected findings</a> show two records, with reasons rather than a claim of confirmed attack.</p>
+<p>An operator would compare the raw plot, channel identity, pre-merge and post-merge fields, authorized maintenance activity, and neighboring sensor observations. A legitimate aircraft identity update, multi-sensor handoff, stale registry, or bench replay can trigger review. The sample capture contains no authenticated TCP peer or merge log, so this proposed hunt has no measured production fidelity. I did not publish a Sigma rule or SIEM query for an ingest schema that the case does not establish. A YARA rule has no useful file behavior to match here.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow diagram above</a> keeps the causal chain visible: sample record, correlation tuple, release condition, patched plot, latest-plot merge, and export timing. The last node shows the defender's opportunity to bind source identity and check the track registry. The <a href="artifacts/cat048_subset.py">synthetic CAT048 tool</a> covers the byte-level portion, while the <a href="artifacts/track_integrity_check.py">hunt</a> covers the proposed pre-merge decision.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://www.eurocontrol.int/publication/cat048-eurocontrol-specification-surveillance-data-exchange-asterix-part4">EUROCONTROL, CAT048 Monoradar Target Reports, Edition 1.32</a>: Category 048 structure and field definitions.</li>
+<li><a href="https://attack.mitre.org/techniques/T1565/002/">MITRE ATT&amp;CK T1565.002, Transmitted Data Manipulation</a>: simulated attack-technique analogy.</li>
+<li><a href="https://cwe.mitre.org/data/definitions/940.html">MITRE CWE-940</a>, <a href="https://cwe.mitre.org/data/definitions/345.html">CWE-345</a>, and <a href="https://cwe.mitre.org/data/definitions/306.html">CWE-306</a>: source, data-authenticity, and critical-function weakness lenses.</li>
+<li><a href="https://capec.mitre.org/data/definitions/194.html">MITRE CAPEC-194, Fake the Source of Data</a>: attack-pattern mapping.</li>
+<li><a href="https://learn.microsoft.com/en-us/azure/security/develop/threat-modeling-tool-threats">Microsoft, STRIDE threats</a>: spoofing and tampering terms.</li>
+<li><a href="https://doi.org/10.6028/NIST.SP.800-53r5">NIST SP 800-53 Rev. 5</a>: illustrative IA-3, SC-8, SI-10, and SC-16 controls.</li>
+<li><a href="https://www.cisecurity.org/controls/cis-controls-navigator/v8">CIS Controls v8</a>: Control 4 and Control 13 proposals.</li>
+<li><a href="https://d3fend.mitre.org/technique/d3f:InboundTrafficFiltering/">MITRE D3FEND, Inbound Traffic Filtering</a>: a supporting boundary-control pattern, subject to source authentication at the ingest.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
