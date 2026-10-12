@@ -1278,5 +1278,29 @@
     ],
     "status": "Solved-Verified",
     "url": "/cyber-ops/ctf-writeups/forensics/arp-icmp-compression-oracle/"
+  },
+  {
+    "title": "The Image Appended to a Package Manager",
+    "category": "Forensics",
+    "difficulty": "Medium",
+    "date": "2026-10-12",
+    "tags": [
+      "ELF",
+      "binary forensics",
+      "file polyglot",
+      "JPEG",
+      "steghide",
+      "DCT steganography",
+      "malware persistence",
+      "supply chain"
+    ],
+    "summary": "Two package-manager binaries behaved alike, but one was 79,117 bytes longer. The extra bytes began with a JPEG, and the white image hid a second image that carried the answer.",
+    "aliases": [
+      "appended data",
+      "package integrity",
+      "ELF overlay"
+    ],
+    "status": "Solved-Verified",
+    "url": "/cyber-ops/ctf-writeups/forensics/elf-jpeg-hidden-image/"
   }
 ]

@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Image Appended to a Package Manager - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="Two package-manager binaries behaved alike, but one was 79,117 bytes longer. The extra bytes began with a JPEG, and the white image hid a second image that carried the answer.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/elf-jpeg-hidden-image/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Image Appended to a Package Manager">
+  <meta property="og:description" content="Two package-manager binaries behaved alike, but one was 79,117 bytes longer. The extra bytes began with a JPEG, and the white image hid a second image that carried the answer.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/elf-jpeg-hidden-image/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Forensics / <span aria-current="page">The Image Appended to a Package Manager</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Image Appended to a Package Manager</h1>
+        <p class="lead">The altered binary kept the same BuildID. Its size gave me a better first question: where did those extra 79,117 bytes go?</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Compare a known-good executable with a recovered copy, find the modification, and recover the concealed information.</p>
+<p><strong>What I did.</strong> I checked file size and structure, compared the baseline bytes, carved the appended JPEG, inspected the visual decoy, then used steghide with an empty passphrase and OCR on the extracted image.</p>
+<p><strong>The result.</strong> The recorded solve recovered a 7,552-byte inner JPEG and read the flag from it. The changed file was an exact baseline prefix plus a 79,117-byte tail.</p>
+<p><strong>The limit.</strong> The executable pair, carved images, flag, and acceptance receipt are not reproduced here. Case measurements and extraction are from the recorded solve; the linked tool uses invented ELF fixtures.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 560" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Compare files; Inspect ELF; Compare bytes; Read trailer; Review image; Extract payload; Read second image">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Compare files</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Same BuildID but size differs</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Inspect ELF</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Section table ends at 0x4940</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Compare bytes</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Baseline prefix unchanged</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Read trailer</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">JFIF begins at 0x4940</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Review image</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">White canvas and a false lead</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Extract payload</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">steghide accepts empty passphrase</text>
+<line x1="180" y1="463" x2="180" y2="482" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="485" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="509" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Read second image</text><text x="18" y="529" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">OCR yields recorded flag</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Forensics / steganography</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>ELF, binary forensics, file polyglot, JPEG, steghide, DCT steganography, malware persistence, supply chain</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved-Verified</td>
+</tr>
+<tr>
+<td>Recorded result</td>
+<td>The 18,752-byte baseline was an exact prefix of the 97,869-byte recovered file. A 79,117-byte JFIF image was appended, and steghide extracted a second 7,552-byte image with an empty passphrase.</td>
+</tr>
+<tr>
+<td>Evidence boundary</td>
+<td>The measurements, OCR result, and solve status are recorded in the case. The binaries, images, and submission receipt are unavailable here for independent replay.</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/elf-jpeg-hidden-image/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>Solve Process Flow</h2>
+<pre><code class="language-mermaid">flowchart LR
+  A[Two ELF files] --&gt; B[Size delta 79117]
+  B --&gt; C[ELF table review]
+  C --&gt; D[Exact baseline prefix]
+  D --&gt; E[JFIF trailer]
+  E --&gt; F[Mostly white image]
+  F --&gt; G[OCR reads decoy]
+  G --&gt; H[steghide empty passphrase]
+  H --&gt; I[Inner JPEG and OCR]
+</code></pre>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I was given two extensionless files: a known-good executable and a copy recovered from a suspect device. Both identified as 64-bit PIE ELF binaries. Strings connected them to <code>apt</code>, the Debian and Ubuntu package tool. The job was to determine whether the second file had changed and recover anything hidden in it.</p>
+<p>The case narrative treats the recovered copy as adversary-controlled. What I could actually compare was narrower. The files had the same BuildID and the same first 18,752 bytes, but the recovered copy was 79,117 bytes larger. Those added bytes began with a JFIF image. No package repository compromise, software update, persistence mechanism, or execution of the appended data was shown. For a real endpoint, I would investigate those possibilities separately.</p>
+<p>I also had a useful baseline. An exact byte comparison between two files can establish an append-only difference even when a general-purpose ELF trailer heuristic cannot decide whether extra bytes are malicious. The trustworthiness of that baseline would still matter outside the challenge.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<h3>Solve Trace</h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>My decision and recorded result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ST.1</td>
+<td><code>file</code> and <code>stat</code> identified two ELF64 PIE files of 18,752 and 97,869 bytes. The BuildID matched; the size delta was 79,117 bytes.</td>
+</tr>
+<tr>
+<td>ST.2</td>
+<td><code>readelf -S</code> and <code>objdump -d</code> showed matching section tables and disassembly. I calculated the section-table end at <code>0x4940</code>. That equaled the baseline file size in this case.</td>
+</tr>
+<tr>
+<td>ST.3</td>
+<td>A Python byte comparison found zero differences in the first 18,752 bytes. That was the strongest support for an append-only change relative to this baseline.</td>
+</tr>
+<tr>
+<td>ST.4</td>
+<td>The first trailer bytes at offset 18,752 were <code>FF D8 FF E0 00 10 4A 46 49 46</code>, the JPEG SOI, APP0 marker, length, and JFIF identifier.</td>
+</tr>
+<tr>
+<td>ST.5</td>
+<td>Carving from that offset yielded a 79,117-byte, 2464 by 1874 JFIF image.</td>
+</tr>
+<tr>
+<td>ST.6</td>
+<td>Pillow and NumPy measured a near-white canvas: mean channel value 254.98; 3,125 zero LSBs and 13,849,483 one LSBs.</td>
+</tr>
+<tr>
+<td>ST.6a</td>
+<td>A decoded-pixel LSB attempt yielded <code>0xFF</code> bytes and no useful message. I stopped following that path. Its failure does not prove every JPEG pixel-LSB scheme impossible.</td>
+</tr>
+<tr>
+<td>ST.7</td>
+<td>OCR on the nonwhite area read "no flag here! or is there?" I treated that as part of the puzzle, then kept examining the file.</td>
+</tr>
+<tr>
+<td>ST.8</td>
+<td><code>steghide extract -sf carrier.jpg -p "" -xf payload.jpg</code> worked with an empty passphrase. The output was a 7,552-byte, 1130 by 290 JPEG.</td>
+</tr>
+<tr>
+<td>ST.9</td>
+<td>OCR on that second image returned the recorded flag value, which stays private here.</td>
+</tr>
+</tbody>
+</table>
+<h3>Tool / Code Timeline</h3>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Tools</th>
+<th>Why they mattered</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Identity and size</td>
+<td><code>file</code>, <code>stat</code>, MD5, SHA-256</td>
+<td>Distinguished whole-file identity from BuildID</td>
+</tr>
+<tr>
+<td>Structure</td>
+<td><code>readelf -S</code>, <code>objdump -d</code>, Python byte comparison</td>
+<td>Located the append-only difference</td>
+</tr>
+<tr>
+<td>Trailer</td>
+<td><code>dd</code>, <code>od</code></td>
+<td>Read the signature after <code>xxd</code> was unavailable</td>
+</tr>
+<tr>
+<td>Image</td>
+<td>Pillow, NumPy, pytesseract</td>
+<td>Measured the white carrier and read its decoy text</td>
+</tr>
+<tr>
+<td>Concealed content</td>
+<td><code>steghide</code>, <code>file</code>, pytesseract</td>
+<td>Extracted and read the inner image</td>
+</tr>
+</tbody>
+</table>
+<p>I did not need the filename extension. The size delta led me to the boundary, and the bytes at that boundary told me what kind of file had been added. The matching BuildID was worth recording precisely because it did not cover the appended bytes.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<h3>Binary Triage and Trailer Detection</h3>
+<p>My first triage script computed <code>e_shoff + e_shentsize * e_shnum</code>, labeled anything after it a trailer, and wrote the remainder to disk. That formula happened to land at the end of this baseline. It cannot serve as a general ELF boundary: file-backed segments or sections can appear after the section header table, and some ELFs have no table. A tool also needs to reject malformed offsets and unsupported extended counts.</p>
+<p>The linked <a href="./artifacts/elf_trailer_review.py">read-only ELF reviewer</a> computes the greatest end offset across the header, program and section tables, file-backed segments, and file-backed sections for little-endian ELF64. It checks whether the entire baseline is a prefix of the suspect and reports a JFIF header lead. Its <a href="./artifacts/README.md">guide</a> lists the supported input and limits; <a href="./artifacts/test_elf_trailer_review.py">tests</a> include a JPEG-like marker inside a legitimate section after the section table.</p>
+<pre><code class="language-bash">file baseline suspect
+stat -c '%n %s' baseline suspect
+sha256sum baseline suspect
+readelf -h -l -S suspect
+python elf_trailer_review.py baseline suspect
+</code></pre>
+<p>The script does not carve by default. I would preserve the original, record a full-file hash, and carve only after reviewing the offset and output destination. The case's exact append-only result came from comparing the baseline bytes, not from a portable BuildID rule.</p>
+<h3>steghide Passphrase Bruteforcer</h3>
+<p>My helper tried an empty passphrase before a short built-in wordlist, then suggested a larger cracking tool. The empty candidate was enough here. The decisive command was:</p>
+<pre><code class="language-bash">steghide extract -sf carrier.jpg -p &quot;&quot; -xf payload.jpg
+file payload.jpg
+sha256sum payload.jpg
+</code></pre>
+<p>I would check the process exit code and the extracted file rather than search stdout or stderr for the words "wrote" or "extracted." A command can print an unexpected message, be localized, or leave an older output file in place. Use a fresh evidence directory and avoid <code>-f</code> unless replacing a known disposable output. The passphrase search is an authorized forensic step here; an incident team would record each attempt and preserve the carrier unchanged.</p>
+<h3>Full Triage-to-Flag Pipeline</h3>
+<p>I also chained ELF parsing, byte comparison, carving, steghide, and OCR. The chain is useful as a map, but my first code assumed 64-bit little-endian ELF, wrote outputs next to the suspect, treated message text as success, and printed OCR output that could contain a secret. I would fix those limits before relying on it in a live investigation.</p>
+<p>I would run the phases separately in a real case. First prove the file relationship. Then carve to a controlled output directory and validate the JPEG. Only after that would I run steghide and inspect the inner image. This leaves a record of where each conclusion came from, and it keeps the flag or a real credential out of routine triage logs.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<h3>ELF Binary Structure and the Loader Boundary</h3>
+<p>An ELF executable has headers that describe file-backed program segments and, when present, sections. The loader primarily follows program headers. An appended tail may therefore leave ordinary execution unchanged. The <a href="https://refspecs.linuxfoundation.org/elf/gabi4+/ch4.eheader.html">ELF header specification</a> also allows an ELF with no section header table. The <a href="https://refspecs.linuxfoundation.org/elf/gabi4+/ch4.sheader.html">section specification</a> says <code>SHT_NOBITS</code> consumes no file bytes. I use those distinctions in the linked reviewer.</p>
+<p>Here the recorded <code>e_shoff = 0x41c0</code>, <code>e_shentsize = 64</code>, and <code>e_shnum = 30</code> give <code>0x4940</code>, or 18,752 decimal. That equals the baseline's entire length, and the suspect begins with an exact copy of those bytes. The case therefore supports an append-only modification without needing the section-table formula as a universal parser.</p>
+<p>The BuildID is an ELF note, not a fresh full-file hash calculated when a monitoring tool opens the file. Appending bytes leaves the note unchanged. A preserved BuildID is unsurprising in this case and cannot substitute for a trusted full-file digest.</p>
+<h3>JPEG Steganography: DCT Coefficients vs. Pixel LSBs</h3>
+<p>JPEG encodes quantized frequency coefficients, while a decoded RGB pixel array is a rendered result. Re-encoding can change pixel least-significant bits, so a naive decoded-pixel LSB extraction is a poor first assumption for this carrier. The failed all-<code>0xFF</code> output and the heavily white image told me that particular path was unproductive. They did not establish zero capacity or exclude every crafted JPEG LSB method.</p>
+<p><code>steghide</code> works with JPEG coefficient data rather than simply reading decoded RGB LSBs. A valid JPEG signature or a white appearance cannot prove steghide content exists. The extraction with the empty passphrase and the resulting inner JPEG are the stronger observations.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<h3>Layer 1: Locating the ELF Boundary and Identifying the Trailer</h3>
+<p>The baseline was exactly 18,752 bytes. The suspect was 97,869 bytes. Subtraction gives the 79,117-byte addition. The first 18,752 bytes compared equal, and the next bytes were <code>FF D8 FF E0 00 10 4A 46 49 46</code>. I carved the remainder at offset <code>0x4940</code> and treated the signature as a JFIF lead. The reported image dimensions and successful steghide operation support that the carrier decoded in the original solve. The raw files are not available here for a fresh decode.</p>
+<p>The recorded <code>readelf</code> and <code>objdump</code> matches support unchanged sections and disassembly, but the byte comparison is more direct for this pair. It does not tell me who appended the image or whether another program ever read it.</p>
+<h3>Layer 2: Ruling Out LSB and Identifying the Steganography Class</h3>
+<p>The 2464 by 1874 image has 13,852,608 RGB channel samples. The recorded LSB counts add to exactly that total: 13,849,483 ones plus 3,125 zeros. A decoded-pixel extraction yielded only <code>0xFF</code> bytes. I treated it as a dead end and turned to the file format and steghide instead.</p>
+<p>OCR found the phrase "no flag here! or is there?" in the nonwhite region. It was a decoy in this challenge. I did not treat its words as an instruction to stop, and I did not infer anything about a real adversary from the joke.</p>
+<h3>Layer 3: steghide Extraction</h3>
+<p>The empty passphrase worked. The tool wrote a second JPEG of 7,552 bytes and 1130 by 290 pixels. OCR gave the flag value. The important validation sequence was extraction success, inner file type and dimensions, then readable content. An OCR transcript alone can misread characters, so I would also inspect the image visually and check the exact submission result. I have no separate acceptance receipt to show here.</p>
+<p>There were two environment detours: <code>xxd</code> was missing, so <code>od</code> supplied the byte view, and a subprocess wrapper encountered an encoding issue with steghide output. Calling steghide directly or reading subprocess output as bytes avoids depending on the terminal's text encoding.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<h3>What the Exercise Validated</h3>
+<p>The first useful finding was 79,117 extra bytes, not a flashy stego result. Once the baseline prefix compared exactly, the investigation became a file-carving problem. The same BuildID could have reassured me too early if I had mistaken it for a whole-file integrity check.</p>
+<h3>What the Exercise Surfaced as Gaps</h3>
+<p>I spent time on decoded-pixel LSBs because the carrier was an image. The all-<code>0xFF</code> output and the JPEG format pushed me away from that route. I would phrase the lesson narrowly: pick a method that fits the encoded format, then test it. My first tool choice did not work on this artifact.</p>
+<p>The missing <code>xxd</code> and steghide subprocess encoding snag were small but real. I had three helper scripts, but I had not separately validated them against the challenge files. The <a href="./artifacts/elf_trailer_review.py">linked reviewer</a> now has synthetic positive, benign, near-miss, and malformed-input checks, but it still has no run against this pair.</p>
+<h3>Transferable Principles</h3>
+<table>
+<thead>
+<tr>
+<th>Case detail</th>
+<th>What I would carry forward</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Matching BuildID with different full-file sizes</td>
+<td>Use a trusted full-file hash and package provenance</td>
+</tr>
+<tr>
+<td>Exact baseline prefix</td>
+<td>Separate append-only modification from patched code</td>
+</tr>
+<tr>
+<td>JFIF bytes at the append offset</td>
+<td>Validate and carve by structure, then inspect the result</td>
+</tr>
+<tr>
+<td>Decoded LSB path failed</td>
+<td>Match the hidden-data hypothesis to the carrier's encoding</td>
+</tr>
+<tr>
+<td>Empty steghide passphrase worked</td>
+<td>Start with the simplest justified extraction attempt</td>
+</tr>
+<tr>
+<td>Visual "nothing here" text</td>
+<td>Treat content as evidence, not as instructions</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<h3>Individual Practitioner Skill Development</h3>
+<p>This case joins ELF parsing, byte comparison, carving, image interpretation, and steghide extraction. I would extend it by building a format-aware scanner that handles both ELF classes and byte orders, extended header counts, and package-specific overlays. The limited <a href="./artifacts/elf_trailer_review.py">offline reviewer</a> makes its ELF64 little-endian scope explicit so it does not silently misparse another executable.</p>
+<h3>Security Operations (SOC / IR / Threat Hunting)</h3>
+<p>The operational question is whether an installed executable still matches a trusted package artifact. Compare its full-file digest and size with an independently trusted baseline, then inspect an unexplained tail. A package manifest on the same compromised host is useful but may have been changed too. <code>debsums</code> can help on Debian systems where package checksums exist; AIDE or another FIM system can supply an independently protected baseline. Package upgrade timing and local wrapper formats need triage before alerting.</p>
+<p>An investigation should preserve file hashes, inode metadata, package version, installation logs, and the recovered image as separate evidence. The trailer may be a data carrier, but this record does not show it being executed, loaded, or transmitted.</p>
+<h3>Intelligence Operations (SIGINT / IO / Attribution)</h3>
+<p>A legitimate-looking executable, a JPEG tail, and steghide form layers of concealment in this exercise. They do not identify an actor, a delivery route, or a covert network channel. If similar files appear elsewhere, compare full-file hashes, tail offsets, carrier structure, and package versions before linking cases. The visible decoy text is weak attribution evidence.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<h3>ELF Trailer Triage Decision Tree</h3>
+<p>I start with file type, full-file size and hash, and package provenance. For an ELF, I inspect program and section extents. If a suspect has bytes beyond those extents, I check whether the tail is expected for that product. With a known-good file, I compare the entire prefix and size before carving. A JPEG signature prompts validation; it does not prove steganography. Only a controlled extraction and verified inner file support that finding.</p>
+<p>The <a href="./artifacts/elf_trailer_review.py">ELF trailer reviewer</a> implements the first comparison, and its <a href="./artifacts/test_elf_trailer_review.py">tests</a> make a key near miss explicit: a JPEG-like marker inside a real section after the section table must not be called an appended trailer.</p>
+<h3>Recommended Complementary Toolkit</h3>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Role and boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>readelf</code>, <code>objdump</code>, <code>od</code></td>
+<td>Inspect ELF layout, code, and exact bytes; output still needs interpretation</td>
+</tr>
+<tr>
+<td><code>binwalk</code>, <code>foremost</code></td>
+<td>Search for embedded formats; signatures alone can false-positive</td>
+</tr>
+<tr>
+<td><code>steghide</code></td>
+<td>Test a supported carrier with an authorized candidate passphrase</td>
+</tr>
+<tr>
+<td><code>stegseek</code></td>
+<td>Optional wordlist recovery when justified; unnecessary for this empty-passphrase case</td>
+</tr>
+<tr>
+<td><code>zsteg</code></td>
+<td>Fits lossless PNG/BMP bitplane questions better than this JPEG path</td>
+</tr>
+<tr>
+<td><code>exiftool</code>, Pillow</td>
+<td>Inspect image metadata and dimensions; neither proves hidden content</td>
+</tr>
+<tr>
+<td><code>debsums</code>, AIDE</td>
+<td>Compare installed files with package or protected FIM baselines</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<h3>Tier 1 - Completeness Checklist</h3>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>Fit for this case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MITRE ATT&amp;CK</td>
+<td><a href="https://attack.mitre.org/techniques/T1027/003/">T1027.003 Steganography</a> fits the hidden image technique in the fictional adversary scenario. <a href="https://attack.mitre.org/techniques/T1027/">T1027</a> broadly covers concealed data. <a href="https://attack.mitre.org/techniques/T1195/002/">T1195.002</a> requires a software supply chain or distribution compromise; none is demonstrated by a modified file recovered from one device. A preserved name alone does not establish T1036.005 masquerading intent.</td>
+</tr>
+<tr>
+<td>MITRE ATLAS</td>
+<td>No AI or ML system appears in the observed file path.</td>
+</tr>
+<tr>
+<td>OWASP Top 10 and LLM Top 10</td>
+<td>No web or LLM application is involved.</td>
+</tr>
+<tr>
+<td>CVSS, EPSS, CISA KEV</td>
+<td>No specific product vulnerability or CVE is identified.</td>
+</tr>
+<tr>
+<td>Cloud controls</td>
+<td>No cloud workload is evidenced; host file integrity is the relevant question.</td>
+</tr>
+</tbody>
+</table>
+<h3>Tier 2 - Applied Where Material</h3>
+<p>The original mapping proposed D3FEND file integrity monitoring, executable allowlisting, and binary hardening. File integrity monitoring and allowlisting are relevant design choices, but a label alone does not tell me whether the baseline is trusted or enforced. I would verify the exact D3FEND term before treating an ID as a control requirement.</p>
+<p>CAPEC concealment patterns can describe the scenario, but a JPEG payload is data here. No executable second stage is shown, so a code-execution CAPEC or CWE-506 "Embedded Malicious Code" would overstate the finding. CWE-345 is a possible design weakness only if an actual monitoring system relied on BuildID alone. The file comparison did not examine a real monitoring system.</p>
+<p>For STRIDE, tampering is visible as a file modification. Information disclosure and privilege escalation are not evidenced by the static pair. Runtime behavior that appears unchanged in disassembly was not exercised here, and no attacker's route to root privileges is established.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<p>I have behavior to describe but no real indicator bundle to share. The exact hash values are withheld; the file sizes and JFIF bytes are case observations, not global block rules. A STIX representation would need valid object IDs, concrete evidence, confidence, and clear distinction between observed file structure and inferred adversary intent. No TAXII sharing occurred.</p>
+<p>The useful exchange with a detection team would be a short finding: a trusted package binary and a recovered copy share an exact 18,752-byte prefix; the latter has a 79,117-byte JFIF tail; steghide with an empty passphrase yielded an inner JPEG in the recorded solve. That states what another analyst could verify if given the evidence.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>11a. Standards Mapping (Abbreviated - T2)</h3>
+<p>NIST SP 800-53 SI-7 and SI-7(1) are the clearest control references for software integrity checking and automated checks. AU-2 applies if file changes and package operations are logged. SI-3 can support malware analysis, but an antivirus signature is not required to notice a full-file hash mismatch. CIS software inventory and malware-defense controls are relevant after checking the organization's current version and implementation group. These are design mappings, not a compliance assessment.</p>
+<h3>11b. Mitigation Realization</h3>
+<p>I would record a trusted full-file digest, size, package identity, and source of the baseline. On Debian systems, <code>debsums -c</code> can triage package-managed files with recorded checksums. AIDE or another FIM system can watch high-value executable paths, with its baseline kept outside the host's writable trust boundary. I would alert on an unexpected content change, then correlate it with an authorized upgrade, reinstall, or local build before declaring compromise.</p>
+<p>The illustrative Splunk and Elastic searches I drafted look for <code>debsums</code> failure messages. They depend on exact ingestion fields and message format, so they remain proposals. The more durable normalized event would include host, path, package/version, trusted baseline hash, observed hash and size, check time, baseline source, and whether the change belongs to an approved package transaction.</p>
+<p>For a purple-team check, append an invented JFIF-like tail to a synthetic ELF fixture and confirm the offline reviewer flags it. Then test an unchanged binary and a marker stored inside a legitimate file-backed section. The <a href="./artifacts/test_elf_trailer_review.py">test file</a> covers those local cases. A production trial would additionally measure how often legitimate overlays and package updates trigger review.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>The work here is a tested local review aid plus detection proposals. It has no deployed sensor or measured production accuracy.</p>
+<h3>IOCs (Sanitized / Illustrative)</h3>
+<p>The concrete file sizes are 18,752 and 97,869 bytes, with a 79,117-byte difference. The case's JFIF start bytes are a structure clue. Placeholder MD5 values and an unchanged BuildID are not useful block indicators. A whole-file SHA-256 value would be useful for evidence comparison if tied to a trusted source, but none is published here.</p>
+<h3>YARA Rule - ELF Trailer Detection</h3>
+<p>I drafted a YARA rule using <code>uint64(40)</code> and <code>uint16(58) * uint16(60)</code>. Apart from supported-class and byte-order questions, it ignored file-backed extents after the section table. I would use YARA to find candidate ELF files or a JFIF marker at a known offset, then hand structural analysis to a parser. The linked <a href="./artifacts/elf_trailer_review.py">reviewer</a> performs that limited structural check. I did not carry the rule forward because it could mislabel legitimate file extents as trailers.</p>
+<h3>YARA Rule - JPEG steghide Carrier (Heuristic)</h3>
+<p>My second rule matched a normal JFIF header and a size under 50 MB. That identifies many ordinary JPEGs and has no steghide-specific evidence. I keep the idea as a file-type triage step, without calling it a steghide detector. An analyst would validate the JPEG, inspect provenance, and run steghide only when the case context justifies it.</p>
+<h3>Sigma Rule - Binary Size Anomaly vs. Package Manifest (Linux FIM)</h3>
+<p>My Sigma selection looked for changed files under system binary paths and filtered an <code>IntegrityStatus</code> of <code>ok</code>. Despite its title, the rule never compared a file size with a trusted manifest. A usable rule needs a real FIM event carrying observed and expected hash or size, or a SIEM join to a protected package baseline. Field names and thresholds depend on the sensor. The <a href="./artifacts/README.md">local review guide</a> states exactly what the offline script accepts; no Sigma backend conversion was tested.</p>
+<h3>Log Sources Required</h3>
+<p>The minimum telemetry is a protected package or FIM baseline plus observed full-file hashes and sizes. Package transaction logs help separate legitimate upgrades from unexplained replacement. File-write telemetry adds timing and process context, but Sysmon FileCreate and FileCreationTimeChanged events alone cannot prove a size mismatch or capture a whole-file digest. The triage result should retain the raw file and provenance for offline examination.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">solve process flow</a> above tracks the investigative layers: baseline comparison, JFIF tail, unproductive LSB attempt, decoy text, and successful extraction. For defense, I would put three controls alongside it: a trusted full-file baseline, an ELF-aware tail review, and careful handling of the carved image. The case supports those steps without assuming package-distribution compromise or execution of the hidden content.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://refspecs.linuxfoundation.org/elf/gabi4+/ch4.eheader.html">ELF header specification</a></li>
+<li><a href="https://refspecs.linuxfoundation.org/elf/gabi4+/ch4.sheader.html">ELF section header and file-backed data specification</a></li>
+<li><a href="https://refspecs.linuxfoundation.org/elf/gabi4+/ch5.pheader.html">ELF program header specification</a></li>
+<li><a href="https://attack.mitre.org/techniques/T1027/003/">MITRE ATT&amp;CK T1027.003: Steganography</a></li>
+<li><a href="https://attack.mitre.org/techniques/T1195/002/">MITRE ATT&amp;CK T1195.002: Compromise Software Supply Chain</a></li>
+<li><a href="https://d3fend.mitre.org/technique/d3f:FileIntegrityMonitoring/">MITRE D3FEND: File Integrity Monitoring</a></li>
+<li><a href="https://doi.org/10.6028/NIST.SP.800-53r5">NIST SP 800-53 Rev. 5</a></li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
