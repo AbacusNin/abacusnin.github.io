@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Phone Call That Repeated Itself - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="A 20-second RTP call looked like media traffic until its PCMU bytes repeated every 50 milliseconds. I found the changed bit positions, recovered the encoded message, and built an offline detection lead.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/network/rtp-pcmu-bitplane/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Phone Call That Repeated Itself">
+  <meta property="og:description" content="A 20-second RTP call looked like media traffic until its PCMU bytes repeated every 50 milliseconds. I found the changed bit positions, recovered the encoded message, and built an offline detection lead.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/network/rtp-pcmu-bitplane/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Network Forensics / <span aria-current="page">The Phone Call That Repeated Itself</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Phone Call That Repeated Itself</h1>
+        <p class="lead">I listened for a message. The useful clue was how often the same 400 bytes came back.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Recover a covert message from an intercepted-call packet capture.</p>
+<p><strong>What I did.</strong> I inventoried UDP flows, validated RTP/PCMU framing, checked audio hypotheses, then compared the encoded-byte LSB plane across repeating 400-sample periods.</p>
+<p><strong>The result.</strong> Two early periods contained the changed bits; even sample positions reconstructed a framed Base64 message that strictly decoded to a flag-shaped result.</p>
+<p><strong>The limit.</strong> The capture and recovery were replayed locally; no platform submission receipt or real-world adversary attribution was available.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 560" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Inventory the capture; Validate the media; Test audible clues; Find repetition; Isolate changed bits; Recover the message; Translate to defense">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Inventory the capture</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">One 1,000-packet flow; two singletons</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Validate the media</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">PT 0, 160 bytes, continuous counters</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Test audible clues</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Reported DTMF and spectrum checks</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Find repetition</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">400-sample period; 99.63% byte match</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Isolate changed bits</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Only the first two periods vary</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Recover the message</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Even positions, framing, strict Base64</text>
+<line x1="180" y1="463" x2="180" y2="482" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="485" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="509" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Translate to defense</text><text x="18" y="529" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Offline triage and synthetic tests</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Network Forensics / Steganography</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>VoIP, RTP, G.711, PCMU, LSB Steganography, Bit-Plane Analysis, Base64, pcap</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved</td>
+</tr>
+<tr>
+<td>Recorded result</td>
+<td>A framed Base64 message yielded a flag-shaped plaintext</td>
+</tr>
+<tr>
+<td>Evidence boundary</td>
+<td>The capture and extraction were replayed; challenge-platform acceptance was not independently available</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/network/rtp-pcmu-bitplane/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>At-a-Glance Attack Flow</h2>
+<p>The path through this challenge was short only in hindsight. The message was encoded, placed in selected bits of a repeating PCMU carrier, sent as RTP, and finally reconstructed from a capture. The flow diagram above shows the checkpoints I used, from packet inventory through an offline defensive review.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I was handed <code>call.pcap</code>, about 210 KiB, with the story of an intercepted suspicious phone call and the hint that it held more than I could hear. My job was to recover the hidden message. The packet capture was the evidence; the description was a lead, not proof of what an adversary did.</p>
+<p>If the same pattern turned up in an enterprise, a useful threat hypothesis would be data hidden in media that ordinary flow logs do not inspect. I would need to establish who controlled the endpoint, whether the media crossed a boundary, and what the recovered data meant before calling it exfiltration. The two unrelated one-packet UDP flows were worth recording, but their printable self-labels do not prove deliberate adversary misdirection. I treated them as challenge distractors and followed the much larger candidate media flow.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<h3>2.1 Flow Enumeration</h3>
+<p>I counted 1,002 packets: one IPv4 UDP flow had 1,000 packets, while two other UDP flows had one each. No TCP packet appeared in this capture. A flow count made the first pivot straightforward: the long flow could carry 20 seconds of audio, while the one-packet strings could not. The absence of SIP <em>in this capture</em> tells me only what this vantage and time window include; signaling could be elsewhere or earlier.</p>
+<h3>2.2 RTP Stream Validation</h3>
+<p>Every packet in the long flow had RTP version 2, no padding, extension, contributing sources, or marker, and payload type 0. The fixed header was 12 bytes and the payload was 160 bytes. One SSRC remained constant. Sequence numbers advanced by one without a gap; timestamps advanced by 160. That is consistent with PCMU at 8 kHz, one 20 ms packet at a time. I recovered 160,000 encoded audio bytes, or 20.00 seconds.</p>
+<p>I check the header flags before cutting at byte 12. RTP can have CSRC entries, extensions, and padding; a hard-coded slice is valid for these observed packets, not as a general parser. Payload type 0 identifies PCMU under the RTP audio/video profile. It does not tell me that SIP was bypassed or that the endpoint was malicious.</p>
+<h3>2.3 First-Order Audio Analysis</h3>
+<p>The initial audio pass decoded PCMU to linear PCM and inspected energy, a spectrogram, and DTMF frequencies. The recorded frame-energy figures were minimum 9,763, maximum 11,528, median 11,113. The max/min ratio is about 1.44 dB when expressed as amplitude. The spectrogram was described as flat and broadband, with no painted text or SSTV sweep, and the Goertzel DTMF scan reported zero pairs. Those visual and DTMF checks are part of the investigative record; I independently replayed the packet and bit-plane checks below, not the original plotted display.</p>
+<p>The negative checks mattered. I first looked for a message I might hear or see in time-frequency space. Once that led nowhere, I had a reason to stop treating this as ordinary audio transcription and look at the encoded bytes.</p>
+<h3>2.4 Bit-Plane Analysis</h3>
+<p>I compared the raw <strong>PCMU bytes on the wire</strong>, not the LSBs of decoded 16-bit PCM. Among tested shifts of 80, 160, 200, 320, 400, 480, and 800 samples, the 400-sample shift produced a 0.9963 byte-match rate over 50,000 comparisons; 800 also matched because it is a multiple. At 8 kHz, 400 samples are 50 ms. The audio was effectively one 50 ms carrier repeated 400 times.</p>
+<p>Reshaping 160,000 bytes into 400 rows of 400 showed all 400 columns had stable upper seven bits. A majority LSB baseline left deviations only in rows 0 and 1, with 89 and 88 changed positions respectively. That places the modifications in the first 800 samples, or 100 ms. The rest is a repeated carrier. The original account reversed those two row counts; this count comes from replaying the capture.</p>
+<h3>2.5 Sample-Index Demultiplexing</h3>
+<p>Packing every LSB from the first two rows did not make readable text. I then separated even and odd sample positions. Taking only even positions from row 0 followed by row 1, and packing most-significant bit first, produced 50 bytes. They began with the four-byte marker <code>00 00 01 60</code> and ended with <code>ff 1f</code>. The bytes between those exact boundaries were valid Base64. Strict decoding returned 31 UTF-8 bytes with the expected flag-like braces. I keep the answer itself out of the public page.</p>
+<p>This is a much stronger validation than scanning the stream for printable characters: the RTP counters, exact period, two changed rows, fixed bit selection, framing bytes, and strict decode all agree. The capture establishes recovery. It does not supply a grader receipt.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<h3>3.1 Flow enumeration and RTP discriminator</h3>
+<p>The first pass grouped IPv4 UDP packets by source/destination addresses and ports, counted packet sizes, and inspected RTP version and payload type. I did not infer RTP from UDP port alone. The <a href="artifacts/rtp_pcmu_review.py">offline RTP reviewer</a> implements the same discriminator with classic pcap length bounds and RTP header checks. It emits a JSON flow record, not an answer.</p>
+<h3>3.2 PCMU extraction to WAV</h3>
+<p>For listening and spectrum work, I kept the 160-byte PCMU payloads in sequence order and decoded them to 8 kHz, 16-bit mono PCM. I retained the raw <code>ulaw</code> stream separately because decoding changes the sample representation. A WAV is useful for ears, energy, DTMF, and a spectrogram; the embedding test belongs on the original PCMU bytes. On modern Python, <code>audioop</code> is no longer a portable dependency, so a maintained G.711 decoder or a small standards-checked lookup table is preferable for that optional listening step.</p>
+<h3>3.3 Bit-plane periodicity and carrier separation</h3>
+<p>The decisive primitive was a byte-match calculation <code>mean(audio[i] == audio[i + P])</code> over candidate periods, followed by an LSB matrix with rows of length <code>P</code>. I used the majority LSB value in each column as the baseline and counted deviations per row. With <code>P=400</code>, rows 0 and 1 stood out and rows 2 through 399 did not. The linked <a href="artifacts/rtp_pcmu_review.py">reviewer</a> performs that measurement and emits the period, match rate, and altered-row count; it deliberately does not reconstruct hidden content.</p>
+<pre><code class="language-python">period = 400
+rows = [audio[i:i + period] for i in range(0, len(audio), period)]
+baseline = [sum(row[j] &amp; 1 for row in rows) &gt; len(rows) // 2
+            for j in range(period)]
+deviations = [sum((row[j] &amp; 1) != baseline[j] for j in range(period))
+              for row in rows]
+# Replay: only rows 0 and 1 deviate; counts 89 and 88.
+</code></pre>
+<h3>3.4 Data extraction and Base64 decode</h3>
+<p>For this case, the extraction rule was: concatenate <code>row[0::2] &amp; 1</code> from rows 0 and 1, pack eight bits per byte in MSB order, require the exact four-byte prefix and two-byte suffix, then strictly Base64-decode the enclosed bytes. I did <strong>not</strong> delete every non-Base64 character from the raw byte stream. That shortcut can silently retain framing bytes that happen to be alphabet characters or conceal corruption. A decoder should check boundaries and fail closed when the alphabet or padding is wrong.</p>
+<pre><code class="language-python">import base64
+bits = [rows[r][j] &amp; 1 for r in (0, 1) for j in range(0, 400, 2)]
+packed = bytes(sum(bits[i+k] &lt;&lt; (7-k) for k in range(8))
+               for i in range(0, len(bits), 8))
+assert packed.startswith(bytes.fromhex(&quot;00000160&quot;))
+assert packed.endswith(bytes.fromhex(&quot;ff1f&quot;))
+recovered = base64.b64decode(packed[4:-2], validate=True)
+# Keep recovered content in the private case record.
+</code></pre>
+<h3>3.5 Fallback: brute-force sample-stride selector</h3>
+<p>The original fallback tried strides <code>1, 2, 3, 4, 5, 8</code>, every offset within each stride, and both bit orders on the first eight rows. It ranked candidates by printable-byte fraction. That is useful when even positions are not obvious, but printable text is a weak score by itself. I would also require enough output bytes, a valid alphabet, expected framing, and a clean strict decode before naming a candidate. The published detector does not brute-force hidden content; it leaves that to a scoped forensic recovery.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<h3>4.1 G.711 μ-law (PCMU)</h3>
+<p>G.711 μ-law is an 8-bit companded voice encoding. With the 8 kHz RTP clock, one encoded byte corresponds to one sample, so a 160-byte payload carries 20 ms of media and a stream runs at 64 kb/s before packet overhead. Companding allocates quantization levels unevenly across amplitudes. Flipping a PCMU wire-byte LSB changes a quantization code; the audible effect depends on the sample and decoding path, so I would not promise inaudibility without listening tests.</p>
+<h3>4.2 RTP framing</h3>
+<p>RTP supplies version, marker/payload type, sequence number, timestamp, and SSRC in its fixed header, with optional CSRC, extension, and padding fields. Sequence and timestamp progression let me test continuity; they do not authenticate the sender. Plain RTP provides neither media encryption nor source authentication. SRTP can protect those properties, but its adoption and signaling vary by deployment. The absence of SIP in one pcap is not a universal protocol violation.</p>
+<h3>4.3 LSB Steganography in PCM Audio</h3>
+<p>The title in the original notes used "PCM audio," but this carrier embeds in <strong>PCMU-encoded bytes</strong>. That difference matters: an analyst who decodes to PCM and then reads PCM LSBs may inspect the wrong bit plane. Even sample indices carried the recovered bits, leaving odd positions and almost the entire 20-second stream as a repeated baseline. Transcoding or resampling could break this exact extraction. A different scheme could distribute changes across the call or use keyed positions, so my sparse-row detection is case-shaped.</p>
+<h3>4.4 Base64 as a Transport Framing</h3>
+<p>Base64 made the embedded message easy to handle once I had the right bit positions. It did not supply reliable framing on its own. Padding such as <code>==</code> is optional in some profiles and is not a substitute for a length field or checked delimiter. Here the exact leading and trailing bytes, plus strict alphabet validation, gave me the boundaries.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit/Analysis Mechanics</summary>
+<p>The break came from a mismatch between plausible media framing and implausibly repetitive content. The packet cadence was regular enough to pass as PCMU media, while the underlying 400-byte waveform recurred 400 times. That made period search cheap. A row-by-column comparison reduced 160,000 candidate bytes to two modified rows, and an even-index selector reduced those rows to 400 bits, or 50 bytes.</p>
+<p>I also learned what the generic fallback actually proves. A high printable score can be coincidence; it does not prove Base64 or malicious intent. For this capture, strict decoding and the expected answer shape closed the forensic loop. The <a href="artifacts/test_rtp_pcmu_review.py">test harness</a> exercises a synthetic positive, an unmodified repeating carrier, a near miss with changes spread over many rows, and a malformed RTP extension. The tests make the detector's narrow decision boundary visible.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<p>My first instinct was to listen and check familiar audio channels. The DTMF, spectrogram, and straightforward LSB packing branches were useful failures because each narrowed the next question. The successful pivot was to compare the stream with itself. A 99.63 percent byte match after 400 samples is hard to ignore, and the matrix view showed exactly where the deviations lived.</p>
+<p>I would now bring stride and offset scoring forward sooner, but I would still validate framing and a strict decode. The challenge also reminded me that a protocol-looking packet is not necessarily meaningful media. In a real case, I would preserve the capture, document the extraction rule, and keep any recovered message separate from public reporting.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<p>For a SOC or incident-response team, the transferable skill is layered triage: inventory flows; confirm RTP header and codec; correlate signaling and endpoint context where available; then sample media content only where policy and privacy controls allow. A no-SIP observation is a lead only if signaling visibility is known. A flow log can show an unusual caller or duration, but it cannot measure a PCMU bit plane.</p>
+<p>For a purple-team exercise, I would generate approved synthetic PCMU traffic with one altered early segment and compare it with a benign repeating test tone and a normal call sample. The <a href="artifacts/rtp_pcmu_review.py">offline reviewer</a> gives the content-side observation; SBC or endpoint logs would supply call legitimacy. The framing marker is a case-local fingerprint, not an actor attribution claim. I would not plan SRTP key recovery or radio taps from this capture; neither is supported by its evidence.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<h3>8.1 Stego Triage Decision Tree</h3>
+<p>I begin with packet and media validity. If the flow is real RTP/PCMU, I ask whether energy and spectrum suggest speech, tones, or an artificial carrier. If an audible explanation fails, I compare encoded bytes across candidate periods. A strong period with sparse changed columns leads to scoped bit-position extraction and encoding checks. At each branch I record a negative result instead of treating it as empty work.</p>
+<h3>8.2 Reusable Bit-Plane Periodicity Probe</h3>
+<p>The <a href="artifacts/rtp_pcmu_review.py">bounded Python reviewer</a> is my reusable probe. It accepts classic Ethernet or raw-IPv4 pcap, parses UDP and RTP PT0 with extension/padding checks, and emits JSON fields for packet count, payload bytes, continuity gaps, 400-sample match rate, and LSB-deviation rows. It caps capture and flow sizes and never outputs the embedded plaintext. Its <a href="artifacts/README.md">README</a> lists required capture visibility, field mapping, tuning, and unsupported codecs or encapsulations.</p>
+<h3>8.3 Solve Pattern Checklist</h3>
+<p>My checklist is: enumerate every flow and singleton; validate RTP version, payload type, header length, sequence and timestamp deltas; record signaling visibility; inspect decoded audio for energy, DTMF, and spectral structure; probe raw encoded-byte periods; compare LSB rows against a baseline; try bounded stride/offset/bit-order candidates; require checked framing and strict decoding; then preserve both successful and failed branches in the case record. I avoid treating a challenge-format match as proof of real-world transmission intent.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<h3>9.1 MITRE ATT&amp;CK (Enterprise v15)</h3>
+<p><a href="https://attack.mitre.org/techniques/T1001/002/">T1001.002, Data Obfuscation: Steganography</a>, is the closest behavioral analogy if an adversary hid operational data in media traffic. The exercise itself has no observed C2. I do not label this T1041 (exfiltration over C2) without an established C2 channel, or T1572 (protocol tunneling) without one protocol carried inside another. T1071 and T1095 are not a useful pair of simultaneous labels for a PCMU payload.</p>
+<h3>9.2 MITRE D3FEND</h3>
+<p><a href="https://d3fend.mitre.org/technique/d3f:NetworkTrafficAnalysis/">D3-NTA, Network Traffic Analysis</a> fits the flow inventory and periodicity review. <a href="https://d3fend.mitre.org/technique/d3f:ProtocolMetadataAnomalyDetection/">D3-PMAD, Protocol Metadata Anomaly Detection</a> fits packet shape, sequence, and timing outliers, although this stream's header progression was ordinary. File-content rules apply only after a sound extraction pipeline; a rule searching raw PCMU for a post-extraction marker would look in the wrong representation. I do not map "decoy analysis" to an adversary technique based on the two singleton challenge packets.</p>
+<h3>9.3 MITRE CAPEC</h3>
+<p>The source discussion considered CAPEC-636, which concerns hiding data in <strong>files</strong>. This case carries bits in RTP media packets, so I leave that ID out of the final mapping. CAPEC-116 "Excavation" does not describe my forensic extraction as an attack. The concrete byte and packet observations are more useful here than a forced CAPEC label.</p>
+<h3>9.4 Frameworks Considered and Omitted</h3>
+<p>OWASP Top 10 and ASVS are web-application frameworks and do not clarify this network-media case. STRIDE could frame information disclosure in a VoIP architecture review, but this capture alone cannot establish the system trust boundaries that such a model needs.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<h3>10.1 STIX 2.1 Sample SDOs</h3>
+<p>A threat-intelligence team could represent the <strong>hypothesis</strong> as an attack-pattern object and attach a defensive course of action. The <a href="artifacts/stix-behavior-example.json">illustrative STIX 2.1 bundle</a> does that with unique IDs and a <code>mitigates</code> relationship. It has been JSON-parsed and its reference IDs checked locally, but no full STIX schema validator or TAXII server has been used. I would not publish the challenge IPs, marker, or synthetic flag as universal IOCs. A STIX Indicator requires a sound observable pattern; this bit-plane relationship is not expressible as a simple portable IP or byte-string indicator. No TAXII collection or exchange occurred.</p>
+<h3>10.2 STIG</h3>
+<p>For an organization using DISA unified-communications guidance, I would consult the currently applicable release and the actual SBC role before citing a requirement. Media encryption, boundary rules, and audit visibility are relevant review topics. This exercise does not prove a STIG finding, and PT0 or missing SIP in one capture is not itself a compliance failure.</p>
+<h3>10.3 CIS Controls v8</h3>
+<p>CIS Control 13 is a useful planning home: 13.3 covers network intrusion detection and 13.6 covers collecting network traffic flow logs. Flow logging supports volume, endpoint, and timing pivots. It cannot inspect PCMU LSBs without payload access. Detailed SBC event logging can support the signaling correlation, but that depends on the deployed product and field mapping.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>11a. Standards Mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Control family</th>
+<th>Case-specific application</th>
+<th>Evidence or limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NIST SP 800-53 SI-4 and AU-6</td>
+<td>Monitor media flows and review escalated findings</td>
+<td>Requires approved packet sampling and trained review</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 SC-7</td>
+<td>Limit RTP egress to authorized endpoints/SBC paths</td>
+<td>Requires a real network architecture and exceptions</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 SC-8</td>
+<td>Protect media in transit where the deployment calls for it</td>
+<td>SRTP alone does not prove an endpoint is benign</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 IR-4</td>
+<td>Preserve captures, correlate endpoints, and handle recovered data</td>
+<td>A playbook step, not an implemented control here</td>
+</tr>
+<tr>
+<td>CIS 13.3 / 13.6</td>
+<td>Sensor coverage and flow-log collection</td>
+<td>Flow logs do not expose content periodicity</td>
+</tr>
+</tbody>
+</table>
+<h3>11b. Mitigation Realization</h3>
+<p>I would first restrict who may originate RTP across a boundary and retain SBC call metadata and signaling logs. An analyst could then correlate the declared session with actual media endpoints, duration, codec, and SSRC. A mismatched session becomes a candidate for a privacy-reviewed capture and the offline periodicity check. The linked tool supplies that last check only.</p>
+<p>The source proposed a Zeek event named <code>rtp_stream_observed</code>; the sketch defines no emitter for that event, so the pasted script would fail as written. A production implementation needs a real RTP analyzer or a normalized feed and a join to SBC signaling. Likewise, I would not declare a blanket SRTP mandate or a weekly dashboard review without a local policy and owner. The control is a deployment decision; this page supplies a tested analytic primitive.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<h3>12.1 Sanitized IOCs</h3>
+<p>The useful indicators are behavioral: a validated RTP PT0 flow with an unusually strong 400-sample byte period, stable upper seven bits, and LSB changes confined to a tiny early part of the stream. The four-byte prefix and two-byte suffix are specific to this challenge's extraction and should be used only as a scoped case fingerprint. The private RFC 1918 endpoints are not threat indicators. A no-SIP observation needs known signaling coverage before it earns weight.</p>
+<h3>12.2 Sigma Rule (Behavioral)</h3>
+<p>A Sigma rule could select a <strong>normalized custom event</strong> such as <code>rtp_pcmu_periodicity_review</code> with <code>review_lead=true</code> and a minimum packet count. Sigma cannot calculate the 400-sample bit-plane statistic from ordinary Zeek <code>conn.log</code>. I therefore keep the stateful measurement in the <a href="artifacts/rtp_pcmu_review.py">offline tool</a>, rather than present a generic "RTP without SIP" Sigma as a validated steganography detector. A deployment should define the event schema and test backend conversion before shipping a rule.</p>
+<h3>12.3 Suricata Rule (Volumetric)</h3>
+<p>Suricata can help locate RTP-shaped flows or enforce an egress policy, but a <code>dsize:172</code> match is not specific to this case, and <code>dsize</code> concerns the UDP payload size rather than an entire IP packet. Here the UDP payload is 172 bytes, including the RTP header. Packet cadence and destination authorization should be aggregated with product-specific telemetry. I have not tested a Suricata rule against live traffic, so I do not present one as a working bit-plane detector.</p>
+<h3>12.4 KQL (Microsoft Sentinel)</h3>
+<p>A Sentinel hunt can prioritize sessions if a custom table has one <strong>flow-level</strong> row per media session with <code>SrcIp</code>, <code>DstIp</code>, <code>PacketCount</code>, <code>DurationSec</code>, <code>Codec</code>, and <code>CallId</code>. A starting template is <code>RtpSession_CL | where Codec == "PCMU" and PacketCount &gt; 100 | join kind=leftanti SipSession_CL on CallId</code>, with a bounded time window and actual SBC field mapping added before use. This is a signaling-coverage lead, not an LSB measurement. The original <code>CommonSecurityLog</code> query treated flow-level <code>SentBytes</code> as per-packet lengths and counted records as packets; that would misstate the evidence.</p>
+<h3>12.5 Splunk SPL</h3>
+<p>With the same normalized session fields, an SPL hunt could begin <code>index=voip sourcetype=rtp_session codec=PCMU packet_count&gt;100 | stats count by src_ip dst_ip call_id</code>. A separate lookup can mark authorized SBC sources and signaling context. Real field names, event granularity, and joins must be checked locally. A CIDR string comparison inside a generic <code>search</code> clause is not reliable subnet testing. This query is a scoping template, not an executed detection.</p>
+<h3>12.6 YARA (Extracted Audio Carrier)</h3>
+<p>YARA can fingerprint fixed bytes in a file, but the marker appeared <strong>after</strong> selecting and packing LSBs. Searching the raw pcap or the raw PCMU stream for <code>00 00 01 60</code> would not measure this case's behavior. A YARA rule on an already extracted message could match this tool's framing, yet the Python reviewer's period and sparse-row calculations are the more useful analytic. I did not create an untested rule that implies it can compute autocorrelation.</p>
+<h3>12.7 Log Source and Data Pipeline Requirements</h3>
+<p>The linked <a href="artifacts/README.md">README</a> names the sensor, inputs, fields, and limits. At minimum I need approved packet capture that includes unencrypted PCMU payloads, a lawful retention path, and a way to identify the call or endpoint. To correlate a no-signaling lead, I also need SBC or SIP logs with common session identifiers and reliable time. NetFlow/IPFIX alone can triage volume and endpoints, not payload bit planes. SRTP payloads require authorized endpoint-side visibility; this offline parser does not decrypt them.</p>
+<h3>12.8 Detection Engineering Notes</h3>
+<p>The synthetic tests passed for a sparse altered carrier, an unchanged repeating carrier, a near miss with changes across many rows, and malformed RTP extension handling. The tool also marked this capture as a review lead with 0.9963 match and two changed rows. These checks establish local parsing and case-fit behavior only. Repeated tones and test media can look suspicious; distributed or keyed embedding may not. I have not run a SIEM backend, measured production false-positive rates, or validated a live SBC integration. Entropy of a binary LSB plane cannot exceed one bit per sample, so the source's "7.5 bits per byte" escalation threshold was invalid for that measurement.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">diagram above</a> follows the work from flow inventory to the hidden message. The defensive layers line up this way:</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Practical realization</th>
+<th>What it can establish</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Behavior</td>
+<td>ATT&amp;CK T1001.002 as a conditional analogy</td>
+<td>A useful hypothesis, without actor or C2 attribution</td>
+</tr>
+<tr>
+<td>Boundary</td>
+<td>NIST SC-7; authorized SBC media paths</td>
+<td>Which endpoints are allowed to originate or receive RTP</td>
+</tr>
+<tr>
+<td>Visibility</td>
+<td>CIS 13.3/13.6; SBC and flow logs</td>
+<td>Session shape and signaling context</td>
+</tr>
+<tr>
+<td>Content</td>
+<td>The offline PCMU reviewer</td>
+<td>Repetition and sparse encoded-byte LSB changes</td>
+</tr>
+<tr>
+<td>Response</td>
+<td>NIST IR-4 playbook</td>
+<td>Preservation, validation, and careful handling of recovered data</td>
+</tr>
+</tbody>
+</table>
+<p>Flow and signaling metadata can tell me whether a media session deserves review; only approved payload access can reveal this exact 400-sample bit-plane pattern. Neither layer alone establishes adversary intent.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://www.rfc-editor.org/rfc/rfc3550">RFC 3550, RTP: A Transport Protocol for Real-Time Applications</a></li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc3551">RFC 3551, RTP Profile for Audio and Video Conferences with Minimal Control</a></li>
+<li><a href="https://www.itu.int/rec/T-REC-G.711">ITU-T G.711, Pulse code modulation of voice frequencies</a></li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc3711">RFC 3711, Secure Real-time Transport Protocol</a></li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc3261">RFC 3261, SIP: Session Initiation Protocol</a></li>
+<li><a href="https://attack.mitre.org/techniques/T1001/002/">MITRE ATT&amp;CK T1001.002, Steganography</a></li>
+<li><a href="https://d3fend.mitre.org/technique/d3f:NetworkTrafficAnalysis/">MITRE D3FEND Network Traffic Analysis</a> and <a href="https://d3fend.mitre.org/technique/d3f:ProtocolMetadataAnomalyDetection/">Protocol Metadata Anomaly Detection</a></li>
+<li><a href="https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html">OASIS STIX 2.1</a></li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5</a> and <a href="https://csrc.nist.gov/pubs/sp/800/58/final">NIST SP 800-58, Security Considerations for Voice over IP Systems</a></li>
+<li><a href="https://cas.docs.cisecurity.org/en/latest/source/Controls13/">CIS Control 13, Network Monitoring and Defense</a></li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>

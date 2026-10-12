@@ -1,0 +1,41 @@
+{
+  "type": "bundle",
+  "id": "bundle--bea53882-57ca-4928-83c5-d030b0c48cfc",
+  "objects": [
+    {
+      "type": "attack-pattern",
+      "spec_version": "2.1",
+      "id": "attack-pattern--835708b9-1c94-48eb-aeac-3298f9e5be4c",
+      "created": "2026-10-12T00:00:00.000Z",
+      "modified": "2026-10-12T00:00:00.000Z",
+      "name": "Hypothetical PCMU media-bit concealment",
+      "description": "Illustrative behavior derived from an RTP/PCMU puzzle: selected bit positions in encoded media carry data. This does not identify an observed actor, campaign, or real-world exfiltration.",
+      "external_references": [
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1001.002",
+          "url": "https://attack.mitre.org/techniques/T1001/002/"
+        }
+      ]
+    },
+    {
+      "type": "course-of-action",
+      "spec_version": "2.1",
+      "id": "course-of-action--93502ec2-f520-4495-bfcd-b2cb7828b203",
+      "created": "2026-10-12T00:00:00.000Z",
+      "modified": "2026-10-12T00:00:00.000Z",
+      "name": "Review anomalously periodic RTP/PCMU media",
+      "description": "After verifying RTP and authorized sensor scope, compare PCMU byte periodicity and sparse bit-plane changes, then correlate any lead with SBC signaling and endpoint context."
+    },
+    {
+      "type": "relationship",
+      "spec_version": "2.1",
+      "id": "relationship--93fe4993-4193-4697-a019-d83187441789",
+      "created": "2026-10-12T00:00:00.000Z",
+      "modified": "2026-10-12T00:00:00.000Z",
+      "relationship_type": "mitigates",
+      "source_ref": "course-of-action--93502ec2-f520-4495-bfcd-b2cb7828b203",
+      "target_ref": "attack-pattern--835708b9-1c94-48eb-aeac-3298f9e5be4c"
+    }
+  ]
+}
