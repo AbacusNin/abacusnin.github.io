@@ -630,5 +630,27 @@
     ],
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/forensics/png-appended-image/"
+  },
+  {
+    "title": "The One 200 in Ten Thousand Requests",
+    "category": "Forensics",
+    "difficulty": "Easy",
+    "date": "2026-10",
+    "tags": [
+      "pcap",
+      "http",
+      "forced-browsing",
+      "enumeration",
+      "access-control",
+      "detection-engineering"
+    ],
+    "summary": "Ten thousand sequential web requests produced one success. The capture identified the endpoint but carried no response content; a later request with a valid session retrieved the answer.",
+    "aliases": [
+      "endpoint leak",
+      "web enumeration",
+      "network forensics"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/forensics/http-endpoint-leak/"
   }
 ]

@@ -1,0 +1,9 @@
+{
+  "src_ip": "192.0.2.10",
+  "host": "example.test",
+  "path_family": "/demo_",
+  "failed_requests": 3,
+  "distinct_failed_paths": 3,
+  "success_path": "/demo_3",
+  "result": "enumeration_then_success"
+}

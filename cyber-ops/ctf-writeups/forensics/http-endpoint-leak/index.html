@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The One 200 in Ten Thousand Requests - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="Ten thousand sequential web requests produced one success. The capture identified the endpoint but carried no response content; a later request with a valid session retrieved the answer.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/http-endpoint-leak/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The One 200 in Ten Thousand Requests">
+  <meta property="og:description" content="Ten thousand sequential web requests produced one success. The capture identified the endpoint but carried no response content; a later request with a valid session retrieved the answer.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/http-endpoint-leak/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Forensics / <span aria-current="page">The One 200 in Ten Thousand Requests</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The One 200 in Ten Thousand Requests</h1>
+        <p class="lead">I went looking for a hidden payload. The useful clue was one ordinary HTTP status code.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Identify what a brute-force web capture disclosed and use that lead to recover the challenge answer.</p>
+<p><strong>What I did.</strong> I counted responses, paired the lone 200 with its request, checked the empty body, and tested the endpoint with the right session after several unnecessary detours.</p>
+<p><strong>The result.</strong> The capture reveals one endpoint. A later authenticated request reportedly returned the answer; the answer itself is withheld.</p>
+<p><strong>The limit.</strong> The packet findings were checked again against the capture. The later live-service response was described during the solve but was not independently replayed. No platform submission transcript is shown.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Capture; Triage; Body; Pivot; Session; Defense">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Capture</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">10,000 sequential requests</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Triage</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">9,999 misses and one success</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Body</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Every response declared zero length</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Pivot</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Pair the success with its path</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Session</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Retrieve with a valid login</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Defense</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Correlate misses then success</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Network Forensics (web)</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Easy</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>pcap, http, forced-browsing, enumeration, access-control, detection-engineering</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved</td>
+</tr>
+<tr>
+<td>Material</td>
+<td>One cleartext HTTP capture, about 11.8 MB and 15 seconds</td>
+</tr>
+<tr>
+<td>Result</td>
+<td>One endpoint identified in the capture; authenticated retrieval recorded during the solve</td>
+</tr>
+<tr>
+<td>Verification boundary</td>
+<td>Packet facts rechecked locally; later service interaction not replayed</td>
+</tr>
+</tbody>
+</table>
+<p>The short solution earns the Easy rating. My time spent chasing other theories is a lesson about investigative discipline, not a measure of the challenge's technical prerequisites.</p>
+<p>Defensive proofs of concept for applying this pattern to web telemetry: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/http-endpoint-leak/artifacts">browse the tools and detections on GitHub</a> and <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/http-endpoint-leak/fixtures">the invented fixtures</a>. These operational examples use synthetic fixtures, not the challenge's raw capture.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I received a packet capture and a prompt asking whether an automated brute-force against a web application leaked anything. The capture showed a client trying a sequential family of paths, <code>/&lt;resource&gt;_0</code> through <code>/&lt;resource&gt;_9999</code>. My job was to find what the traffic revealed and recover the challenge answer.</p>
+<p>The simulated actor wanted to discover a path that was not advertised in the application. I was the analyst with the capture. The important boundary was between learning that a resource exists and being allowed to read its content. A discovered path is useful intelligence. The capture alone cannot show that the application gave content to an unauthorized client.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I first checked the capture format and shape. It is a classic little-endian pcap with 100,004 packets over roughly 15.08 seconds. The IP traffic in it is loopback. It records 10,000 HTTP <code>GET</code> requests to one numeric path family, each index from 0 to 9999 exactly once and in order. My independent packet pass found 9,999 <code>404</code> responses and one <code>200</code>, with all 10,000 requests paired to responses. Every response declared <code>Content-Length: 0</code>; the successful response also had no body bytes in its first packet. In this capture, the answer was a pointer to a path, not a string in the successful response.</p>
+<p>That should have ended the capture search. Instead, I treated the empty body as a hint that a more elaborate encoding must be present. My investigation notes count roughly 133 sandbox command executions and around 100 distinct techniques. The tooling inventory records approximately 240 <code>tshark</code> references, 180 Python references, 70 Scapy references, 29 <code>tcpflow</code> references, 31 <code>strings</code> references, 20 <code>editcap</code>/<code>capinfos</code> references, 16 live <code>curl</code> references, two <code>nmap</code> runs, one Suricata 7.0.3 run, and hash comparisons. Those are rough activity notes, not a benchmark or counts of unique executions per tool. <code>bulk_extractor</code> and Zeek were unavailable in that environment, so I approximated their functions with Python.</p>
+<h3>2a. Complete Technique Register</h3>
+<p>I keep the negative work because it explains the bad hypothesis I was carrying. The packet counts and path pairing above were the parts I checked again; the other family outcomes come from my investigation notes.</p>
+<p><strong>Family A, structure and integrity.</strong> I compared <code>tshark</code>, Scapy, and <code>tcpflow</code> views; checked <code>capinfos</code>, protocol hierarchy, the classic-pcap magic bytes, record boundaries, captured versus wire lengths, checksums, and file tail. My notes show no length mismatch or embedded pcapng comment block. The two downloaded copies matched by SHA-256. My later byte comparison also found the two available copies identical.</p>
+<p><strong>Family B, HTTP application data.</strong> I listed methods, URIs, hosts, response codes, streams, headers, cookies, authorization fields, query strings, request bodies, and possible exportable objects. I found no useful alternate content location or exported object. The URI range was complete and ascending with no gap or duplicate. I counted 17 distinct response strings and found the <code>200</code> versus <code>404</code> status text to be the useful discriminator.</p>
+<p><strong>Family C, statistics.</strong> I tried chi-square, Benford, run-length, Kolmogorov-Smirnov, compression ratio, per-field variation, and mutual-information checks. None gave a reproducible message. Random-looking metadata alone cannot prove there is no encoding, but these tests supplied no reason to continue treating the fields as a carrier.</p>
+<p><strong>Family D, timing.</strong> I measured request spacing and response latency, tried bimodality and modulus-2-through-600 ANOVA variants, a continuous-frequency transform, TCP timestamp deltas, and microsecond bit extraction. A period near 44.21 appeared in the analysis but did not decode useful content; one out-of-order packet was noise, not a message.</p>
+<p><strong>Family E, protocol-field covert channels.</strong> I swept IP IDs, TCP initial sequence numbers, ephemeral ports, windows, reserved and urgent bits, eight fields' low bytes, high bytes, nibbles and bit planes, and response-arrival order. My notes show zero values for the relevant reserved-bit and urgent-pointer checks. The single success occurred in its matching request slot, so permutation/order did not provide a second channel.</p>
+<p><strong>Family F, cryptographic transforms.</strong> I tried single-byte XOR, repeating-key XOR for periods 1 through 8, additive and subtractive transforms, bit rotations, Base32/Base64-like alphabets, Caesar shifts, 168 pairwise field combinations, index-selection sets, and 5/6/7-bit symbol framings. Apparent XOR hits were TCP timestamp artifacts. I also used the successful index as a possible offset, stride, key, modulus, or selector. None produced a verified answer. I did not submit the hash-derived guesses.</p>
+<p><strong>Family G, carving and strings.</strong> I searched for ZIP, gzip, PNG, JPEG, PDF, RAR, 7z, PEM, SQLite, xz, and bzip2 signatures; decoded narrow and UTF-16 strings; swept reconstructed flows; and approximated URL, email, Base64, hex, host, and account extractors. I found no useful embedded payload.</p>
+<p><strong>Family H, independent parsers.</strong> Suricata reportedly produced zero alerts or anomalies and agreed that the HTTP response lengths were zero. Python-derived equivalents of Zeek <code>http.log</code>, <code>files.log</code>, <code>conn.log</code>, and notice/weird views also gave no hidden-content lead. A zero-alert result is a property of that run and rule set, not evidence that the browsing behavior was safe.</p>
+<p><strong>Family I, visual encodings.</strong> I rendered 100 by 100 field bitmaps, low-byte strips, a Hilbert curve over 70,000 low bytes, and raw field-byte grayscale. No readable glyph emerged.</p>
+<p><strong>Family J, other services.</strong> I tried object-store listings and keys, a GCS bucket, CDN-origin clues, prior-year flag conventions, a full and a fast host port scan, and probes of high ports. The object-store checks yielded anonymous deny or a missing bucket. The high ports served unrelated interactive challenges, not this HTTP answer. These were dead ends, and the prior-year flag-format assumption was particularly misleading.</p>
+<p>The useful pivot was a request to the discovered path on the live platform from a valid authenticated browser session. My anonymous requests had returned <code>404</code>; the valid session received content. The differential is consistent with access gating, but a <code>404</code> does not reveal the server's exact authorization decision or route logic.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>The compact triage I wish I had used first is a status tally followed by inspection of the rare response's TCP stream:</p>
+<pre><code class="language-sh">tshark -r capture.pcap -Y 'http.response' -T fields -e http.response.code | sort | uniq -c
+tshark -r capture.pcap -Y 'http.response.code == 200' -T fields -e frame.number -e tcp.stream -e http.content_length
+</code></pre>
+<p>I pair the response to its request in the same TCP stream. I do not rely on a version-specific convenience field to report the request URI. The <a href="artifacts/http_capture_triage.py">offline capture triage script</a> makes that pairing for this simple cleartext pcap and reports the URI, status counts, numeric range, and declared body length as JSON. Its <a href="artifacts/README.md">guide</a> states the packet-local parser's limits. For a different capture with segmentation, retransmission, TLS, or HTTP/2, I would use full stream reassembly and verify the output manually.</p>
+<pre><code class="language-sh">python -B artifacts/http_capture_triage.py capture.pcap
+</code></pre>
+<p>I also used <code>capinfos</code>, <code>editcap</code>, Scapy, <code>tcpflow</code>, <code>strings</code>, Python statistical libraries, and a Suricata pass. I prepared a Zeek <code>http.log</code> route: inspect <code>uri</code>, <code>status_code</code>, and <code>response_body_len</code> for the rare success. The XOR and entropy scripts belong to my failed-path register, not to the minimum solution.</p>
+<p>My final request used the discovered URI and an authenticated platform session. I would keep a session credential out of shell history and published notes. The capture's loopback address was never a useful remote destination. I did not repeat live scans or account requests for this page.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>Forced browsing means requesting guessed resources without navigating to them through links. A run of numeric paths can reveal the shape of an application's namespace. In this capture the code distribution is unusually clean: 9,999 misses and one success. The success identifies a specific path. It does not mean that the HTTP response contained a secret, because the successful response declared zero content length.</p>
+<p><a href="https://www.rfc-editor.org/rfc/rfc9110.html">RFC 9110</a> also makes the anonymous <code>404</code> worth treating carefully: a server can return <code>404</code> when it is unwilling to disclose a resource's existence. The valid-session result suggests an authentication-sensitive difference, but I cannot infer the exact server policy from a status code. Discoverability, authentication, and authorization are three separate questions.</p>
+<p>The path index has a theoretical maximum of about <code>log2(10,000)</code>, or 13.3 bits, if a uniformly selected one-of-10,000 index is the only unknown. That is a way to describe the namespace choice, not a measurement of all information in the pcap or of secret entropy.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit/Analysis Mechanics</summary>
+<p>The successful route can be identified deterministically: enumerate HTTP transactions, isolate the one <code>200</code>, and pair it with the matching request. A body check then determines whether the capture itself has content to recover. Here all declared body lengths are zero, and the successful response's packet had no body bytes. My earlier full-stream review reached the same conclusion.</p>
+<p>The captured traffic uses loopback, so it cannot directly name a public service endpoint. The record's last step used the corresponding path on the live challenge platform with a valid session. It reports that this request returned the answer and that anonymous probing had returned <code>404</code>. I keep the answer value out of this page. I can independently verify the pcap-side lead; I cannot independently verify the historical live transaction or submission from the capture alone.</p>
+<p>In three actions: count codes, extract the successful path, request it in the authorized challenge session. The failed analyses in Section 2a happened between the second and third actions.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<p>I overworked this case. Once I had one successful path and a zero-length response, the next cheap test was to follow that pointer in the intended environment. Instead I looked for ciphertext, metadata bits, carved files, and timing channels. Those checks were technically interesting, but they were answers to a question the evidence had stopped asking.</p>
+<p>Two assumptions kept me there. First, I carried a flag-format convention from earlier challenges into this one as though it were a rule. Second, I treated the anonymous <code>404</code> as conclusive absence and did not vary session state. The later authenticated request exposed that mistake. In future HTTP triage I will write down both the resource I found and the identity making the request.</p>
+<p>The portable habit is to use status and path metadata to find the anomaly, inspect the response body, then run the cheapest authorized test of the lead. I still preserve the negative work because it shows how an investigation can be thorough yet poorly directed. The actual challenge difficulty is Easy despite my detour.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<p>For my own practice, this is a stopping-rule exercise as much as a network-forensics exercise. I can apply the same first pass to access logs, Zeek <code>http.log</code>, WAF records, or a cleartext capture: count statuses by client, host, path family, and time; pair any rare success with the preceding misses; then examine the route and requester context.</p>
+<p>For a SOC or incident-response team, the useful hypothesis is a client discovering a numbered endpoint after many misses. I would preserve the raw request/response records, check proxy attribution, identify the account or session if present, inspect response bytes and route sensitivity, and ask the application owner whether the path was intended to be accessible. Secret rotation follows only if exposure is confirmed. Authorized discovery scans, broken links, and health checks are expected false positives to tune around.</p>
+<p>For threat intelligence, the cadence, path pattern, and User-Agent could help cluster activity, but they are weak selectors. A single CTF loopback capture does not establish a real actor, campaign, external IOC, or exfiltration. For a purple-team exercise, I would generate a controlled series of numbered-path misses followed by a success on a test host, verify the sensor records all five necessary fields, and check that the alert points to the exact requests without claiming sensitive-data loss.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>My reusable decision pattern is: establish the protocol; tally status codes; pair rare success with its request; check whether the response actually carries content; then follow any discovered pointer under the permitted account context. Deeper carving or covert-channel work begins only if those checks fail.</p>
+<p>The <a href="artifacts/http_capture_triage.py">capture triage tool</a> and its <a href="fixtures/sample_http.pcap">synthetic pcap</a> reproduce the basic request/response shape without publishing the challenge endpoint. The <a href="fixtures/expected_capture.json">expected capture report</a> makes the output checkable. The <a href="artifacts/web_enum_detector.py">normalized web-log detector</a> runs the operational hypothesis on <a href="fixtures/web_events.jsonl">invented web events</a>, with an <a href="fixtures/expected_detection.json">expected finding</a>. The <a href="artifacts/test_http_lab.py">regression checks</a> include a positive case and near misses. The <a href="artifacts/README.md">lab guide</a> explains inputs, limits, and tuning.</p>
+<p>My early generic triage idea chose whichever status was rarest and treated a missing content length as an empty body. I changed that logic: this tool explicitly reports <code>200</code> responses and calls a body <code>declared_empty</code> only when the response says <code>Content-Length: 0</code> without transfer coding. It remains a packet-local helper, so I still require a real stream review before using it to rule out content in a new capture.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>Mapping</th>
+<th>Why it fits</th>
+<th>Boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://attack.mitre.org/techniques/T1595/003/">MITRE ATT&amp;CK</a></td>
+<td>T1595.003, Active Scanning: Wordlist Scanning</td>
+<td>Sequential probing of a numbered web path family</td>
+<td>Technique analogy for the simulated client; no real intrusion attribution</td>
+</tr>
+<tr>
+<td><a href="https://capec.mitre.org/data/definitions/87.html">CAPEC</a></td>
+<td>CAPEC-87, Forceful Browsing</td>
+<td>Requesting unlinked paths until one resolves</td>
+<td>Pattern mapping, not proof of a particular application vulnerability</td>
+</tr>
+<tr>
+<td><a href="https://d3fend.mitre.org/technique/d3f:NetworkTrafficAnalysis/">MITRE D3FEND</a></td>
+<td>Network Traffic Analysis</td>
+<td>Defensive review of the captured HTTP metadata</td>
+<td>Proposed analytic activity, not an observed deployed control</td>
+</tr>
+<tr>
+<td><a href="https://cwe.mitre.org/data/definitions/425.html">CWE</a> / <a href="https://owasp.org/Top10/A01_2021-Broken_Access_Control/">OWASP A01</a></td>
+<td>CWE-425 / Broken Access Control</td>
+<td>Worth checking if an unauthorized role can read the discovered route</td>
+<td>Not established here: the recorded content retrieval used a valid session</td>
+</tr>
+</tbody>
+</table>
+<p>I do not map this endpoint namespace to ATT&amp;CK T1590, which concerns victim network information. I also cannot call the valid-session response an authorization bypass without the route policy and role test.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<p>The strongest indicator here is behavioral: many distinct <code>404</code> paths in one numbered family, followed by a <code>200</code> for the same client and host within a short period. The challenge's loopback address and route name are not reusable external IOCs. A default client User-Agent, if present, is too weak on its own. There is no evidence of a TAXII feed or a production intelligence exchange.</p>
+<p>I sketched a STIX 2.1 bundle with an attack-pattern, indicator, and course-of-action object. The indicator pattern matched one HTTP request path, but that single observable cannot express the aggregate and temporal <code>404</code>-then-<code>200</code> behavior. I therefore keep the multi-event logic in the <a href="artifacts/web_enum_detector.py">web-log detector</a> and the <a href="artifacts/sigma_endpoint_discovery.yml">Sigma candidate</a>. A STIX producer could describe the pattern in prose with references, but it should not claim an equivalent executable STIX pattern without a valid representation and consumer test.</p>
+<p>For standards implementation, I would select the current STIG and CIS Benchmark for the actual server product, then check its route authorization and access-log requirements. The capture does not identify that product or establish a compliance finding. <a href="https://csrc.nist.gov/pubs/sp/800/92/final">NIST SP 800-92</a> offers general log-management context; it does not certify this detection.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>11a. Standards Mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Candidate area</th>
+<th>Practical question</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5</a></td>
+<td>AC-3</td>
+<td>Does the application enforce access decisions for every sensitive route and role?</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>CM-7</td>
+<td>Are unnecessary debug or hidden routes removed or gated?</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>SI-4, AU-2, AU-3</td>
+<td>Are requests logged with enough client, path, time, and response detail to investigate enumeration?</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>SC-5</td>
+<td>Is high-volume enumeration throttled without blocking normal users?</td>
+</tr>
+<tr>
+<td><a href="https://www.cisecurity.org/controls/v8">CIS Controls v8</a></td>
+<td>4, 8, 13</td>
+<td>Secure configuration, log management, and network monitoring are implementation areas to assess.</td>
+</tr>
+</tbody>
+</table>
+<p>These are control-design prompts, not assessed compliance results. I also considered the web-server STIG family and product-specific CIS Benchmarks; a real assessment needs the deployed server and version before citing a requirement ID.</p>
+<h3>11b. Mitigation Realization</h3>
+<p>I would make the application's authorization check explicit on sensitive routes and test anonymous, normal-user, and privileged-user outcomes. I would remove unnecessary production routes, enable detailed access logging, and use proxy or WAF rate limits as a brake on bulk enumeration. A discovered route returning <code>200</code> to a valid account might be correct behavior, so the deciding test is the route's intended audience and the response actually delivered. If an unauthorized account obtained a secret, I would contain access and rotate the affected value; the capture by itself does not establish that condition.</p>
+<p>The <a href="artifacts/web_enum_detector.py">offline detector</a> is the concrete monitoring proof of concept. The <a href="artifacts/detection_queries.md">query templates</a> and <a href="artifacts/sigma_endpoint_discovery.yml">Sigma correlation candidate</a> show how to move it toward SIEM processing, with backend and field-mapping work still required.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>The packet-level facts I can stand behind are the 10,000 numbered requests, 9,999 <code>404</code>s, one <code>200</code>, and declared zero-length responses. The useful production signal is a distinct-path <code>404</code> run followed by a <code>200</code> for the same client, host, and numeric path family. No challenge-specific IP, domain, route, flag wrapper, or file hash is a responsible general-purpose IOC.</p>
+<p>The <a href="artifacts/web_enum_detector.py">web-log detector</a> implements a sliding five-minute window with a default threshold of 100 distinct misses. It requires sorted JSONL events with timestamp, real client IP, host, path, and status. Its <a href="fixtures/web_events.jsonl">synthetic events</a>, <a href="fixtures/expected_detection.json">expected output</a>, and <a href="artifacts/test_http_lab.py">tests</a> show one hit and near misses for the wrong source, host, family, order, duplicate paths, or time window. The <a href="artifacts/detection_queries.md">SPL and KQL templates</a> use fixed bins and need local schema mapping and runtime validation. The <a href="artifacts/sigma_endpoint_discovery.yml">Sigma correlation</a> parsed with pySigma, but no backend conversion or production log trial was performed. The <a href="artifacts/README.md">guide</a> gives the sensor and tuning assumptions.</p>
+<p>An alert is a lead. I would inspect account state, authenticated response size, route ownership, and authorization policy before calling it exposure. I would also suppress known testing sources with care, so those exceptions do not conceal an actual discovery attempt. I had considered a generic YARA <code>FLAG{...}</code> pattern, but a puzzle wrapper is neither the observed network behavior nor a useful organization secret format. A real DLP rule needs that organization's secret grammar and a measured false-positive test.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow diagram above</a> summarizes the case: enumeration, one success, zero-length captured body, authenticated follow-up, and a defensive correlation. I deliberately stop the diagram before any claim of unauthorized disclosure. In a real investigation the next box would be a route-policy and response-content review, whose outcome could change the severity entirely.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://www.rfc-editor.org/rfc/rfc9110.html">RFC 9110, HTTP Semantics</a>, especially <code>200</code> and <code>404</code> response meaning.</li>
+<li><a href="https://attack.mitre.org/techniques/T1595/003/">MITRE ATT&amp;CK T1595.003</a>, Wordlist Scanning.</li>
+<li><a href="https://capec.mitre.org/data/definitions/87.html">MITRE CAPEC-87</a>, Forceful Browsing.</li>
+<li><a href="https://d3fend.mitre.org/technique/d3f:NetworkTrafficAnalysis/">MITRE D3FEND Network Traffic Analysis</a>.</li>
+<li><a href="https://cwe.mitre.org/data/definitions/425.html">MITRE CWE-425</a> and <a href="https://owasp.org/Top10/A01_2021-Broken_Access_Control/">OWASP Top 10 A01:2021</a>, conditional application review references.</li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5</a>, <a href="https://csrc.nist.gov/pubs/sp/800/92/final">NIST SP 800-92</a>, and <a href="https://www.cisecurity.org/controls/v8">CIS Controls v8</a>.</li>
+<li><a href="https://sigmahq.io/sigma-specification/specification/sigma-correlation-rules-specification.html">Sigma Correlation Rules specification</a>, <code>value_count</code> and <code>temporal_ordered</code> structure.</li>
+<li><a href="https://www.tcpdump.org/manpages/pcap-savefile.5.html">pcap capture file format</a>, classic file and packet records.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>

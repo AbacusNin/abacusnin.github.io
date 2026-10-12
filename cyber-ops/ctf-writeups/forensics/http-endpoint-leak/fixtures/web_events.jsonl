@@ -1,0 +1,5 @@
+{"ts":"2026-10-01T12:00:00Z","src_ip":"192.0.2.10","host":"example.test","path":"/demo_0","status":404}
+{"ts":"2026-10-01T12:00:01Z","src_ip":"192.0.2.10","host":"example.test","path":"/demo_1","status":404}
+{"ts":"2026-10-01T12:00:02Z","src_ip":"192.0.2.11","host":"example.test","path":"/demo_9","status":404}
+{"ts":"2026-10-01T12:00:03Z","src_ip":"192.0.2.10","host":"example.test","path":"/demo_2","status":404}
+{"ts":"2026-10-01T12:00:04Z","src_ip":"192.0.2.10","host":"example.test","path":"/demo_3","status":200}
