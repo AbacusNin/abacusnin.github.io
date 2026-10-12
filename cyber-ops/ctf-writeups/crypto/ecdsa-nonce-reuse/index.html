@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Three Firmware Signatures, One Reused Nonce - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="I found three firmware signatures with the same ECDSA r value, recovered the signing scalar from their hashes, and traced the separate AES key-derivation step to the flag.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/ecdsa-nonce-reuse/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="Three Firmware Signatures, One Reused Nonce">
+  <meta property="og:description" content="I found three firmware signatures with the same ECDSA r value, recovered the signing scalar from their hashes, and traced the separate AES key-derivation step to the flag.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/ecdsa-nonce-reuse/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Crypto / <span aria-current="page">Three Firmware Signatures, One Reused Nonce</span></p>
+      <div class="page-head">
+        <h1 class="page-title">Three Firmware Signatures, One Reused Nonce</h1>
+        <p class="lead">Twelve firmware signatures were enough to expose a signing key. Three of them shared the same r value.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Identify the firmware versions with a reused ECDSA nonce, recover the signing key in decimal, and decrypt the flag.</p>
+<p><strong>What I did.</strong> I grouped the signatures by r, solved the two-signature equations, compared all three pairs, and tried the recorded AES key candidates.</p>
+<p><strong>The result.</strong> The recorded solve found one scalar across all three pairs and a flag-format plaintext after SHA-256 truncation and AES-128 decryption.</p>
+<p><strong>The limit.</strong> The JSON log, private scalar, ciphertext, plaintext, and acceptance receipt are unavailable here for an independent replay. The linked signing-log audit uses invented events.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Parse the log; Group by r; Recover nonce and key; Check three pairs; Try AES keys; Validate plaintext">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Parse the log</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Twelve firmware records</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Group by r</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Three signatures collide</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Recover nonce and key</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Solve modulo curve order</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Check three pairs</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">One recorded scalar</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Try AES keys</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Six rejects and one candidate</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Validate plaintext</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Padding and prefix reported</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Crypto</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>ECDSA, secp256k1, nonce-reuse, k-reuse, private-key-recovery, AES-128, KDF</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved-Verified</td>
+</tr>
+<tr>
+<td>Recorded result</td>
+<td>Three firmware signatures shared an <code>r</code>; pairwise recovery converged on one private scalar; a SHA-256-truncated AES key gave a padded flag-format plaintext.</td>
+</tr>
+<tr>
+<td>Evidence boundary</td>
+<td>The recorded solve reports final validation. The underlying log, recovered scalar, ciphertext, and platform receipt are not included here.</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/crypto/ecdsa-nonce-reuse/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>Analytical Attack Chain (Overview)</h2>
+<pre><code class="language-mermaid">flowchart LR
+  A[Parse 12 signing records] --&gt; B[Group by key and r]
+  B --&gt; C[Three signatures collide]
+  C --&gt; D[Solve for nonce and private scalar]
+  D --&gt; E[Check all three pairs]
+  E --&gt; F[Try AES key derivations]
+  F --&gt; G[Check padding and flag format]
+  C -. defender .-&gt; H[Review signing audit and key exposure]
+</code></pre>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I started with a fictional device's firmware-update log. It described ECDSA on secp256k1 with SHA-256, gave the signer's public key, and listed twelve firmware versions. Each record carried a message hash and signature <code>(r, s)</code>. A separate 16-byte encrypted flag made this more than a signing-key question: I had to identify the versions that shared a nonce, recover the private scalar as a decimal integer, then find the AES key that decrypted the flag.</p>
+<p>The log was the whole investigative surface. I had no signer, firmware image, or live device. In a real update service, signatures and public keys may be widely visible while the private key stays protected. Reusing an ECDSA nonce breaks that boundary. This challenge simulated the math of that failure; it did not document an actual compromised signing service.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I parsed the twelve records into <code>(r, s, h)</code> integers and grouped them by <code>r</code>. Three versions landed in one group. That was the cheapest useful check: one pass through the log before touching modular arithmetic. The version strings are not included in this public record.</p>
+<p>I then used two distinct message hashes from that group to solve for a candidate nonce <code>k</code> and private scalar <code>d</code> modulo the secp256k1 group order. I repeated the calculation for all three pairs; the recorded results agree on one scalar. The step order is a reconstruction, not a live terminal transcript.</p>
+<p>There was a brief detour over the shared <code>r</code>. It was reported as incorrect, so the value was parsed again. The second parse matched byte for byte and the objection was retracted as a read error. I kept the value and moved on. The later uncertainty was real: the challenge had not specified how to turn <code>d</code> into an AES key. The recorded sweep contains seven candidates, six rejected outputs, and one candidate with exact PKCS#7 padding and the expected prefix. Section 3 names five of those candidate forms and the two others noted in the trace; it is a reconstruction, not a terminal transcript.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>Python's <code>json</code> module handled the log. Integer arithmetic and <code>pow(x, -1, n)</code> supplied modular inverses. The recorded AES step used PyCryptodome and <code>hashlib</code>. Here is the recovery core in a form that shows the actual input relationship without exposing the challenge values:</p>
+<pre><code class="language-python">N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+
+def recover_same_k(h1, s1, h2, s2, r):
+    k = ((h1 - h2) * pow((s1 - s2) % N, -1, N)) % N
+    d = ((s1 * k - h1) * pow(r, -1, N)) % N
+    return k, d
+
+# Parse each version's messageHash and signature fields as integers.
+# Group by signature.r within the same signing key and curve.
+# Compare the three distinct-hash pairs, then verify candidate d against Q.
+</code></pre>
+<p>The equation assumes the two signatures used the same signed nonce. ECDSA can also give the same <code>r</code> for <code>k</code> and <code>n-k</code>; low-<code>s</code> normalization can change the observed sign of <code>s</code>. A general verifier should test the applicable sign branches and check that <code>d*G</code> equals the supplied public key. The recorded three-pair convergence is strong internal consistency, but I have no public-key comparison output to report.</p>
+<p>The candidate forms were raw 32-byte <code>d</code>, its first or last 16 bytes, MD5 of the hex representation, MD5 of decimal text, full SHA-256, and the first 16 bytes of SHA-256 of <code>d</code> bytes. The recorded winner was <code>SHA256(d_bytes)[:16]</code>. A 32-byte candidate would request AES-256, while a 16-byte candidate requests AES-128; the code must choose the matching key length. The ciphertext was one 16-byte block, so AES-ECB was the challenge's single-block test. I would not carry ECB into a new product design.</p>
+<pre><code class="language-python">from hashlib import sha256
+from Crypto.Cipher import AES
+
+d_bytes = private_scalar.to_bytes(32, &quot;big&quot;)
+aes_key = sha256(d_bytes).digest()[:16]
+plain_block = AES.new(aes_key, AES.MODE_ECB).decrypt(ciphertext_block)
+pad = plain_block[-1]
+assert 1 &lt;= pad &lt;= 16 and plain_block[-pad:] == bytes([pad]) * pad
+plain = plain_block[:-pad]
+# Check the expected challenge prefix and exact answer format before submission.
+</code></pre>
+<p>The <a href="artifacts/signature_r_audit.py">signing-log reviewer</a> is later defensive work. It reads invented signing events to show how a service could surface a collision. It did not recover this challenge key. The <a href="artifacts/synthetic_signing.jsonl">synthetic event stream</a>, <a href="artifacts/test_signature_r_audit.py">tests</a>, and <a href="artifacts/README.md">usage guide</a> make that boundary inspectable.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>An ECDSA signature starts with a private scalar <code>d</code>, message hash <code>h</code>, and one-use secret scalar <code>k</code>. The signer computes <code>R = k*G</code>, takes <code>r = R.x mod n</code>, then computes <code>s = k^-1(h + r*d) mod n</code>. The public key is <code>Q = d*G</code>. The value <code>r</code> is public, and under a fixed curve it is tied to the nonce's elliptic-curve point.</p>
+<p>If two distinct messages are signed under the same key with the same nonce, their <code>s</code> equations share the same unknowns. Subtracting them cancels <code>r*d</code>, leaving <code>k</code>; substitution then gives <code>d</code>. A repeated <code>r</code> is the cheap symptom to investigate. It can also occur when the same digest and signature are logged twice, when deterministic signing repeats an identical message, or through the <code>k</code> versus <code>n-k</code> symmetry. I would separate those cases before calling an operational alert a confirmed key loss.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit/Analysis Mechanics</summary>
+<p>The failed invariant was a fresh effective nonce for each distinct message. For two signatures with the same signed <code>k</code>, the calculation is:</p>
+<pre><code class="language-text">s1 - s2 = k^-1 (h1 - h2)                   mod n
+k = (h1 - h2) * (s1 - s2)^-1              mod n
+d = (s1*k - h1) * r^-1                    mod n
+</code></pre>
+<p>The inverses exist when their operands are nonzero modulo the prime group order. I would reject a pair where <code>s1-s2</code> or <code>r</code> has no inverse rather than force a result. In the record, all three pairwise calculations converged. With the actual log and public point available, the additional check would be <code>d*G == Q</code>, followed by signature verification. Convergence alone does not replace those checks.</p>
+<p>Once <code>d</code> was known, the encryption layer was a separate puzzle. The recorded result says <code>SHA256(d_bytes)[:16]</code> decrypted the 16-byte block to 13 bytes of plaintext and three bytes of PKCS#7 padding. Valid padding on its own is a weak discriminator for a single trial. The expected prefix and reported acceptance made the chosen derivation persuasive. The public record withholds the raw block and answer, so that validation cannot be rerun here.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<p>I liked how little work the first check needed. Grouping twelve <code>r</code> values exposed the interesting trio immediately. The hard part was refusing to promote that first collision into a complete result before checking the hashes, the sign branch, and the recovered scalar.</p>
+<p>Three pairwise recoveries agreeing gave me more confidence than one equation. The KDF sweep then reminded me that key recovery and payload decryption are different claims. I tried simple encodings and hash forms because the challenge supplied no derivation rule. Six candidates failed by the recorded output checks. That is a bounded search, not evidence that every possible KDF was considered.</p>
+<p>The mistaken "incorrect" signal for <code>r</code> was useful in another way. I went back to the bytes rather than changing the arithmetic to fit a comment. The reparse matched. When the evidence is reproducible, a disagreement should trigger a check of representation and scope before a new theory.</p>
+<table>
+<thead>
+<tr>
+<th>Exercise move</th>
+<th>Practice I would carry forward</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Group <code>r</code> values first</td>
+<td>Search public signing records before expensive analysis.</td>
+</tr>
+<tr>
+<td>Compare all three pairs</td>
+<td>Check independent paths and the published public key.</td>
+</tr>
+<tr>
+<td>Try bounded KDF forms</td>
+<td>Record rejected encodings and the exact acceptance test.</td>
+</tr>
+<tr>
+<td>Reparse after the objection</td>
+<td>Resolve a reading dispute from bytes, not intuition.</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<p>In a real firmware pipeline, I would begin with the signer's own audit trail: key ID, curve, digest, signature, artifact version, and timestamp. If one key emits the same <code>r</code> on distinct digests, I would preserve the events, verify the signatures, test the algebra on a protected copy, and start the signing-key exposure response. Rotation, revocation, re-signing, release inventory, and entropy-source review follow only after scoping which key and releases are affected.</p>
+<p>The same secp256k1 family appears in other signing settings, including transaction ecosystems, but this case does not establish a vulnerable blockchain wallet or a real firmware vendor. A pattern of shared <code>r</code> values may link signatures to a faulty signer; that alone cannot identify an actor. Bias without an exact collision would call for different analysis, possibly a lattice method, and substantially more evidence.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The reusable offensive primitive is the two-signature algebra in Sections 3 and 5. To apply it responsibly to a new record, I would collect <code>(key_id, curve, r, s, h)</code> per operation, group by key and <code>r</code>, exclude identical-digest repeats, account for <code>s</code> sign conventions, recover candidate scalars from distinct messages, and verify against the public key. The final step is to inventory what that key signed, not to stop at the number printed by a script.</p>
+<p>For defenders I made a small <a href="artifacts/signature_r_audit.py">JSONL collision reviewer</a>. It emits a review lead when one key and curve reuse <code>r</code> with different signature data, and marks distinct message hashes as urgent. The <a href="artifacts/synthetic_signing.jsonl">invented fixture</a> contains a collision, an identical retry, and a different-key near miss. The <a href="artifacts/test_signature_r_audit.py">four checks</a> cover those paths and malformed input. The <a href="artifacts/README.md">README</a> specifies the signing-service fields, 5 MB and 50,000-line bounds, output, and limits. None of these files contains the challenge signature or a recovered key.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>Fit to this case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MITRE ATT&amp;CK</td>
+<td><a href="https://attack.mitre.org/techniques/T1553/002/">T1553.002 Code Signing</a> describes a possible downstream abuse of a compromised signing key. <a href="https://attack.mitre.org/techniques/T1552/004/">T1552.004 Private Keys</a> is adjacent, but this key was derived from public signatures rather than found in an unsecured file. <a href="https://attack.mitre.org/techniques/T1600/001/">T1600.001</a> concerns adversary weakening of network-device encryption and does not describe this accidental signing flaw. No ATT&amp;CK behavior was observed in the puzzle.</td>
+</tr>
+<tr>
+<td>MITRE ATLAS</td>
+<td>N/A: no ML system.</td>
+</tr>
+<tr>
+<td>OWASP Top 10 / LLM Top 10</td>
+<td>N/A: no web or LLM application surface.</td>
+</tr>
+<tr>
+<td>CVSS, EPSS, CISA KEV</td>
+<td>N/A: no identified product vulnerability or CVE.</td>
+</tr>
+<tr>
+<td>CIS Benchmarks / CSA CCM</td>
+<td>N/A as a cloud configuration mapping: the log describes no cloud tenant.</td>
+</tr>
+<tr>
+<td>CWE</td>
+<td><a href="https://cwe.mitre.org/data/definitions/323.html">CWE-323</a> is the general nonce-reuse weakness. <a href="https://cwe.mitre.org/data/definitions/338.html">CWE-338</a> would require evidence of a weak PRNG; the root cause here is unknown.</td>
+</tr>
+<tr>
+<td>CAPEC</td>
+<td><a href="https://capec.mitre.org/data/definitions/97.html">CAPEC-97 Cryptanalysis</a> is broad context for the key-recovery step. <a href="https://capec.mitre.org/data/definitions/474.html">CAPEC-474</a> is key-theft signature spoofing; <a href="https://capec.mitre.org/data/definitions/475.html">CAPEC-475</a> is improper-validation signature spoofing. Neither spoofing act was observed in this challenge.</td>
+</tr>
+<tr>
+<td>MITRE D3FEND</td>
+<td><a href="https://d3fend.mitre.org/technique/d3f:ServiceBinaryVerification/">D3-SBV</a> means Service Binary Verification. It does not describe a signing-log nonce check. Here the concrete defense is application audit correlation and independent signature validation.</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<p>I have no actor, malicious infrastructure, campaign, or real exposed signing key to share. The challenge-specific <code>r</code>, private scalar, and ciphertext are withheld. I would not manufacture a STIX object or TAXII feed from them. If the same flaw surfaced in an actual product, an advisory would need affected key IDs, release scope, fix status, and distribution guidance; those facts are absent here.</p>
+<p>The useful standards connection is how a signer chooses and protects <code>k</code>. <a href="https://www.rfc-editor.org/rfc/rfc6979">RFC 6979</a> specifies deterministic ECDSA nonce generation from private-key and message material through an HMAC-based process. <a href="https://csrc.nist.gov/pubs/fips/186-5/final">FIPS 186-5</a> is a digital-signature standard, but citing it does not make a secp256k1 implementation FIPS validated. There is no system configuration here from which to assign a STIG finding.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Application to a real signer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NIST SP 800-53 SC-12 / SC-13</td>
+<td>Govern key management and cryptographic protection. Select an approved, maintained signing implementation for the deployment's actual compliance scope, protect private keys, and test nonce generation.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 SI-7</td>
+<td>Verify firmware integrity and maintain a trustworthy release/signing record. A collision review can inform incident response; it does not itself prove every distributed image is valid.</td>
+</tr>
+<tr>
+<td>CIS Controls v8 16.5</td>
+<td>Use maintained, trusted components in the signing pipeline; pin and review the library and its build provenance.</td>
+</tr>
+</tbody>
+</table>
+<p>Python's <code>SigningKey</code>, <code>SECP256k1</code>, and <code>sign_deterministic</code> can illustrate deterministic signing. The important distinction is between a message and an already-computed digest. Passing a digest to an API that hashes again changes what is signed. A message-level example is:</p>
+<pre><code class="language-python">from hashlib import sha256
+from ecdsa import SECP256k1, SigningKey
+from ecdsa.util import sigencode_der
+
+sk = SigningKey.from_secret_exponent(private_scalar, curve=SECP256k1)
+signature = sk.sign_deterministic(firmware_bytes, hashfunc=sha256, sigencode=sigencode_der)
+</code></pre>
+<p>That code shows the intent. It does not establish deployment readiness or FIPS validation. A production signer should use the selected library's documented digest API if the firmware hash was computed elsewhere, maintain key isolation and release approval, and test signature verification and nonce behavior before rollout.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>The detection idea is a repeated <code>r</code> under one key, on different message digests. A real sensor is the signing service or a verified feed of its signature records. A network-only SIEM feed that logs only "sign succeeded" cannot run this check. A Sigma selection on <code>EventType=Signed</code> captures candidate events but does not express the cross-event collision. SPL must group by key and curve as well as <code>SignatureR</code>; otherwise it can mix unrelated signers. I would start with a query shaped like this, after mapping actual field names:</p>
+<pre><code class="language-spl">index=codesigning EventType=Signed
+| stats dc(MessageHash) as distinct_hashes count values(ArtifactVersion) as versions by KeyId Curve SignatureR
+| where distinct_hashes &gt; 1
+| table KeyId Curve SignatureR versions count distinct_hashes
+</code></pre>
+<p>This is a proposed hunt, not a tested Splunk rule. The <a href="artifacts/signature_r_audit.py">local reviewer</a> implements the key/curve/<code>r</code> grouping on synthetic events, and its <a href="artifacts/test_signature_r_audit.py">test file</a> includes a benign identical retry and a different-key near miss. An operational response would re-read the raw signature bytes and verify the public key before treating the lead as confirmed compromise. There is no measured false-positive rate, backend conversion, live sensor, or production deployment here. A repeated <code>r</code> on distinct hashes is urgent; a duplicate log, normalization issue, or key-ID error still needs to be ruled out.</p>
+<p>No challenge-specific scalar, ciphertext, or <code>r</code> belongs in an IOC feed. This case's reusable artifact is the detection condition and the response path, not a value to block across organizations.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow near the top</a> follows the solve from log parsing through AES decryption. Its branch at the repeated <code>r</code> is where a real signing operator could have noticed a key-exposure lead before anyone tried to recover the scalar. That defender branch requires a trustworthy key identifier and full signature records; the puzzle log supplied those values for analysis, but no operational audit system was tested.</p>
+<pre><code class="language-mermaid">flowchart LR
+  A[Public signing records] --&gt; B[Distinct digests share r]
+  B --&gt; C[Review signature bytes and key ID]
+  C --&gt; D[Verify signatures and assess key exposure]
+  D --&gt; E[Rotate or revoke affected key]
+  E --&gt; F[Inventory and re-sign affected releases]
+</code></pre>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ol>
+<li><a href="https://csrc.nist.gov/pubs/fips/186-5/final">NIST FIPS 186-5, Digital Signature Standard</a>.</li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc6979">RFC 6979, Deterministic Usage of DSA and ECDSA</a>.</li>
+<li><a href="https://www.secg.org/sec2-v2.pdf">SEC 2, Recommended Elliptic Curve Domain Parameters</a>, secp256k1 parameters.</li>
+<li><a href="https://attack.mitre.org/techniques/T1552/004/">MITRE ATT&amp;CK T1552.004</a>, <a href="https://attack.mitre.org/techniques/T1600/001/">T1600.001</a>, and <a href="https://attack.mitre.org/techniques/T1553/002/">T1553.002</a>.</li>
+<li><a href="https://capec.mitre.org/data/definitions/97.html">MITRE CAPEC-97</a>, <a href="https://capec.mitre.org/data/definitions/474.html">CAPEC-474</a>, and <a href="https://capec.mitre.org/data/definitions/475.html">CAPEC-475</a>.</li>
+<li><a href="https://cwe.mitre.org/data/definitions/323.html">CWE-323</a> and <a href="https://cwe.mitre.org/data/definitions/338.html">CWE-338</a>.</li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/57/pt1/r5/final">NIST SP 800-57 Part 1 Rev. 5</a>, key-management guidance.</li>
+<li>Nguyen and Shparlinski, "The Insecurity of the Elliptic Curve Digital Signature Algorithm with Partially Known Nonces," <em>Designs, Codes and Cryptography</em> 30(2), 2003. This is adjacent work on partial nonce knowledge, not the repeated-nonce method used here.</li>
+</ol>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>

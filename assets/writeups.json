@@ -1207,5 +1207,28 @@
     ],
     "status": "Solved-External",
     "url": "/cyber-ops/ctf-writeups/osint/cover-channel-courier/"
+  },
+  {
+    "title": "Three Firmware Signatures, One Reused Nonce",
+    "category": "Crypto",
+    "difficulty": "Medium",
+    "date": "2026-10-12",
+    "tags": [
+      "ECDSA",
+      "secp256k1",
+      "nonce-reuse",
+      "k-reuse",
+      "private-key-recovery",
+      "AES-128",
+      "KDF"
+    ],
+    "summary": "I found three firmware signatures with the same ECDSA r value, recovered the signing scalar from their hashes, and traced the separate AES key-derivation step to the flag.",
+    "aliases": [
+      "firmware signing",
+      "duplicate r",
+      "signing key exposure"
+    ],
+    "status": "Solved-Verified",
+    "url": "/cyber-ops/ctf-writeups/crypto/ecdsa-nonce-reuse/"
   }
 ]
