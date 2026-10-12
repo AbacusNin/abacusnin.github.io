@@ -1095,5 +1095,28 @@
     ],
     "status": "Solved. Full 40-character flag recovered statically without ever executing the BPF program. All 160 rodata entries reproduced byte-identically by a closed-form generator.",
     "url": "/cyber-ops/ctf-writeups/reversing/ebpf-diagonal-rodata/"
+  },
+  {
+    "title": "The Photo That Put Me One H3 Cell Too Far South",
+    "category": "OSINT",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "photo-geolocation",
+      "image-OSINT",
+      "GEOINT",
+      "H3",
+      "hierarchical-hex-indexing",
+      "bearing-triangulation",
+      "OPSEC"
+    ],
+    "summary": "I placed an untagged photograph on a bridge, then lost one H3 cell by reading the camera angle backward. The correction came from checking the bearing against a second footbridge.",
+    "aliases": [
+      "image geolocation",
+      "photo location exposure",
+      "hexagonal grid"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/osint/photo-h3-geolocation/"
   }
 ]

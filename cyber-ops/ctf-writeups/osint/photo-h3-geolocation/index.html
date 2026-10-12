@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Photo That Put Me One H3 Cell Too Far South - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="I placed an untagged photograph on a bridge, then lost one H3 cell by reading the camera angle backward. The correction came from checking the bearing against a second footbridge.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/osint/photo-h3-geolocation/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Photo That Put Me One H3 Cell Too Far South">
+  <meta property="og:description" content="I placed an untagged photograph on a bridge, then lost one H3 cell by reading the camera angle backward. The correction came from checking the bearing against a second footbridge.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/osint/photo-h3-geolocation/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / OSINT / <span aria-current="page">The Photo That Put Me One H3 Cell Too Far South</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Photo That Put Me One H3 Cell Too Far South</h1>
+        <p class="lead">The image had no GPS to read. It still had a bridge, a pavilion, a small footbridge, and enough geometry to narrow the camera position to one cell.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Identify the photographer&#x27;s H3 resolution-11 cell from a single metadata-stripped photograph.</p>
+<p><strong>What I did.</strong> I checked metadata, inventoried stable visual clues, verified the bridge and pavilion with open sources, and combined a bearing with an auxiliary landmark to select the camera cell.</p>
+<p><strong>The result.</strong> I first submitted a cell just south of the intended one, then corrected the position to the northern candidate. I recorded the challenge as solved.</p>
+<p><strong>The limit.</strong> The exact cell, photograph, map pins, and platform receipt are not included in this account. The defensive files use invented fixtures.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Check the image; Find the place; Constrain the camera; Catch the error; Use a second landmark; Publish the lesson">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Check the image</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">No metadata location reported</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Find the place</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Flags, bridge, pavilion, and water</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Constrain the camera</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Bridge sidewalk and subject bearing</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Catch the error</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">First candidate one cell too far south</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Use a second landmark</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Footbridge favors the northern segment</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Publish the lesson</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Review image exposure before posting</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>OSINT / GEOINT</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>photo-geolocation, image-OSINT, GEOINT, H3, hierarchical-hex-indexing, bearing-triangulation, OPSEC</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved</td>
+</tr>
+<tr>
+<td>Recorded result</td>
+<td>A corrected northern camera cell after an initial southern submission</td>
+</tr>
+<tr>
+<td>Evidence boundary</td>
+<td>Exact cell, photo, map pins, and platform receipt are not shown; the defensive examples use synthetic inputs</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/osint/photo-h3-geolocation/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>Pre-Read Mental Model</h2>
+<pre><code class="language-mermaid">flowchart LR
+    A[Photo&lt;br/&gt;EXIF stripped] --&gt; B[Macro Clue Inventory&lt;br/&gt;Flag, Architecture, Water]
+    B --&gt; C[Hypothesis: Region/City&lt;br/&gt;Web Verification]
+    C --&gt; D[Micro Clue Refinement&lt;br/&gt;Vegetation, Auxiliary Landmarks]
+    D --&gt; E[Geometric Constraint&lt;br/&gt;Bearing + Angular Position]
+    E --&gt; F[Coordinate Estimate&lt;br/&gt;lat/lon]
+    F --&gt; G[H3 Index Conversion&lt;br/&gt;Resolution 11]
+    G --&gt; H[Submitted H3 cell&lt;br/&gt;recorded solve]
+</code></pre>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<h3>Challenge</h3>
+<p>I had one portrait-oriented JPEG and a deceptively narrow answer format: identify the H3 resolution-11 cell containing the photographer. The image itself had no useful location metadata. The event wanted the cell ID wrapped in its flag format, so a correct city or bridge name would only get me to the starting line.</p>
+<p>At resolution 11, H3 reports an average hexagon edge of 28.66 m and area of 2,149.64 m². Those are global averages, not a promise that a particular camera position is within a fixed distance of a cell center. The bridge in the photo ran about 250 m. Even after I knew which bridge it was, several cells could still cover the plausible walking strip. <a href="https://h3geo.org/docs/core-library/restable/">H3's resolution table</a> gives the scale and its variation.</p>
+<h3>Threat Scenario Mapping</h3>
+<p>The puzzle is an image geolocation exercise. I can also see a realistic exposure problem in it. A person may remove EXIF and still publish a photo with enough fixed landmarks to disclose a worksite or travel position. An attacker could collect such public images for reconnaissance. A defender could use the same method to check organizational posts before release, or to assess adversary-posted imagery during an investigation. This exercise describes no real adversary or victim.</p>
+<h3>Assets and Access</h3>
+<p>I worked from a roughly 2 MB JPEG at 2268 by 4032 pixels, public search and mapping references, and local Python tooling. No live service, sensor feed, or hidden location API was part of the solve. I have kept the place names, coordinates, and answer cell out of the public account.</p>
+<h3>Analytical Objective</h3>
+<p>I needed one cell for the camera position, supported by the visible evidence. I also needed to know which observations actually constrained the position. The flag poles helped identify the bridge. The pavilion and smaller footbridge helped place me along it.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<h3>Stage 1 - Metadata Triage</h3>
+<p>I checked the easy route first. Pillow's EXIF read returned <code>None</code>. A separate <code>pyexiv2</code> pass found no EXIF, IPTC, XMP, or comment fields, and a strings pass gave no useful embedded text. That removed GPS metadata as a route to the answer. It did not make the picture geographically anonymous. A local, read-only version of this first check is in <a href="artifacts/image_exposure_review.py">image_exposure_review.py</a>; it reports metadata presence without printing coordinates.</p>
+<h3>Stage 2 - Macro-to-Micro Visual Inventory</h3>
+<p>I worked from features least likely to move. Flags and their pole arrangement, a civic bridge, water, and a small domed pavilion gave me the broad place. I then checked the bridge structure and an access footbridge near the island. Vegetation helped with the scene, though season is weaker evidence than built infrastructure. A CTF-team sticker was a useful reminder to be careful: it could be put on another surface tomorrow, so I did not use it to locate the camera.</p>
+<p>My inventory covered flag and language clues, architectural style and era, water or terrain, auxiliary infrastructure, vegetation state, and transient marks such as stickers or graffiti. The large stable features narrowed the country and city. The small marks did not choose a cell.</p>
+<h3>Stage 3 - Hypothesis Verification</h3>
+<p>I made two public-source checks before trusting the site hypothesis. One described the flag-lined civic bridge; the other matched a domed kiosk pavilion on the nearby island. That agreement moved me from broad searching to camera-position geometry. I am leaving the place names and search details out of this public account.</p>
+<h3>Stage 4 - Geometric Refinement</h3>
+<p>I narrowed the camera to the bridge's west sidewalk. The pavilion sits a little left of the image center, which constrains its bearing relative to the camera heading. The auxiliary footbridge appears in the upper-right background. Its placement on one side of the island gave me a second, more local check on which part of the main bridge could see it.</p>
+<p>The bridge length was approximately 250 m. I sampled the possible sidewalk positions, compared each point's bearing to the pavilion with the expected angular window, then checked whether the auxiliary footbridge would be visible. I ended in the northern portion. These are image-derived constraints, not exact surveyed angles; a lens, crop, or uncertain heading can move a boundary candidate.</p>
+<h3>Methodology Note - First-Commit Error</h3>
+<p>My first submitted cell was one cell too far south. I had described the pavilion as left of a westward camera heading, then carried the north/south implication backward when choosing the photographer's location. The auxiliary footbridge was already in my notes but had not been applied as a hard check. Once I sketched the direction and tested both constraints together, the southern candidate no longer fit. I recorded the case as Solved after the correction. The exact cell and platform receipt are not part of this public account.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<h3>Metadata Stripping Verification</h3>
+<p>The first check was <code>Image.open(path).getexif()</code> in Pillow, followed by the reported <code>pyexiv2</code> checks of EXIF, IPTC, XMP, and comments. I also used a strings pass as a cheap check for embedded text. The reported results were empty. <a href="artifacts/image_exposure_review.py">The local image exposure reviewer</a> turns that into a repeatable pre-publication check for consented files. It has byte and pixel limits and never prints a recovered GPS coordinate. It does not prove that a visually distinctive image is safe to post.</p>
+<h3>Bearing and Distance Utilities</h3>
+<p>The geometry needs an initial bearing from a camera point to a known landmark, a distance along the candidate path, and a signed difference between target bearing and camera heading. I kept the sign convention explicit: negative means the subject is left of the heading. The <a href="artifacts/geo_path_review.py">path review script</a> uses a great-circle bearing and haversine distance. Its <code>angular_delta(225, 270) == -45</code> fixture checks the southwest-of-west case that mattered here. I considered projecting destination points, then used path sampling because it made the decision easier to inspect.</p>
+<h3>Linear Sampling of a Path with H3 Cell Assignment</h3>
+<p>I modeled the sidewalk as a line between its endpoints, sampled it at a configurable short interval, and mapped each sample to H3 when the library was available. A 2 m step gives more than one observation per typical resolution-11 cell on a short bridge, but it is still sampling. A narrow crossing can be missed. I keep the ordered candidate cells and inspect neighbors rather than treating the first matching sample as a proof of exact location. The linked module rejects zero-length paths, out-of-range coordinates, antimeridian crossings, and more than 50,000 samples.</p>
+<h3>Solve Driver</h3>
+<p>The driver combines a known path, a target landmark, an analyst-supplied heading, an angular window, and a separately verified auxiliary-path interval. It returns the matching sample count and distinct H3 cells. <a href="artifacts/geo_sample.json">The invented input example</a> shows the required fields. The actual challenge coordinates and cell IDs are not in this page. The tool does not infer the auxiliary footbridge's visibility from imagery; that judgment must come from map and sight-line review.</p>
+<h3>One-Liner - Verify a Submitted H3 Cell on the Map</h3>
+<p>For a candidate cell, the H3 Python check is <code>h3.cell_to_latlng(cell)</code> and <code>h3.cell_to_boundary(cell)</code>. I would plot the full boundary against the sidewalk and neighboring cells before submitting. A center point alone can look plausible while the camera position falls just across an edge. The linked path tool requires H3 Python 4.x for its command-line cell output; its geometry tests run without that package.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<h3>H3 - Hexagonal Hierarchical Geospatial Indexing</h3>
+<p>H3 assigns the earth to cells at progressively finer resolutions. Most cells are hexagons; twelve at each resolution are pentagons. A cell index gives me a compact way to group camera-position candidates, compare adjacent areas, and roll an answer up to a coarser level. The index is an output of the geolocation work, not evidence that the underlying coordinates are right.</p>
+<h4>Resolution Hierarchy</h4>
+<p>The current <a href="https://h3geo.org/docs/core-library/restable/">H3 table</a> lists these average hexagon values. I use them for scale, then inspect the actual cell geometry when a boundary matters.</p>
+<table>
+<thead>
+<tr>
+<th>Resolution</th>
+<th style="text-align: right;">Average edge</th>
+<th style="text-align: right;">Average area</th>
+<th>Working scale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td style="text-align: right;">1,281 km</td>
+<td style="text-align: right;">4.36 million km²</td>
+<td>Continental aggregation</td>
+</tr>
+<tr>
+<td>5</td>
+<td style="text-align: right;">9.85 km</td>
+<td style="text-align: right;">252.9 km²</td>
+<td>Metropolitan aggregation</td>
+</tr>
+<tr>
+<td>9</td>
+<td style="text-align: right;">200.8 m</td>
+<td style="text-align: right;">105,333 m²</td>
+<td>Neighborhood</td>
+</tr>
+<tr>
+<td>10</td>
+<td style="text-align: right;">75.9 m</td>
+<td style="text-align: right;">15,048 m²</td>
+<td>Street segment</td>
+</tr>
+<tr>
+<td>11</td>
+<td style="text-align: right;">28.7 m</td>
+<td style="text-align: right;">2,150 m²</td>
+<td>Specific viewpoint candidate</td>
+</tr>
+<tr>
+<td>12</td>
+<td style="text-align: right;">10.8 m</td>
+<td style="text-align: right;">307 m²</td>
+<td>Smaller viewpoint area</td>
+</tr>
+<tr>
+<td>15</td>
+<td style="text-align: right;">0.58 m</td>
+<td style="text-align: right;">0.895 m²</td>
+<td>Sub-meter average cell area</td>
+</tr>
+</tbody>
+</table>
+<p>This exercise asked for resolution 11 because the visual constraints were meant to separate adjacent cells. Plenty of photographs cannot support that precision. H3 area varies by location and pentagons differ from hexagons. A cell ID also does not express confidence on its own.</p>
+<h4>Why Hexagons</h4>
+<p>The six-neighbor pattern makes local candidate expansion and approximate distance searches convenient. Square grids require a choice between four side neighbors and eight neighbors including diagonals. H3's hierarchy also supports coarser grouping. I do not assume all cell centers are equally spaced or that every finer cell has a perfectly nested polygon inside its parent; the grid is an indexing system on a sphere with distortion.</p>
+<h3>Photo Geolocation Tradecraft</h3>
+<p>I ranked fixed infrastructure above portable marks, checked the broad place before measuring small angles, and used independent features to challenge my favorite candidate. The flag and bridge established a setting. The pavilion and footbridge made the camera-position test possible. Vegetation may help estimate season; shadows can help if time and orientation are known. Each is only as strong as the image and map evidence behind it. I stopped refining once the constraints distinguished the required cell, while keeping the adjacent-cell risk in view.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit/Analysis Mechanics</summary>
+<h3>Why the Geometry Resolves the Position</h3>
+<p>The camera was constrained to a sidewalk, so the search was mainly along one path. At each possible point I could compute the pavilion bearing. I could then ask whether its image position made sense for the assumed camera heading. The smaller access footbridge supplied another constraint because its visibility changes as the camera moves along the bridge. This is a candidate filter, not a photogrammetric survey.</p>
+<h4>Bearing Constraint (Subject Angular Position)</h4>
+<p>For a rectilinear image near the frame center, an illustrative approximation is <code>target_bearing ≈ camera_heading + horizontal_offset_fraction × horizontal_field_of_view</code>. A subject 25% of the frame width left of center with a 70-degree field of view would have an offset around -17.5 degrees. Those numbers illustrate the arithmetic; neither the field of view nor an exact pixel measurement was available for this case. A crop or wide lens would change the estimate. I used an angle <em>window</em> rather than a single asserted bearing.</p>
+<h4>Sign Convention - The Source of First-Commit Error</h4>
+<p>Compass bearings increase clockwise. With a camera facing west at 270 degrees, a landmark to the left lies toward the southwest, with a bearing below 270 degrees in this local example. I initially translated that into the wrong side of the landmark along the bridge. The <a href="artifacts/test_geo_review.py">geometry test</a> nails the sign before any H3 cell is chosen: 225 degrees relative to 270 degrees is -45 degrees. A diagram showing camera, heading arrow, landmark, and north arrow would have caught my first submission.</p>
+<h4>Auxiliary Landmark Constraint</h4>
+<p>The small footbridge on the island's north side gave me a second test. It appeared in the upper-right background. From the southern candidate, that relationship was inconsistent with the local arrangement. The northern candidate fit both constraints. I have not reproduced the map pins or image measurement in this public account.</p>
+<h3>Why H3 Indexing Matters Operationally</h3>
+<p>Cell IDs let an analyst group nearby image-derived locations, compare them to other spatial data, and roll results up for a less precise report. H3 does not turn a weak geolocation into strong evidence. I would store the underlying point estimate, uncertainty, cell resolution, observation time, and source rationale together. A single cell can hide uncertainty that spans a boundary. For a real case, I would retain the adjacent candidate cells until the visual evidence excludes them.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<h3>What This Exercise Validated</h3>
+<p>The broad-to-narrow inventory saved time. A flag arrangement, distinctive pavilion, and water layout got me to the city and bridge. A portable sticker added context but could not locate the camera. The H3 answer format then forced a second kind of care: knowing the bridge was not enough. I had to decide which side of a cell boundary the camera belonged on.</p>
+<p>Public descriptions of the bridge and pavilion were useful corroboration. They did not measure the camera position. That came from the scene geometry. I would keep those search pages and the photo together if I had to defend a location finding outside a game.</p>
+<h3>What This Exercise Surfaced</h3>
+<p>I made a plain directional mistake at the moment it mattered. My first cell was immediately south of the recorded correct one. The auxiliary footbridge was visible in the image inventory, but I had left it out of the final decision. I now draw a north arrow, camera heading, and target bearing before I convert a location to a fine grid cell. I also list the neighbors and say what would rule each one out.</p>
+<p>The wrong submission was useful feedback. It prompted the sign check and a second look at the independent footbridge clue. I can explain the corrected geometry, but I cannot show a platform transcript for the final answer here.</p>
+<h3>Transferable Principles</h3>
+<p>I keep these habits beyond photo puzzles: check easy metadata first, rank stable clues above portable marks, corroborate a place with more than one source, draw geometry before a precision claim, and keep uncertainty visible when an answer straddles a boundary. In defensive work, a failed alert or false positive can serve the same purpose as the wrong cell: it tells me which assumption needs another test.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<h3>Individual Practitioner Skill Development</h3>
+<p>This case gave me practice in visual inventory, bearing math, and geospatial indexing. The adjacent work is familiar: comparing a satellite or street-level view, checking shadow direction when capture time is known, and testing whether a claimed location agrees with infrastructure. The harder skill is expressing uncertainty honestly. One photo may justify a city, a bridge, or several neighboring H3 cells without justifying an exact cell.</p>
+<h3>Security Operations (SOC, IR, Threat Hunting)</h3>
+<p>The best defensive use is an authorized pre-publication review. A marketing image can show no EXIF GPS and still reveal a facility through a distinctive bridge, badge, license plate, screen, or caption. I would run the <a href="artifacts/image_exposure_review.py">metadata triage</a>, then have a person inspect visual context and posting time. Reviewers need a way to record a finding, ask for a crop or delayed post, and document the release decision.</p>
+<p>For a site I own, web or CDN logs could support a hunt for unusually high image retrieval by one client. The <a href="artifacts/bulk_image_requests.yml">experimental Sigma correlation</a> defines that narrow observable. It would miss collection through third-party platforms or ordinary browsing patterns. During IR, a photo can help establish where an event took place, but I would retain the original, search references, and alternate locations as case evidence.</p>
+<h3>Intelligence Operations (SIGINT, IO/IW, OSINT, Attribution)</h3>
+<p>I can attach a reviewed image-derived location to other intelligence using H3, then compare at a common resolution. The cell should carry provenance and uncertainty; otherwise the join looks more exact than the image deserves. Repeated public photos may reveal travel patterns, so publication review should consider the series as well as one frame. The same geometry can also test a location claim in adversary-posted media. A visible contradiction can weaken that claim, but one matching landmark does not identify an actor or prove capture time.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<h3>Decision Tree - Photo Geolocation Triage</h3>
+<p>This is the route I would use again. It keeps metadata and visual evidence separate until they agree.</p>
+<pre><code class="language-mermaid">flowchart TB
+    A[Image received] --&gt; B{GPS or other&lt;br/&gt;metadata present?}
+    B --&gt;|Yes| C[Validate metadata&lt;br/&gt;against visible scene]
+    B --&gt;|No| D[Inventory stable&lt;br/&gt;visual features]
+    C --&gt; D
+    D --&gt; E[Confirm broad place&lt;br/&gt;with public references]
+    E --&gt; F[Constrain camera path&lt;br/&gt;and heading]
+    F --&gt; G[Compute bearing window&lt;br/&gt;and candidate cells]
+    G --&gt; H[Check second landmark&lt;br/&gt;and cell neighbors]
+    H --&gt; I{Enough evidence&lt;br/&gt;for required precision?}
+    I --&gt;|No| J[Report wider area&lt;br/&gt;or gather more evidence]
+    I --&gt;|Yes| K[Record candidate,&lt;br/&gt;uncertainty, and sources]
+</code></pre>
+<h3>Solve Pattern Checklist</h3>
+<ul>
+<li>[ ] Check EXIF, IPTC, XMP, and comments before manual searching.</li>
+<li>[ ] Inventory flags, language, architecture, water, terrain, and vegetation.</li>
+<li>[ ] Rank fixed structures above stickers, graffiti, and transient objects.</li>
+<li>[ ] Verify a city and landmark against separate public references.</li>
+<li>[ ] Identify the possible camera path, heading, and auxiliary landmarks.</li>
+<li>[ ] Sketch north, heading, and signed subject angle before choosing a cell.</li>
+<li>[ ] Sample the path, inspect candidate H3 boundaries and neighbors, and apply the independent visibility check.</li>
+<li>[ ] Record what would falsify the chosen location and whether the output precision is earned.</li>
+</ul>
+<h3>Reusable Code Module - Camera-Path Geometric Solver</h3>
+<p>The <a href="artifacts/geo_path_review.py">offline path reviewer</a> contains the bearing, distance, signed-angle, bounded sampling, and optional H3 assignment primitives. <a href="artifacts/geo_sample.json">Its synthetic input</a> shows the interface; <a href="artifacts/test_geo_review.py">tests</a> include the left-of-west sign case, a constrained positive, a near miss, a malformed image, and a benign image. The <a href="artifacts/README.md">README</a> describes prerequisites, field meanings, and limits. The auxiliary interval is a manual analyst conclusion, never a pixel classifier. Neither the script nor its fixtures reconstruct the hidden challenge photograph or prove the reported cell.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<h3>MITRE ATT&amp;CK</h3>
+<p>The challenge is defender analysis, so I map the exposure it illustrates rather than label my solve as an attack. <a href="https://attack.mitre.org/techniques/T1593/">T1593</a> covers searching open sites, with <a href="https://attack.mitre.org/techniques/T1593/001/">T1593.001</a> for social media. <a href="https://attack.mitre.org/techniques/T1591/001/">T1591.001</a> is the closest fit when an adversary derives a victim organization's physical location. A frame that actually reveals people could also support T1589, and visible software information could support T1592.002, but neither was established in this challenge image. No attacker collection was observed here.</p>
+<h3>MITRE D3FEND</h3>
+<p>D3FEND describes technical defensive methods. It does not supply a precise label for the human act of recognizing a pavilion and bearing in a photo. I would use D3FEND when describing a specific deployed content-control or monitoring mechanism, after matching that mechanism to the ontology. For this case, the useful defensive work is a publication review plus a bounded metadata check, with no claimed D3FEND implementation.</p>
+<h3>CAPEC</h3>
+<p><a href="https://capec.mitre.org/data/definitions/118.html">CAPEC-118</a> is a broad <em>category</em> for collecting and analyzing information, not a specific attack pattern demonstrated by this photo. I also considered CAPEC-407 (pretexting) and CAPEC-410 (social-engineering elicitation). Those require interaction with a person. No such interaction happened in this solve, so I do not assign them to it. They remain possible downstream scenarios if a real actor uses a location to construct a pretext.</p>
+<h3>Frameworks Considered and Omitted</h3>
+<p>STRIDE would fit a designed system, not this isolated visual solve. OWASP application categories need an application failure. Sector privacy rules may matter to a real publishing organization, but there is no medical or student record in this evidence. I leave those mappings to the owner's actual environment rather than turn an image puzzle into a compliance finding.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<h3>STIX/TAXII</h3>
+<p>A reviewed photo-location finding could be shared as a STIX 2.1 <code>location</code> object linked to observed image data. <a href="artifacts/synthetic_image_location_stix.json">This synthetic bundle</a> shows a file observable, <code>observed-data</code>, <code>location</code>, and a generic <code>related-to</code> relationship. Its coordinates are invented and deliberately coarse. If a recipient needs an H3 index, I would add a documented custom <code>x_</code> property only after computing a real cell from the reviewed coordinate and agreement on its meaning. I would include precision and provenance. The case's exact cell is unavailable, so I did not put a fabricated one in the bundle. TAXII is a transport option for an actual sharing arrangement; no feed or exchange was used in this challenge.</p>
+<h3>STIG</h3>
+<p>STIGs govern configured systems, not the act of reading a landmark in a photo. An organization using these scripts would separately harden its analyst workstation and any internal publication pipeline under the applicable baseline. This case contains no system configuration, version, or STIG scan result, so I assign no finding ID.</p>
+<h3>CIS Benchmarks</h3>
+<p>CIS Benchmarks likewise apply to specific products and versions. The image-exposure process may use a benchmarked workstation or server, but that cannot be assessed from the photograph. CIS Controls are a better language for awareness and publication workflow in Section 11. No benchmark compliance result is claimed.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>11a. Standards Mapping</h3>
+<p>I map the <em>organizational exposure</em> of public imagery, not the act of solving the CTF. The mappings are planning aids. They do not show that a control was implemented or assessed.</p>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>Identifier</th>
+<th>Relevant use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>AT-2, AT-3</td>
+<td>Train general staff and high-exposure publishing roles to spot image disclosures</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>PL-4</td>
+<td>Put external image-posting rules in acknowledged rules of behavior</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>CA-8</td>
+<td>Include authorized public-image exposure review in a penetration test plan</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>SI-12</td>
+<td>Set retention and handling rules for submitted image evidence</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>PM-12, PM-13</td>
+<td>Consider insider-risk context and the staff skill needed for review, without treating a photo as an insider indicator alone</td>
+</tr>
+<tr>
+<td>CIS Controls v8</td>
+<td>14.5, 14.9</td>
+<td>Address unintentional disclosure and role-specific awareness</td>
+</tr>
+<tr>
+<td>CIS Controls v8</td>
+<td>18.1</td>
+<td>Include scoped OSINT in a testing program</td>
+</tr>
+<tr>
+<td>CMMC 2.0 Level 2</td>
+<td>AT.L2-3.2.1, AT.L2-3.2.2</td>
+<td>Awareness and role-specific training when that program applies to the organization</td>
+</tr>
+</tbody>
+</table>
+<h3>11b. Mitigation Realization</h3>
+<h4>AT-2 / AT-3 / CIS 14.5 / CMMC AT.L2-3.2.1 - Awareness Training</h4>
+<p>I would teach this case with an approved example image. Ask trainees to list what a stranger can infer from background landmarks, screens, badges, and timing, then compare their answers with metadata results. A completed module needs actual curriculum, attendance, and assessment evidence. A slide saying "strip EXIF" is too narrow: this photograph had no GPS metadata and still gave away a place.</p>
+<h4>PL-4 - Social Media Policy</h4>
+<p>A workable policy tells staff which images require review before external posting: facility approaches, access controls, work screens, documents, other personnel, and real-time travel. It names who can approve or request a crop or delayed post. It should address consent and local law. The exercise illustrates the need for that decision. There is no evidence that any organization adopted this policy.</p>
+<h4>CA-8 / CIS 18.1 - OSINT-Inclusive Adversary Emulation</h4>
+<p>An authorized test can review the organization's own public images and approved personnel channels. The deliverable is an exposure report with the image URL, observed clue, confidence, alternate location, and remediation owner. Collection should stay within agreed scope; a single photo should not be turned into a person-level tracking claim.</p>
+<h4>Image Sanitization - Technical Control (Pipeline Realization)</h4>
+<p>The <a href="artifacts/image_exposure_review.py">metadata checker</a> is a read-only intake step. A production sanitizer would need to re-encode each supported format, strip or intentionally retain metadata under policy, and verify the output. It must also send the visual content to human review. I would not call an image clean from an EXIF-only check or save every format as JPEG. The review step makes the control more honest.</p>
+<h4>PM-12 - Insider Threat Program Integration</h4>
+<p>Image exposure can be a context item in an existing, governed insider-risk program, with privacy review and corroboration. I would not infer intent from a location clue or quietly monitor personal accounts. Public posting patterns alone are not an insider finding.</p>
+<h4>SI-12 - Public-Facing Content Governance</h4>
+<p>The publication workflow should name a reviewer, retain the approval decision as long as policy requires, and provide a way to remove or replace an image if someone finds a missed disclosure. That produces a checkable process rather than an informal reminder.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<h3>Detection Engineering Note</h3>
+<p>There is no challenge-derived malicious IP, domain, hash, or actor indicator. The defensible observables are process behaviors: metadata left in an image I own, a visual landmark found during review, or high-volume downloads from a site I operate. An attacker gathering photos on a third-party platform may leave no useful telemetry in my environment. I treat each detection below as an exposure review or hunt hypothesis, not a deployed alert.</p>
+<h3>Sigma - Detection of Bulk Image Scraping</h3>
+<p>The <a href="artifacts/bulk_image_requests.yml">two-document Sigma file</a> has one webserver event selection for successful JPEG, PNG, and WebP requests, then a correlation for more than 200 matching requests by one client IP in ten minutes. I use a separate correlation rule because event selection alone does not count requests. The threshold is a starting value for tuning, not a universal scrape signature. NAT, proxies, cache behavior, and page design change its meaning.</p>
+<h3>Detection Logic - Geolocated Image Posting Self-Audit</h3>
+<p>The <a href="artifacts/image_exposure_review.py">local scanner</a> reports whether consented JPEG, PNG, or WebP files carry EXIF GPS, IPTC, XMP, or comments. It reads only bounded local files and never prints coordinates. Visual badges, screens, landmarks, or captions still need a reviewer. A clean metadata result is a near miss for the automation, not an all-clear for publication.</p>
+<h3>Log Source and Data Pipeline Requirements</h3>
+<table>
+<thead>
+<tr>
+<th>Use</th>
+<th>Required data</th>
+<th>Boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bulk image request hunt</td>
+<td>Web/CDN timestamp, client identifier, URI path, response status, host, user agent</td>
+<td>Counts requests on owned infrastructure only; cache and proxies distort it</td>
+</tr>
+<tr>
+<td>Organizational image check</td>
+<td>Approved image bytes, file format, metadata, review decision</td>
+<td>Metadata is deterministic; visible content needs human judgment</td>
+</tr>
+<tr>
+<td>Authorized channel review</td>
+<td>Approved post URL, account, posting time, image and caption</td>
+<td>Platform permissions and privacy rules control collection</td>
+</tr>
+</tbody>
+</table>
+<h3>False Positive Surfaces and Tuning</h3>
+<p>Search crawlers, authorized mirrors, CDN warming, a press launch, and shared egress IPs can all cross a request threshold. I would verify crawler identity through independently controlled data, compare unique paths and bytes, and tune against a normal traffic baseline. A user-agent string alone is easy to spoof. On the image side, a GPS tag can be coarse or deliberately altered, and a metadata-free image can still be placeable. The test suite covers synthetic positive, benign, and near-miss cases; no production logs or photographs were used to estimate detection accuracy.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">pre-read diagram</a> shows my route from metadata triage through two visual constraints to the H3 answer. This second view shows the real-world exposure and response path. It is a workflow proposal, not a deployed control map.</p>
+<pre><code class="language-mermaid">flowchart TB
+    A[Organizational photo proposed for release] --&gt; B[Read-only metadata check]
+    B --&gt; C[Human review of landmarks, screens, badges, caption, and timing]
+    C --&gt; D{Location or sensitive context exposed?}
+    D --&gt;|Yes| E[Crop, delay, replace, or restrict the post]
+    D --&gt;|No| F[Record reviewer decision and publish]
+    F --&gt; G[Monitor owned-site image request patterns]
+    G --&gt; H[Investigate unusual collection with source logs]
+    H --&gt; I[Update training and publication guidance]
+</code></pre>
+<p>ATT&amp;CK T1593.001 and T1591.001 describe possible reconnaissance against public imagery. Training and publication rules reduce what gets exposed. The metadata checker and request hunt have narrower, testable roles. The latter cannot detect a stranger studying a single image or pulling it from another platform.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<h3>Primary Authoritative Sources</h3>
+<ul>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5</a>, security and privacy control descriptions.</li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/150/final">NIST SP 800-150</a>, cyber threat information sharing guidance.</li>
+<li><a href="https://attack.mitre.org/tactics/TA0043/">MITRE ATT&amp;CK Reconnaissance</a> and <a href="https://attack.mitre.org/techniques/T1591/001/">T1591.001</a>.</li>
+<li><a href="https://capec.mitre.org/">MITRE CAPEC catalog</a> and <a href="https://capec.mitre.org/data/definitions/118.html">CAPEC-118</a>.</li>
+</ul>
+<h3>H3 Geospatial Indexing</h3>
+<ul>
+<li><a href="https://h3geo.org/docs/">H3 documentation</a> and <a href="https://h3geo.org/docs/core-library/restable/">cell statistics by resolution</a>.</li>
+<li>Sahr, White, and Kimerling, "Geodesic Discrete Global Grid Systems," <em>Cartography and Geographic Information Science</em> 30(2), 2003.</li>
+<li><a href="https://www.uber.com/us/en/blog/h3/">Uber Engineering's H3 overview</a>, background on the grid design.</li>
+</ul>
+<h3>Standards and Frameworks</h3>
+<ul>
+<li><a href="https://www.cisecurity.org/controls">CIS Critical Security Controls</a> and <a href="https://business.defense.gov/Programs/Cyber-Security/">CMMC 2.0 program</a>.</li>
+<li><a href="https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html">OASIS STIX 2.1 standard</a>.</li>
+<li><a href="https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-correlation-rules-specification.md">Sigma correlation specification</a>.</li>
+</ul>
+<h3>Intelligence Community OSINT/GEOINT Doctrine</h3>
+<ul>
+<li><a href="https://www.dni.gov/files/ODNI/documents/IC_OSINT_Strategy.pdf">ODNI IC OSINT Strategy 2024-2026</a>, public strategy context.</li>
+<li><a href="https://www.nga.mil/resources/GEOINT_Basic_Doctrine_Publication_10_.html">NGA GEOINT Basic Doctrine Publication 1.0</a>, public GEOINT doctrine.</li>
+</ul>
+<h3>Spherical Geometry</h3>
+<ul>
+<li><a href="https://www.edwilliams.org/avform.htm">Aviation Formulary</a>, bearing and great-circle formulas.</li>
+<li>Vincenty, "Direct and Inverse Solutions of Geodesics on the Ellipsoid," <em>Survey Review</em> 23(176), 1975.</li>
+</ul>
+<h3>Image and Metadata Tooling</h3>
+<ul>
+<li><a href="https://pillow.readthedocs.io/en/stable/">Pillow documentation</a>, image and EXIF parsing.</li>
+<li><a href="https://exiv2.org/">Exiv2</a>, metadata inspection background.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
