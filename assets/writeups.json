@@ -608,5 +608,27 @@
     ],
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/forensics/auditd-insider-implant/"
+  },
+  {
+    "title": "The Image After the Image",
+    "category": "Forensics",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "PNG structure",
+      "appended data",
+      "file carving",
+      "signature repair",
+      "polyglot-style concatenation",
+      "rasterized payload"
+    ],
+    "summary": "A themed PNG still had data after its IEND chunk. I repaired a second image with a missing signature, then worked through two visual transcription mistakes before the drawn flag was accepted.",
+    "aliases": [
+      "appended PNG",
+      "IEND carving",
+      "image steganography"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/forensics/png-appended-image/"
   }
 ]

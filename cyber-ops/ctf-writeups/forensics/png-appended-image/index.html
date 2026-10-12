@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Image After the Image - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="A themed PNG still had data after its IEND chunk. I repaired a second image with a missing signature, then worked through two visual transcription mistakes before the drawn flag was accepted.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/png-appended-image/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Image After the Image">
+  <meta property="og:description" content="A themed PNG still had data after its IEND chunk. I repaired a second image with a missing signature, then worked through two visual transcription mistakes before the drawn flag was accepted.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/png-appended-image/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Forensics / <span aria-current="page">The Image After the Image</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Image After the Image</h1>
+        <p class="lead">The first picture opened normally. The bytes after its ending told the rest of the story.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Recover a flag hidden in a single themed PNG supplied for a 500-point university CTF challenge.</p>
+<p><strong>What I did.</strong> I measured the data past the first PNG&#x27;s logical end, identified a signature-stripped second image, restored its signature, rendered it, and checked ambiguous glyphs against submission feedback.</p>
+<p><strong>The result.</strong> The repaired image displayed the flag as drawn text. Two transcription guesses failed before the corrected answer was accepted; the value is withheld.</p>
+<p><strong>The limit.</strong> The carrier image and platform transcript are not displayed here. The local lab uses an invented PNG, so it tests the reusable carving method rather than replaying the accepted submission.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Carrier; Boundary; Trailer; Repair; Render; Verify">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Carrier</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Open the visible PNG</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Boundary</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Parse chunks to first IEND</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Trailer</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Find a second IHDR stream</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Repair</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Restore the PNG signature</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Render</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Read the drawn text</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Verify</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Resolve ambiguous glyphs</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Steganography / forensics (file structure)</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>PNG structure, appended data, file carving, signature repair, polyglot-style concatenation, rasterized payload</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved</td>
+</tr>
+<tr>
+<td>Available material</td>
+<td>One themed PNG analyzed locally</td>
+</tr>
+<tr>
+<td>Goal</td>
+<td>Recover a flag drawn inside concealed image data</td>
+</tr>
+<tr>
+<td>Result</td>
+<td>Corrected visual transcription accepted after two rejected guesses</td>
+</tr>
+<tr>
+<td>Verification boundary</td>
+<td>The carrier and submission transcript are not available on this page</td>
+</tr>
+</tbody>
+</table>
+<p>I rate this Medium based on the chunk-structure repair and the visual transcription, since the challenge supplied points but no difficulty label.</p>
+<p>Defensive proofs of concept for file inspection: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/png-appended-image/artifacts">browse the scanner, test, YARA triage rule, and guide on GitHub</a> and <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/png-appended-image/fixtures">the invented PNG and expected report</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>The challenge handed me one themed PNG and asked for a flag. The prompt hinted at something "extra" in the picture. I took that literally and looked at the file beyond the pixels it showed. There was no service to query or account to compromise. This was a local file puzzle.</p>
+<p>The flag format was familiar, but its exact characters mattered. I needed to find where the extra data lived, turn it into something I could view, and transcribe the drawn letters accurately. The exercise does not establish an attacker or a real victim. Its operational use comes later, when I apply the same file-boundary check to files moving through an organization.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I started with <code>file</code> and a SHA-256 hash, then checked the PNG's structure. The first valid <code>IEND</code> chunk ended the image a viewer displayed, but bytes remained after it. Counting markers in the challenge file showed one PNG signature and two <code>IEND</code> markers. The trailing region began with an <code>IHDR</code> chunk, the start of another PNG's chunk stream. It lacked the eight-byte PNG signature.</p>
+<p>I carved that second stream from its <code>IHDR</code> through its own <code>IEND</code>, added the standard signature at the front, and opened the result. The second image drew the flag by hand. A text search would not read letters stored as pixels.</p>
+<p>I considered a least-significant-bit sweep of the visible image. Once the trailing stream decoded into an image containing the answer, I left that route alone. The last part was less tidy: the drawn text used digit and letter look-alikes, and the leetspeak was inconsistent across repeated words. Two submissions failed because I read particular glyphs incorrectly. I rechecked those strokes and submitted the corrected transcription, which the platform accepted.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>The first pass was deliberately small:</p>
+<pre><code class="language-sh">file carrier.png
+sha256sum carrier.png
+</code></pre>
+<p>The important offset is the end of the first <em>parsed</em> <code>IEND</code> chunk. A raw search for the bytes <code>IEND</code> can land inside a chunk's data and produce the wrong offset. The <a href="artifacts/trailing_data_detector.py">offline scanner</a> follows each chunk's declared length, checks its CRC, and stops at the structural <code>IEND</code>. It then tests any trailing <code>IHDR</code> candidate as a complete second PNG stream. It restores the fixed signature only when that stream passes its structural checks. The <a href="artifacts/README.md">guide</a> gives the input and output contract.</p>
+<pre><code class="language-sh">python artifacts/trailing_data_detector.py fixtures/sample_appended.png --out recovered
+</code></pre>
+<p>The carved image still needs to be opened and read. The script does not execute content inside it or decide which visually similar glyph is the flag character. The <code>--out</code> option writes recovered PNGs under the requested directory and refuses to overwrite an existing file.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>A PNG begins with an eight-byte signature. After that come length-prefixed chunks with a type, data, and CRC. <code>IHDR</code> describes the image; one or more <code>IDAT</code> chunks carry compressed pixels; <code>IEND</code> closes the PNG datastream. The <a href="https://www.w3.org/TR/png-3/">PNG specification</a> requires <code>IEND</code> to be last and says no other content follows it in a conforming datastream.</p>
+<p>That gave me a clean boundary. The visible image ended at its first structural <code>IEND</code>. The extra bytes were outside that image, even though many viewers still displayed the carrier normally. The appended stream began at <code>IHDR</code> and had its own chunks through <code>IEND</code>; its signature had been removed. Because the PNG signature is a fixed byte sequence, I could prepend it. That repair works only when the rest of the stream is intact enough to decode.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>The concealment used concatenation. One complete PNG came first. A second image's chunk stream sat after the first image's <code>IEND</code>, so the carrier still looked ordinary in a viewer. Removing the second signature reduced the chance that a simple signature scan would spot another PNG. The extra image could be reconstructed from the surviving <code>IHDR</code>, <code>IDAT</code>, and <code>IEND</code> chunks.</p>
+<p>My path was: establish the first image's true end, measure the trailer, find the next <code>IHDR</code> boundary, restore the signature, render the second image, and read the lettering. The recovery proved where the answer was stored. Submission feedback resolved the last ambiguity in the hand-drawn glyphs. The first two rejected strings were transcription errors; they did not undo the file-structure finding.</p>
+<p>The repaired image decoded to a fixed-size raster and its text fit the expected flag shape. The accepted submission is part of the case record. I do not have the carrier or submission transcript here for an independent replay. A damaged second stream would need more than signature repair, and a different kind of appended payload would need a different decoder.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned</summary>
+<p>The prompt's "extra" hint earned a byte-level check before I spent time on pixel steganography. Comparing the file's full length with its parsed PNG length was quick and decisive. It also spared me an LSB search that would not explain the second <code>IHDR</code> and <code>IEND</code>.</p>
+<p>The wrong submissions taught a separate lesson. Rasterized text can make a technically correct carve look like a failed solve. Next time I would list possible readings for each <code>1/l</code>, <code>0/o</code>, <code>3/e</code>, or <code>5/s</code> shape before submitting. I would inspect each stroke at a larger scale and resist assuming that the writer applied leetspeak consistently.</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>What held up</th>
+<th>What could still fail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Structural recovery</td>
+<td>A second PNG stream followed the carrier's <code>IEND</code></td>
+<td>Corrupt chunks would need further repair</td>
+</tr>
+<tr>
+<td>Rendering</td>
+<td>The repaired image showed drawn text</td>
+<td>A text search cannot read those pixels</td>
+</tr>
+<tr>
+<td>Answer check</td>
+<td>The corrected transcription was accepted</td>
+<td>Similar-looking glyphs caused two rejected guesses</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Operational Extrapolation</summary>
+<h3>Individual Practitioner Development</h3>
+<p>This was good practice in PNG internals, carving, and checking a file's declared end against its actual size. I would take the same question to JPEG, ZIP, and other formats, using each format's real structure rather than searching for a convenient marker string. A wider tool would need benign-file testing before I trusted its alert rate.</p>
+<h3>Security Operations</h3>
+<p>For a monitored file store, I would have a content-inspection job parse image boundaries and record trailing-byte counts. A positive file would go to review, not straight to an incident label. The reviewer could carve the trailer, determine whether it is a valid second format, and ask whether the producer legitimately appends data. The <a href="artifacts/trailing_data_detector.py">scanner</a> demonstrates that structural step on local files. The <a href="artifacts/test_trailing_data_detector.py">test cases</a> cover clean files, damaged candidates, and a misleading <code>IEND</code> string inside a valid chunk. No organization or production feed was assessed in this exercise.</p>
+<h3>Intelligence Operations</h3>
+<p>The challenge supplied no actor, infrastructure, or collection context. I would not turn a concealed puzzle image into an attribution claim or an IOC feed. If a real file appeared in an investigation, I would keep its hash, source, timestamps, parsed offsets, and carved bytes together so another analyst could reproduce the finding. That is an evidence-handling plan, not a claim about this challenge.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The <a href="artifacts/trailing_data_detector.py">scanner</a> accepts a local PNG, reports the carrier's end offset and trailing-byte count, and tries to carve a signed or signature-stripped second PNG from the trailer. It checks chunk framing and CRCs, limits input to 16 MB, and never runs the extracted content. The <a href="artifacts/README.md">guide</a> lists the supported structure and the checks it does not make.</p>
+<p>The <a href="fixtures/sample_appended.png">invented appended PNG</a> provides a safe example. Its first image ends at byte 973. The 1,155-byte trailer contains a stripped 180-by-64 PNG that reads <code>SAMPLE TEXT</code>, followed by an ASCII note. The <a href="fixtures/expected_report.json">expected report</a> records the boundary, trailer length, and recovered image hash. The <a href="artifacts/test_trailing_data_detector.py">tests</a> check that sample, a clean image with <code>IEND</code> text inside metadata, benign trailer text, a corrupt candidate, signed and stripped second images, and input bounds. Five local test groups passed. I also opened the carved sample image and checked its visible text.</p>
+<p>The <a href="artifacts/png_trailing_data.yar">YARA rule</a> is a narrower triage signal. It looks for a PNG signature, a fixed <code>IEND</code> byte sequence, and an immediately following stripped <code>IHDR</code> header. The Python scanner checks the chunk structure. The rule's engine compilation and performance on a file collection remain untested.</p>
+<pre><code class="language-sh">python -B -m unittest -v artifacts/test_trailing_data_detector.py
+</code></pre>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Applicability and Mapping</summary>
+<p>The exercise does not show adversary behavior, so I do not assign it an observed MITRE ATT&amp;CK technique. Hiding a second image inside a benign-looking file resembles <a href="https://attack.mitre.org/techniques/T1027/">T1027, Obfuscated Files or Information</a>. Keeping data beyond the displayed image also resembles <a href="https://attack.mitre.org/techniques/T1564/">T1564, Hide Artifacts</a>. Both are low-confidence analogies for how this method could be used in the wild. They say nothing about an actor in this puzzle.</p>
+<p>D3FEND and STRIDE would require a defined defensive system or threat model to map precisely. OWASP web categories do not fit this local image task. I keep those labels off the case rather than giving a file carve the appearance of a web finding.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intelligence and Standards Integration</summary>
+<p>This file yielded no real infrastructure indicator, malware family, vulnerability, or campaign relationship. I have no case-specific STIX object to share and no TAXII exchange to report. The production-facing value is the inspection method: preserve the file, parse its real end, record the trailer, and review any recovered object with provenance. That method is described in the <a href="artifacts/README.md">lab guide</a>, including the limits that matter before operational use.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<p>The puzzle did not test an organization's controls, so it supports no NIST, CIS, STIG, or compliance finding. A real content-inspection control could place a structural PNG check in an upload or data-loss-prevention path. It would need a policy for benign trailers, retention for the original and carve, reviewer access, and a way to record the decision. The <a href="artifacts/trailing_data_detector.py">scanner</a> supplies the parsing example; its 16 MB limit and incomplete PNG conformance checks would need deliberate changes for a production pipeline.</p>
+<p>I would measure false positives on the files that pipeline actually sees before setting an alert threshold. A trailing region by itself proves a format anomaly. It does not prove malicious intent.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>The main static-file signal is a valid PNG whose on-disk bytes continue after its structural <code>IEND</code>. A second valid <code>IHDR</code>-to-<code>IEND</code> stream in that trailer strengthens the finding. The <a href="artifacts/trailing_data_detector.py">scanner</a> checks that sequence with chunk lengths and CRCs. The <a href="fixtures/sample_appended.png">sample</a> is a positive case; the <a href="artifacts/test_trailing_data_detector.py">tests</a> include benign and damaged near misses. A file inspector needs access to the entire byte stream, not only the header or a rendered thumbnail.</p>
+<p>The <a href="artifacts/png_trailing_data.yar">YARA candidate</a> searches for an immediate stripped-image pattern. Its fixed-byte match can be fooled by coincidental bytes inside compressed data, and it misses a second image separated by text or one with its signature intact. It is for triage. The source-style count of two <code>IHDR</code> or <code>IEND</code> strings is weaker still: those letters may occur inside chunk data. I would verify a YARA hit with the structural parser before calling it an embedded image. No YARA engine or live collection was used to validate this rule.</p>
+<p>A hunt could ask for stored PNGs whose file size exceeds their parsed image length, then group by producer and carve the uncommon trailers. Benign metadata appended by a producer is a likely false positive. Other payload types, corrupted PNGs, oversized files, and trailers hidden inside a different format fall outside this scanner. Sigma, KQL, and SPL event rules would need actual file-inspection telemetry; none was present in the challenge.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow above</a> follows the first image's boundary to the second image and the final visual check. The <a href="fixtures/sample_appended.png">invented sample</a> lets a reader repeat the signature repair without exposing a flag. Its <a href="fixtures/expected_report.json">expected report</a> gives concrete offsets for checking the carve.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://www.w3.org/TR/png-3/">W3C Portable Network Graphics specification, Third Edition</a>: signature, length-prefixed chunks, CRC, <code>IHDR</code>, <code>IDAT</code>, and <code>IEND</code> constraints used in Sections 3 through 5 and 12.</li>
+<li><a href="https://attack.mitre.org/techniques/T1027/">MITRE ATT&amp;CK T1027</a> and <a href="https://attack.mitre.org/techniques/T1564/">T1564</a>: analogical mappings in Section 9, without an observed actor claim.</li>
+<li><a href="https://yara.readthedocs.io/en/latest/writingrules.html">YARA rule guide</a>: indexed match offsets and the <code>for</code> condition in the triage rule described in Section 12.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
