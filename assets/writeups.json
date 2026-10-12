@@ -316,5 +316,24 @@
     "summary": "A status call exposed most of a shuffle seed. I recovered the missing bits, predicted where each word had moved, and grouped later salted hashes without knowing the salt. The solver passed local replica tests; live acceptance was not observed.",
     "status": "Solved-External",
     "url": "/cyber-ops/ctf-writeups/reversing/prng-state-leak/"
+  },
+  {
+    "title": "Six Fast Signatures and a Private Key",
+    "category": "Crypto",
+    "difficulty": "Hard",
+    "date": "2026-10",
+    "tags": [
+      "ECDSA",
+      "P-256",
+      "side-channel",
+      "timing",
+      "HNP",
+      "lattice",
+      "LLL",
+      "Minerva-class"
+    ],
+    "summary": "Six unusually fast P-256 signatures exposed tight bounds on their nonces. I used a lattice to recover a scalar that matched the public key, then found the payload's hash-chain wrapper. The flag-shaped plaintext stays withheld.",
+    "status": "Solved-Verified",
+    "url": "/cyber-ops/ctf-writeups/crypto/ecdsa-nonce-timing/"
   }
 ]
