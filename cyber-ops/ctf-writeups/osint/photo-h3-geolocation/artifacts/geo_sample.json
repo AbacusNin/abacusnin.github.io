@@ -1,0 +1,10 @@
+{
+  "path_start": [40.001, -105.001],
+  "path_end": [39.999, -105.001],
+  "subject": [40.0, -105.0],
+  "heading_deg": 90,
+  "subject_offset_window_deg": [-10, 10],
+  "aux_path_fraction_window": [0.4, 0.6],
+  "step_m": 2,
+  "h3_resolution": 11
+}

@@ -1,0 +1,40 @@
+title: Successful Image Requests on a Published Site
+id: 449dc783-07e8-420c-9eaf-a555ef46b276
+status: experimental
+description: Base event selection for a separate high-volume image request correlation.
+references:
+  - https://attack.mitre.org/techniques/T1593/
+logsource:
+  category: webserver
+detection:
+  selection:
+    cs-uri-stem|endswith:
+      - .jpg
+      - .jpeg
+      - .png
+      - .webp
+    sc-status: 200
+  condition: selection
+falsepositives:
+  - Normal browsing and search engine indexing
+level: informational
+---
+title: High Volume of Successful Image Requests by One Client
+id: 5f73dd92-e093-4858-84bd-c460fd661a60
+status: experimental
+description: Hunt for over 200 successful image requests from one client IP in ten minutes.
+references:
+  - https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-correlation-rules-specification.md
+correlation:
+  type: event_count
+  rules:
+    - 449dc783-07e8-420c-9eaf-a555ef46b276
+  group-by:
+    - c-ip
+  timespan: 10m
+  condition:
+    gt: 200
+falsepositives:
+  - Verified search crawlers and authorized archive jobs
+  - CDN warming and press launches
+level: medium
