@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Merchant Name Was a Dead End - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="I called a hotel-name search a zero, got it wrong, and went back to the category code. That one change unlocked five questions in a 1,000-row transaction table.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/merchant-code-pivot/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Merchant Name Was a Dead End">
+  <meta property="og:description" content="I called a hotel-name search a zero, got it wrong, and went back to the category code. That one change unlocked five questions in a 1,000-row transaction table.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/merchant-code-pivot/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Forensics / <span aria-current="page">The Merchant Name Was a Dead End</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Merchant Name Was a Dead End</h1>
+        <p class="lead">The merchant column looked like the obvious place to start. It gave me an empty result and an incorrect answer.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Answer five questions about a synthetic transaction table with unreliable merchant display names.</p>
+<p><strong>What I did.</strong> I profiled the fields, checked the card-network category mapping, and used the right operation for each question.</p>
+<p><strong>The result.</strong> The corrected hotel-code count was four; the other questions resolved through category filtering, frequency, summation, and a strict amount threshold.</p>
+<p><strong>The limit.</strong> The five answers were recorded during the challenge. The linked tool and tests use invented transactions to demonstrate the method.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Read 1,000 rows; Try the display name; Check a code reference; Answer the remaining questions; Take it into operations">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Read 1,000 rows</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Profile merchant, MCC, amount, and time</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Try the display name</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Empty match leads to a wrong Q1 answer</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Check a code reference</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Hotel code 3795 changes the count to four</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Answer the remaining questions</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Unique, frequency, sum, and greater-than filter</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Take it into operations</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Review with account and merchant context</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Forensics - Data / Financial Intelligence</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>data-forensics, financial-intelligence, MCC, pandas, anomaly-detection, AML, FININT, pattern-of-life</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved - all flags captured</td>
+</tr>
+<tr>
+<td>Recorded result</td>
+<td>Q1: 4; Q3: MCC 3023; Q4: $198.26; Q5: 504. Q2 resolved to one merchant name, which is withheld here.</td>
+</tr>
+<tr>
+<td>Validation boundary</td>
+<td>The linked code is tested against invented rows; those tests do not replay the 1,000-row result.</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/merchant-code-pivot/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>Analytical Attack Chain (Overview)</h2>
+<pre><code class="language-mermaid">flowchart LR
+    A[1,000 transaction rows] --&gt; B[Profile columns]
+    B --&gt; C[Merchant-name search returns zero]
+    C --&gt; D[Check card-network MCC reference]
+    D --&gt; E[Filter by the relevant code]
+    E --&gt; F[Count, unique, frequency, sum, threshold]
+    F --&gt; G[Review and report five answers]
+</code></pre>
+<p>The zero was the useful part of the story. It was my first answer, and it was wrong. The merchant labels in this dataset were synthetic; I had exhausted variants of the name before checking whether the category code offered a better route.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<h3>Challenge Presentation</h3>
+<p>The exercise gave me 1,000 synthetic credit-card transaction rows with four fields: <code>timestamp</code>, <code>merchant</code>, <code>mcc</code>, and <code>amount</code>. I had five questions: count transactions for a named hotel, find the sole merchant in a named retail category, identify the most frequent MCC, total spend for a medical-services category, and count amounts strictly greater than a specified threshold. The case record says all five flags were captured. It preserves the numerical outcomes for four questions; the merchant name from Question 2 is not printed here.</p>
+<p>The data was built to make display names a poor starting point. An MCC describes a merchant's business type. Some card-network codes, including the branded hotel code used in Question 1, are more specific. Most codes are shared by many merchants. That distinction matters: a category filter can recover the right <em>row set</em> in this puzzle, but it does not normally prove which legal entity made a transaction.</p>
+<h3>Threat Model</h3>
+<p>This was an analytical puzzle, not evidence of payment fraud, money laundering, or compromised accounts. The scenario imagined a financially motivated actor blending into transaction noise, but the dataset only establishes synthetic naming and five questions. For an operational analogue, I would be an authorized investigator working with a normalized extract. I would ask whether a weak display-name match had hidden relevant transactions, then require a merchant identifier, acquiring context, and transaction provenance before attributing those rows to a real business.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<h3>Phase 1: Dataset Profiling</h3>
+<p>I profiled the four columns before settling on the query strategy: types, nulls, cardinality, amount range, and time coverage. The merchant names looked programmatically generated. The MCC column was complete and integer-typed. That made it useful for category filtering, although completeness alone says nothing about whether a code was assigned correctly. In pandas, the first pass was <code>df.dtypes</code>, <code>df.describe(include="all")</code>, <code>df.isnull().sum()</code>, and distinct counts for <code>mcc</code> and <code>merchant</code>.</p>
+<h3>Phase 2: Field Trust Classification</h3>
+<p>I treated <code>mcc</code> as a <strong>reference-backed category</strong>, <code>amount</code> as a value to validate, <code>timestamp</code> as contextual time data, and <code>merchant</code> as an unreliable display label in this particular extract. I would not call any one column ground truth in a production financial system. MCCs can be miscoded, amounts need currency and reversal context, timestamps need a time zone, and legal entity matching needs identifiers beyond a display string. In this challenge, the code was the more stable pivot because the names were intentionally unhelpful.</p>
+<h3>Phase 3: Question 1 - Initial Dead End and Pivot (Instructive)</h3>
+<p>I searched the merchant field for the named hotel, parent-brand forms, and abbreviations. Every query returned an empty DataFrame. I reported zero and the answer was marked incorrect. My mistake was turning "no string match" into "no transactions" without testing another identifier.</p>
+<p>I then looked up the brand-specific hotel code in a card-network reference. <a href="https://cis.visa.com/content/dam/VCOM/download/merchants/visa-merchant-data-standards-manual.pdf">Visa's Merchant Data Standards Manual</a> lists MCC <code>3795</code> as <strong>Paris Las Vegas Hotel</strong>. Filtering the case table by <code>3795</code> gave four rows. That is the corrected Q1 count in the record. The code's specificity made this pivot plausible here; I would still verify merchant-account IDs before making a real-world entity claim.</p>
+<pre><code class="language-python">hotel_rows = df[df[&quot;mcc&quot;] == 3795]
+len(hotel_rows)  # 4
+</code></pre>
+<h3>Phase 4: Questions 2-5 - Systematic Execution</h3>
+<p>The remaining questions used four small operations. For Q2, I filtered MCC <code>5311</code> (department stores in the Visa list) and found one merchant name; I am leaving that name out of this public account. For Q3, <code>value_counts().idxmax()</code> returned MCC <code>3023</code>. For Q4, I summed <code>amount</code> for MCC <code>8011</code> and got <code>$198.26</code>. For Q5, the count of <code>amount &gt; 50.00</code> was <code>504</code>; equality to 50 did not qualify. I kept frequency ties and missing values in mind for reusable code even though this case had one top code.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<h3>3.1 Environment and Data Ingest</h3>
+<p>I used pandas to read the CSV, strip column-name whitespace, parse timestamps and amounts, and make MCC nullable integer data. That is enough for quick puzzle queries, but malformed currency values or a missing column can silently change an aggregate if a parser coerces them to null. The <a href="artifacts/transaction_review.py">offline transaction reviewer</a> uses only the Python standard library, rejects malformed MCCs and non-finite or negative amounts, and bounds the local input. Its <a href="artifacts/synthetic_transactions.csv">six-row fixture</a> is invented and intentionally gives different counts from the challenge.</p>
+<h3>3.2 Challenge-Specific Solves</h3>
+<p>Here is the full set of operations I needed. The <a href="artifacts/transaction_review.py">runnable tool</a> implements them with decimal amounts and reports an ambiguous merchant category instead of forcing a single name.</p>
+<pre><code class="language-python">q1 = len(df[df[&quot;mcc&quot;] == 3795])
+q2 = df[df[&quot;mcc&quot;] == 5311][&quot;merchant&quot;].dropna().unique()
+q3 = df[&quot;mcc&quot;].value_counts().idxmax()
+q4 = df[df[&quot;mcc&quot;] == 8011][&quot;amount&quot;].sum()
+q5 = (df[&quot;amount&quot;] &gt; 50.00).sum()
+</code></pre>
+<p>The <a href="artifacts/test_transaction_review.py">synthetic tests</a> cover all five operations, a zero name hit with a nonzero MCC count, an ambiguous category, and malformed input. They exercise the proof of concept, not the historical answer sheet.</p>
+<h3>3.3 Fallback: Negative Space Validation Protocol</h3>
+<p>I should have run this check before submitting Q1 as zero. A failed name search tells me about the search expression and the field it used. I would then inspect the known category code, any stable merchant/account ID, date and amount filters, spelling or DBA variants, and the completeness of the extract. A zero across those <em>documented</em> routes is still bounded by the records and identifiers available. My later <code>validate_null()</code> sketch checked name patterns, candidate MCCs, and date range. Its "confirmed absence" string was too strong because those paths cannot prove global absence.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<h3>ISO 18245 Merchant Category Codes</h3>
+<p><a href="https://www.iso.org/standard/79450.html">ISO 18245:2023</a> defines codes for classifying merchants by the business, trade, or services they supply. A code is a category signal, not a universal merchant ID or proof of activity type for an individual transaction. Card-network manuals can add practical detail. Visa's list makes <code>3795</code> a branded hotel code, while <code>5311</code> and <code>8011</code> describe broader department-store and physician categories. The <a href="artifacts/mcc_reference.csv">small lookup excerpt</a> and <a href="artifacts/mcc_lookup.py">search CLI</a> show those distinctions without posing as a complete or permanently current catalog.</p>
+<h3>Signal Trust as an Analytical Framework</h3>
+<p>The label/code split here resembles other investigations: an account name can change while a SID remains stable, or a process name can be spoofed while other execution context remains. None of those fields is infallible. I rank a field by who assigns it, how it can change, what it actually identifies, and whether another source can corroborate it. For these five questions, MCC was the better <em>category</em> filter. I used merchant text afterward as a value to report for Q2, not as the first filter for Q1.</p>
+<h3>MCC Range Structure</h3>
+<p>I can group code ranges into agriculture, contracted services, travel, retail, professional services, and government as a memory aid. The boundaries and branded codes vary across network reference lists. I would use a dated network manual for a consequential lookup. The distinction that mattered here was simple: <code>3795</code> is branded in the Visa list; <code>5311</code> and <code>8011</code> are general categories. A range guess would not have justified the hotel count.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit and Analysis Mechanics</summary>
+<h3>Invariant Violated by the Dataset Design</h3>
+<p>The puzzle broke my assumption that a named hotel must appear in the <code>merchant</code> display field. The MCC values remained useful for the exercise even though the names did not. That is an analytical failure mode, not a software exploit.</p>
+<h3>Derivation of the MCC-Based Entity Resolution Method</h3>
+<p>My first path was <code>name -&gt; string match -&gt; zero rows</code>. The corrected path was <code>name -&gt; dated card-network reference -&gt; branded MCC -&gt; row filter -&gt; count</code>. For generic categories, that path stops at category membership. It cannot uniquely resolve a merchant without more identifiers. The case's Q2 worked because its filtered subset happened to contain one displayed name.</p>
+<h3>Operational Steps</h3>
+<p>I made a separate operation out of each question: count Q1's branded code; list Q2's unique names after filtering department stores; count all codes and handle a possible tie for Q3; sum Q4 with decimal arithmetic; and apply a strict greater-than test for Q5. I would record the filter, row count, and reference used for each answer. <a href="artifacts/synthetic_transactions.csv">The test fixture</a> is small enough to check by hand, and <a href="artifacts/transaction_review.py">the tool</a> prints the operations separately.</p>
+<h3>Why Null Validation Is a Separate Step</h3>
+<p>The rejected Q1 answer came from a perfectly executed query against the wrong field. A clean zero can look authoritative. Before closing a case on one, I now write down the field searched, alternate identifiers, reference mapping, date coverage, and known data gaps. If the dataset lacks a stable merchant identifier, I label the conclusion as a bounded search result rather than a verified absence.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<h3>What the Exercise Validated</h3>
+<p>The useful habit was field profiling before question solving. The five operations were ordinary pandas work: count, unique, frequency, sum, and a Boolean filter. The judgment was choosing a field that answered the question I actually had. After I stopped treating a display name as an identity key, the queries became short.</p>
+<h3>What the Exercise Surfaced as Gaps</h3>
+<p>I did not validate the empty Q1 result before reporting it. The incorrect-answer feedback forced me back through the assumptions behind that query. I also should have made the initial profile explicit: type checks, null counts, and merchant/MCC cardinality would have made the synthetic names harder to overlook. A prepared null-check function can remind me to test another field, but it cannot certify an entity's absence by itself.</p>
+<h3>Transferable Principles</h3>
+<table>
+<thead>
+<tr>
+<th>In this challenge</th>
+<th>In an authorized transaction review</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Merchant text returned zero</td>
+<td>Inspect aliases and stable identifiers before closing a lead</td>
+</tr>
+<tr>
+<td>A card-network code recovered a useful row set</td>
+<td>Verify the reference version and what the code actually identifies</td>
+</tr>
+<tr>
+<td><code>value_counts()</code> exposed the dominant category</td>
+<td>Establish a baseline before calling a distribution unusual</td>
+</tr>
+<tr>
+<td>A simple amount threshold answered Q5</td>
+<td>Separate a query cutoff from a regulatory or fraud threshold</td>
+</tr>
+<tr>
+<td>I checked the corrected count in code</td>
+<td>Keep query text, row counts, reference, and reviewer decision together</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<h3>Individual Practitioner Skill Development</h3>
+<p>This case is a good drill in structured-data triage. I can carry its small operations into SQL, SPL, KQL, and ES|QL. The next step is harder: join a merchant reference table, keep code-list versions, handle currency and refunds, and preserve account or merchant identifiers. Time-series baselines, entity linkage, and anomaly models need those inputs. A cluster of MCC values alone is too coarse for attribution.</p>
+<h3>Security Operations (SOC / IR / Threat Hunting)</h3>
+<p>Financial transaction logs can enter an enterprise investigation when the organization operates or protects a payment service. An analyst might look for a first-seen category for an account, sudden velocity, or a mismatch between a vetted merchant record and its display label. Each requires permissions and data beyond this four-column puzzle. A code such as <code>7995</code> selects a category for review; it cannot be called a fraud indicator without account history and other evidence.</p>
+<p>I considered hunting for gambling, money-transfer, and quasi-cash patterns and repeated amounts just below a cutoff. I would treat those as hypotheses. The <code>$45-$50</code> interval used for the teaching example is arbitrary and is <strong>not</strong> a legal reporting threshold or a validated structuring detector. A useful workflow starts with an approved policy, an account-level baseline, a defined time window, and a review process for ordinary customers who trigger the same filter.</p>
+<h3>Intelligence Operations (SIGINT / FININT / Attribution)</h3>
+<p>A category distribution can describe part of a spending pattern. In a lawful financial-intelligence review, it can help choose which records to inspect next or compare a customer's own history over time. It cannot establish that two accounts belong to one actor, that a merchant is a front company, or that a name is deliberately deceptive. I would require identifiers, provenance, location and time context, and independent reporting before making those claims. The puzzle taught me to pivot away from bad labels; it did not prove any real-world laundering behavior.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The <a href="artifacts/README.md">artifact README</a> explains the inputs, output, and testing boundary for the <a href="artifacts/transaction_review.py">offline reviewer</a>, <a href="artifacts/synthetic_transactions.csv">invented CSV</a>, <a href="artifacts/test_transaction_review.py">transaction tests</a>, <a href="artifacts/mcc_reference.csv">limited MCC reference</a>, <a href="artifacts/mcc_lookup.py">lookup CLI</a>, <a href="artifacts/category_review.yml">Sigma selection</a>, <a href="artifacts/synthetic_category_events.jsonl">synthetic Sigma events</a>, <a href="artifacts/test_category_review.py">Sigma test</a>, and <a href="artifacts/synthetic_review_stix.json">synthetic STIX object</a>. These are defensive proofs of concept. They do not contain the challenge's transaction table or a production risk model.</p>
+<h3>8.1 Full Modular Analysis Engine</h3>
+<p>I sketched a broader engine around profiling, category frequency, aggregations, threshold filters, anomaly scoring, rule-driven review, and clustering. Those are useful modules to design, but the last three need a much richer dataset and validation plan. A fixed MCC "high risk" weight, a round-number rule, or KMeans cluster can produce a chart without producing a defensible investigation finding. The available challenge table has no account history, merchant ID, case labels, or confirmed fraud outcomes.</p>
+<p>I kept the implemented proof of concept to the five operations the exercise actually used. <a href="artifacts/transaction_review.py">transaction_review.py</a> reads a bounded CSV, preserves cents with <code>Decimal</code>, and returns category and amount results. It reports all tied top MCCs rather than silently picking one. Its <code>q2_unique_merchant</code> field becomes null when more than one distinct name appears in the chosen category. That is an intentional guard against pretending a general MCC identifies one merchant.</p>
+<pre><code class="language-sh">python -B transaction_review.py synthetic_transactions.csv \
+  --entity-mcc 3795 --category-mcc 5311 \
+  --spend-mcc 8011 --threshold 50 --name-hint hotel
+</code></pre>
+<p>The invented fixture has six rows. It returns two <code>3795</code> rows and zero matches for the word <code>hotel</code>, so the negative-name/positive-code failure is visible without exposing financial data. <a href="artifacts/test_transaction_review.py">The tests</a> also cover a category with multiple merchants, a bad amount, and a missing required field. Production enrichment would need a reviewed reference table, currencies, reversals, account/merchant keys, privacy controls, and model evaluation.</p>
+<h3>8.2 Field Trust Triage Flowchart</h3>
+<pre><code class="language-text">Read transaction extract
+  -&gt; Check columns, types, nulls, code-list version, and date coverage
+  -&gt; Classify each field by who assigns it and what it identifies
+  -&gt; Match the question to count / unique / frequency / sum / threshold
+  -&gt; Choose a reference-backed filter where the name is unreliable
+  -&gt; Keep merchant IDs and names for corroboration and reporting
+  -&gt; If result is zero or ambiguous, test alternate identifiers and scope
+  -&gt; Record the query, row count, reference, and remaining uncertainty
+</code></pre>
+<p>The trust-tier idea needs one qualification: an MCC can be a useful category key and still be wrong or too broad. The time, amount, and display-name fields also need their own checks.</p>
+<h3>8.3 MCC Quick-Lookup CLI</h3>
+<p>The <a href="artifacts/mcc_lookup.py">lookup script</a> searches <a href="artifacts/mcc_reference.csv">a four-row reference excerpt</a> checked against the Visa manual: <code>3795</code>, <code>5311</code>, <code>7011</code>, and <code>8011</code>. It is deliberately incomplete. For another case, I would use the network's current dated manual or an approved institutional table, then record the exact version. A search miss in this tiny excerpt means only that I did not include the code.</p>
+<h3>8.4 Solve Pattern Checklist</h3>
+<ul>
+<li>[ ] Count rows and check column types, nulls, ranges, and duplicates.</li>
+<li>[ ] Record what each field identifies and where its value came from.</li>
+<li>[ ] Match the question to the correct operation and comparison boundary.</li>
+<li>[ ] Verify MCC meaning against a dated network reference.</li>
+<li>[ ] Keep category membership separate from merchant identity.</li>
+<li>[ ] Check zero and ambiguous results through another identifier or reference.</li>
+<li>[ ] Show count alongside sum; retain currency and reversal context.</li>
+<li>[ ] Save the query and output before reporting the answer.</li>
+</ul>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<h3>9.1 MITRE ATT&amp;CK</h3>
+<p>No observed event in this puzzle establishes an ATT&amp;CK technique. Synthetic merchant names were a challenge-design feature, not evidence of cyber masquerading. T1036 and T1036.005 concern adversary masquerading in computer systems; T1078 concerns use of valid accounts. The dataset did not show account compromise, cloud-account abuse, staged data, or acquired web infrastructure, so I would not tag it with T1078.004, T1074.001, T1530, or T1583.006 either. Those IDs can guide a <em>separate</em> cyber investigation if its evidence supports them. They do not explain these five CSV questions.</p>
+<h3>9.2 MITRE D3FEND</h3>
+<p>D3-DAM and D3-OAM can suggest data analysis and operational mapping, but D3-SBV and D3-NTA describe different defensive work. This review is financial tabular analysis, not service-binary verification or network traffic analysis. I use the concrete field and query requirements here instead of assigning a D3FEND label merely by analogy. D3FEND becomes useful when a cyber defensive technique, its digital artifact, and its deployment are actually specified.</p>
+<h3>9.3 CAPEC</h3>
+<p>CAPEC-167 (catching an exception thrown by a subsystem) and CAPEC-117 (interception) do not describe a failed display-name search or the five questions. I leave CAPEC unmapped. STRIDE, OWASP Top 10, CACAO, and OpenC2 would also need a different system-design, application, or orchestration question to add value.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<h3>10.1 STIX 2.1 Sample Objects</h3>
+<p>This case has no actor, malware, infrastructure, or confirmed malicious transaction to publish as an IOC. The <a href="artifacts/synthetic_review_stix.json">synthetic STIX 2.1 bundle</a> contains a textual course of action: check the category mapping and provenance before closing a name-search null. It does not invent a <code>financial-transaction</code> cyber observable or claim that a category is malicious. The <a href="https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html">OASIS specification</a> allows a course of action to carry such procedural guidance, but this file is an illustrative representation. No TAXII exchange occurred.</p>
+<h3>10.2 STIGs</h3>
+<p>No STIG finding follows from the table or my pandas queries. STIGs assess configurations of particular systems against named benchmarks. A real payment platform could have applicable STIGs, but this dataset does not identify its stack or show a tested configuration.</p>
+<h3>10.3 CIS Benchmarks</h3>
+<p>CIS Benchmarks also require a specific product and configuration. The organizational <a href="https://www.cisecurity.org/controls/cis-controls-navigator/v8">CIS Controls</a> can help frame log collection and review if transaction events are in the organization's security-monitoring scope. A completed category filter does not establish that those safeguards are implemented.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>11a. Standards Mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Control family</th>
+<th>Conditional operational fit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NIST SP 800-53 Rev. 5 AU-6 / AU-12</td>
+<td>Review and generation of audit records if the payment platform's transaction events are designated audit data; the puzzle extract alone does not show the system control.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5 SI-4</td>
+<td>Monitoring context if a deployed security program analyzes authorized transaction events.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5 IR-4</td>
+<td>Incident-handling workflow if a transaction lead enters a defined investigation.</td>
+</tr>
+<tr>
+<td>CIS Controls v8 8.2 / 8.11</td>
+<td>Collect and review audit logs where the organization treats these events as audit logs.</td>
+</tr>
+<tr>
+<td>CIS Controls v8 13.1</td>
+<td>Centralized security event alerting, conditional on an actual security alert pipeline.</td>
+</tr>
+</tbody>
+</table>
+<p>I do not map SI-4(4) to financial inflow/outflow, RA-3 directly to a toy score, or CIS 13.6 to transaction "flow logs." Those controls have specific cybersecurity scopes. The case can teach the analyst's query discipline without turning a CSV exercise into compliance evidence.</p>
+<h3>11b. Mitigation Realization</h3>
+<p>For an authorized production review, I would preserve incoming records, validate schema and reference version, run a category filter, join stable identifiers, and send <em>review leads</em> to an analyst queue. The queue should show why a row appeared, the relevant baseline, and the source system. A daily job could automate the first steps after data classification and access controls are in place. I would not schedule a prototype over real transactions without privacy review and a defined owner.</p>
+<p>The <a href="artifacts/category_review.yml">Sigma rule</a> supplies one low-severity category selection. The <a href="artifacts/transaction_review.py">offline tool</a> supplies the Q1-Q5 operations for a local CSV. Neither implements arbitrary risk weights, the $45-$50 "structuring" rule, or unsupervised clustering. Those ideas need labeled outcomes, account-level history, a regulatory context, and false-positive evaluation before deployment.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<h3>12.1 Indicators of Concern (Sanitized / Illustrative)</h3>
+<p>The MCC list <code>{4829, 6011, 6051, 7995}</code> is a <strong>category review set</strong>, not an IOC list. I also considered repeated <code>$45-$49.99</code> amounts, synthetic-looking merchant names, and concentration in selected categories. Each is context-dependent and can describe normal behavior. I would record these as leads only after defining an account or merchant baseline, a time window, and a reason the values matter in that environment. The five solved CTF answers do not identify a real suspicious account.</p>
+<h3>12.2 Sigma Rule - High-Risk MCC Transaction Detection</h3>
+<p>The <a href="artifacts/category_review.yml">informational Sigma rule</a> selects normalized transaction events whose string <code>mcc</code> is one of four chosen codes. It needs a mapping from the platform's actual event schema. It has no ATT&amp;CK tag, no unsupported Sigma threshold block, and no claim that a single matching event is fraud. I parsed the rule locally with pySigma and checked a <a href="artifacts/synthetic_category_events.jsonl">selected category, ordinary category, and near miss</a> using <a href="artifacts/test_category_review.py">a local test</a>. Backend conversion and live telemetry were outside this proof of concept. For a useful alert, I would correlate with account history, transaction velocity, identity, and analyst-confirmed outcomes in a supported SIEM query or correlation rule.</p>
+<h3>12.3 SIEM Queries</h3>
+<p>The first query is a Splunk review queue for a <em>chosen</em> category set. It assumes normalized <code>mcc</code>, <code>amount</code>, <code>account_id</code>, and currency fields. The threshold is a local triage parameter, not an AML rule:</p>
+<pre><code class="language-spl">index=financial_transactions sourcetype=normalized:transaction
+| where mcc IN (&quot;4829&quot;, &quot;6011&quot;, &quot;6051&quot;, &quot;7995&quot;)
+| stats count AS transactions sum(amount) AS total BY account_id, mcc, currency
+| where transactions &gt;= 3
+| sort -transactions
+</code></pre>
+<p>This KQL version asks for the same grouped review. It needs a verified <code>TransactionLogs</code> table and field mapping before use:</p>
+<pre><code class="language-kql">TransactionLogs
+| where mcc in (&quot;4829&quot;, &quot;6011&quot;, &quot;6051&quot;, &quot;7995&quot;)
+| summarize transactions=count(), total=sum(amount)
+    by account_id, mcc, currency, bin(timestamp, 1d)
+| where transactions &gt;= 3
+| order by transactions desc
+</code></pre>
+<p>For a baseline, ES|QL can count by MCC. The query shape is <code>FROM financial_transactions | STATS transactions = COUNT(*) BY mcc | SORT transactions DESC | LIMIT 10</code>. Before calling a code unusually frequent, I would compare the same population across time, account type, and transaction volume. The <code>$45-$50</code> SPL example is best kept as a teaching filter; it lacks the account grouping and regulatory context needed for a structuring finding.</p>
+<h3>12.4 YARA</h3>
+<p>YARA can match bytes in files, but the useful detection question here is about <strong>fields in transaction events</strong>. Parsing CSV records and querying <code>mcc</code>, amount, account, and time is more precise than searching raw file bytes. I did not make a YARA rule for this case.</p>
+<h3>12.5 Detection Engineering Notes</h3>
+<p>The minimum operational event needs timestamp with zone, stable account and merchant IDs, MCC, amount, currency, transaction state, and source. Reversals and duplicate events must be handled before summing. Access controls and retention matter because financial records can be sensitive. A 30- to 90-day history might help establish a baseline, but the right window depends on the population and seasonality.</p>
+<p>Legitimate customers use all four selected categories. A generic-name pattern and a small amount interval are weak signals. I would test a positive lead, an ordinary customer in the same category, and a near miss with realistic field mappings. Then I would measure the analyst yield and adjust thresholds. <a href="artifacts/test_transaction_review.py">The local tests</a> cover query mechanics and malformed records; they do not measure production false-positive rate or prove an AML typology.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">pre-read analysis flow</a> follows the actual puzzle pivot. This layered view shows how I would carry the method into an authorized review process while keeping the evidence and control boundaries visible.</p>
+<pre><code class="language-mermaid">flowchart TB
+    A[&quot;Puzzle: synthetic merchant names&quot;] --&gt; B[&quot;Name search returns zero&quot;]
+    B --&gt; C[&quot;Reference check: branded MCC 3795&quot;]
+    C --&gt; D[&quot;Four rows in corrected Q1 result&quot;]
+    D --&gt; E[&quot;Operational intake: validate schema and reference&quot;]
+    E --&gt; F[&quot;Join stable account and merchant identifiers&quot;]
+    F --&gt; G[&quot;Query category, amount, and time&quot;]
+    G --&gt; H[&quot;Analyst reviews context and baseline&quot;]
+    H --&gt; I[&quot;Record supported finding or close lead&quot;]
+</code></pre>
+<p>I performed the first four steps in the challenge. The later steps describe the extra work needed before using a similar pivot on real financial records.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://www.iso.org/standard/79450.html">ISO 18245:2023, Retail financial services: Merchant category codes</a></li>
+<li><a href="https://cis.visa.com/content/dam/VCOM/download/merchants/visa-merchant-data-standards-manual.pdf">Visa Merchant Data Standards Manual, MCC listing</a></li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5, Security and Privacy Controls</a></li>
+<li><a href="https://www.cisecurity.org/controls/cis-controls-navigator/v8">CIS Critical Security Controls Navigator</a></li>
+<li><a href="https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html">OASIS STIX 2.1 specification</a></li>
+<li><a href="https://sigmahq.io/docs/basics/rules.html">Sigma rule specification</a></li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>

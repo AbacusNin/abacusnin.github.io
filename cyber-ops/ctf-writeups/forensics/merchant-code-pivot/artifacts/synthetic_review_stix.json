@@ -1,0 +1,15 @@
+{
+  "type": "bundle",
+  "id": "bundle--93d1be0f-5f30-4d19-aef4-08b0c7b3b270",
+  "objects": [
+    {
+      "type": "course-of-action",
+      "spec_version": "2.1",
+      "id": "course-of-action--c6a366af-66ca-4f44-a616-89a3aa5d202c",
+      "created": "2026-10-12T00:00:00.000Z",
+      "modified": "2026-10-12T00:00:00.000Z",
+      "name": "Check category mapping before closing a merchant-name null",
+      "description": "For an authorized transaction review, validate the merchant category against a network reference and inspect transaction provenance before concluding that an absent display-name match means no activity. Category alone does not identify a merchant or prove misconduct. This is a synthetic workflow example."
+    }
+  ]
+}

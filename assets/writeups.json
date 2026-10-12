@@ -1139,5 +1139,29 @@
     ],
     "status": "Solved (one-shot; self-validated against four checks)",
     "url": "/cyber-ops/ctf-writeups/crypto/xor-known-prefix/"
+  },
+  {
+    "title": "The Merchant Name Was a Dead End",
+    "category": "Forensics",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "data-forensics",
+      "financial-intelligence",
+      "MCC",
+      "pandas",
+      "anomaly-detection",
+      "AML",
+      "FININT",
+      "pattern-of-life"
+    ],
+    "summary": "I called a hotel-name search a zero, got it wrong, and went back to the category code. That one change unlocked five questions in a 1,000-row transaction table.",
+    "aliases": [
+      "merchant category code",
+      "transaction analysis",
+      "negative result validation"
+    ],
+    "status": "Solved - all flags captured",
+    "url": "/cyber-ops/ctf-writeups/forensics/merchant-code-pivot/"
   }
 ]

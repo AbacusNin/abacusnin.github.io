@@ -1,0 +1,3 @@
+{"case":"selected category","mcc":"7995","expected":true}
+{"case":"ordinary category","mcc":"5311","expected":false}
+{"case":"near miss","mcc":"7994","expected":false}

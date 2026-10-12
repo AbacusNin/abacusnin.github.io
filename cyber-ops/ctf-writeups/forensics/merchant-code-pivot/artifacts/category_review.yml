@@ -1,0 +1,28 @@
+title: Selected Merchant Category Code for Human Review
+id: 6cb0a4ad-7f09-4b9c-aaf9-f3ef54d616de
+status: experimental
+description: Selects transaction events in chosen MCC categories for contextual review; no fraud or AML conclusion.
+references:
+  - https://www.iso.org/standard/79450.html
+  - https://cis.visa.com/content/dam/VCOM/download/merchants/visa-merchant-data-standards-manual.pdf
+logsource:
+  product: financial_transaction_platform
+  service: transaction_logs
+detection:
+  selection:
+    mcc:
+      - '4829'
+      - '6011'
+      - '6051'
+      - '7995'
+  condition: selection
+fields:
+  - timestamp
+  - account_id
+  - merchant_id
+  - mcc
+  - amount
+  - currency
+falsepositives:
+  - Ordinary activity in any selected category
+level: informational
