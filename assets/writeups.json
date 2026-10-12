@@ -746,5 +746,27 @@
     ],
     "status": "Solved-Verified",
     "url": "/cyber-ops/ctf-writeups/forensics/booking-client-fingerprint/"
+  },
+  {
+    "title": "Six Hex Characters and a Wrong First Guess",
+    "category": "Crypto",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "SHA1",
+      "truncated hash",
+      "preimage brute-force",
+      "oracle fingerprinting",
+      "algorithm confusion",
+      "socket scripting"
+    ],
+    "summary": "A TCP service wanted a plaintext that matched a six-character hash prefix. I guessed MD5, used its rejection to identify SHA-1, then searched locally and submitted one candidate.",
+    "aliases": [
+      "SHA-1",
+      "digest prefix",
+      "TCP hash oracle"
+    ],
+    "status": "Solved-Verified",
+    "url": "/cyber-ops/ctf-writeups/crypto/truncated-hash-oracle/"
   }
 ]

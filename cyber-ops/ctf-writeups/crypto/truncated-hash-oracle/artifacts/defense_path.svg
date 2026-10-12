@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 292" role="img" aria-labelledby="title desc">
+  <title id="title">From the short hash gate to a service-side fix</title>
+  <desc id="desc">A 24-bit raw-hash gate and digest echo allow offline search after one diagnostic rejection. Code review and application audit can find the weak comparison and echo. A keyed verifier with a justified tag length and quiet rejection closes those gaps.</desc>
+  <rect width="920" height="292" rx="12" fill="#0b1018"/>
+  <g font-family="Arial, sans-serif" fill="#e6e9f0">
+    <rect x="20" y="33" width="192" height="170" rx="9" fill="#141d29" stroke="#e66b91"/>
+    <text x="35" y="62" font-size="17" font-weight="bold" fill="#ff93ad">Weak gate</text>
+    <text x="35" y="94" font-size="14">24-bit hash prefix</text>
+    <text x="35" y="117" font-size="14">Unkeyed comparison</text>
+    <text x="35" y="140" font-size="14">Digest echo on failure</text>
+    <text x="35" y="177" font-size="12" fill="#9eaec1">Puzzles show the shape</text>
+
+    <rect x="250" y="33" width="192" height="170" rx="9" fill="#141d29" stroke="#f2bb6a"/>
+    <text x="265" y="62" font-size="17" font-weight="bold" fill="#f2bb6a">Observed path</text>
+    <text x="265" y="94" font-size="14">One diagnostic probe</text>
+    <text x="265" y="117" font-size="14">Local preimage search</text>
+    <text x="265" y="140" font-size="14">One final submission</text>
+    <text x="265" y="177" font-size="12" fill="#9eaec1">No high-rate network burst</text>
+
+    <rect x="480" y="33" width="192" height="170" rx="9" fill="#141d29" stroke="#35e0d0"/>
+    <text x="495" y="62" font-size="17" font-weight="bold" fill="#69ecdf">Defender review</text>
+    <text x="495" y="94" font-size="14">AST prefix check</text>
+    <text x="495" y="117" font-size="14">Tag-length audit</text>
+    <text x="495" y="140" font-size="14">Response-path audit</text>
+    <text x="495" y="177" font-size="12" fill="#9eaec1">Application context needed</text>
+
+    <rect x="710" y="33" width="192" height="170" rx="9" fill="#141d29" stroke="#91b4ff"/>
+    <text x="725" y="62" font-size="17" font-weight="bold" fill="#a9c4ff">Service control</text>
+    <text x="725" y="94" font-size="14">Keyed verifier</text>
+    <text x="725" y="117" font-size="14">Justified tag length</text>
+    <text x="725" y="140" font-size="14">No digest echo</text>
+    <text x="725" y="177" font-size="12" fill="#9eaec1">Test accepted and rejected</text>
+
+    <path d="M214 118 H245 M444 118 H475 M674 118 H705" fill="none" stroke="#b7c4d6" stroke-width="2"/>
+    <path d="M245 118 l-8 -5 v10 z M475 118 l-8 -5 v10 z M705 118 l-8 -5 v10 z" fill="#b7c4d6"/>
+    <text x="20" y="245" font-size="13" fill="#aab9cb">Review connections: NIST SP 800-53 SC-13 / SI-7; CIS Controls v8 16.11</text>
+    <text x="20" y="268" font-size="12" fill="#8f9eb0">The challenge outcome is reported. The defender tools were tested on invented inputs.</text>
+  </g>
+</svg>

@@ -1,0 +1,5 @@
+{"kind":"issued","session":"weak-demo","construction":"raw_hash","algorithm":"sha1","tag_bits":24}
+{"kind":"rejected","session":"weak-demo","echoed_digest":true}
+{"kind":"issued","session":"approved-demo","construction":"hmac","algorithm":"sha256","tag_bits":128}
+{"kind":"rejected","session":"approved-demo","echoed_digest":false}
+{"kind":"issued","session":"raw-full-demo","construction":"raw_hash","algorithm":"sha256","tag_bits":256}

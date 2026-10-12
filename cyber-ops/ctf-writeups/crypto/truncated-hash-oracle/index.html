@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Six Hex Characters and a Wrong First Guess - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="A TCP service wanted a plaintext that matched a six-character hash prefix. I guessed MD5, used its rejection to identify SHA-1, then searched locally and submitted one candidate.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/truncated-hash-oracle/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="Six Hex Characters and a Wrong First Guess">
+  <meta property="og:description" content="A TCP service wanted a plaintext that matched a six-character hash prefix. I guessed MD5, used its rejection to identify SHA-1, then searched locally and submitted one candidate.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/truncated-hash-oracle/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Crypto / <span aria-current="page">Six Hex Characters and a Wrong First Guess</span></p>
+      <div class="page-head">
+        <h1 class="page-title">Six Hex Characters and a Wrong First Guess</h1>
+        <p class="lead">My first candidate was wrong. The rejection told me which hash the service was using.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Identify the hash behind a fresh 24-bit prefix and return a matching plaintext before the service&#x27;s input timeout.</p>
+<p><strong>What I did.</strong> I read the full banner, tested an MD5 candidate, compared the service&#x27;s echoed digest with local algorithms, and searched SHA-1 candidates offline.</p>
+<p><strong>The result.</strong> The retained solve record reports a SHA-1 match followed by a service response saying &quot;Collision found&quot; and returning the flag.</p>
+<p><strong>The limit.</strong> The live socket transcript, original scripts, and acceptance receipt were not available for replay. The math and defensive examples were checked locally; the final service response remains reported.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Banner; Wrong first try; Fingerprint; Search; Submit">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Banner</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Fresh six-hex-character target</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Wrong first try</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">MD5 candidate rejected with digest echo</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Fingerprint</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Known input matches local SHA-1 prefix</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Search</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Sequential SHA-1 candidates computed locally</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Submit</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">One matching plaintext, accepted in notes</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Crypto / interactive TCP service</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>SHA1, truncated hash, preimage brute-force, oracle fingerprinting, algorithm confusion, socket scripting</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved-Verified in the retained challenge account</td>
+</tr>
+<tr>
+<td>Goal</td>
+<td>Find any plaintext whose service hash begins with a fresh six-hex-character target</td>
+</tr>
+<tr>
+<td>Reported result</td>
+<td>SHA-1 identified from a rejection echo; one matching plaintext accepted and a flag returned</td>
+</tr>
+<tr>
+<td>Independently checked here</td>
+<td>24-bit search probability, local hash-loop timing, and defensive proof-of-concept behavior</td>
+</tr>
+<tr>
+<td>Evidence limit</td>
+<td>No live transcript, original script files, or platform receipt to replay</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/crypto/truncated-hash-oracle/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>The service presented a new six-character hexadecimal target on each TCP connection. It wanted any plaintext whose hash began with those six characters. The challenge record describes an approximately 30-second idle input timeout and a 200,000-guess budget. I had to identify the hash algorithm and get a matching input back before the session went idle.</p>
+<p>This was a puzzle service. The record does not establish an adversary attacking a real network. Its design still resembles a risk I would care about in production: a verifier checks only a short part of a digest and assumes that comparison is difficult to satisfy. Here the compared value was 24 bits, even though the underlying SHA-1 digest is 160 bits. The server's rejection path also gave away a computed digest for a chosen input. That feedback made the algorithm easy to fingerprint.</p>
+<p>I have the retained solve notes and their code excerpts, but no socket capture or acceptance receipt. They report an accepted plaintext and a returned flag. The rest of this page keeps that outcome as reported while separating the parts I can check locally: the search math, Python behavior, and defensive review tools.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I started by connecting with a Python socket and reading the banner. A single immediate <code>recv()</code> had captured only part of it, so the recorded script paused briefly and read again. The target came from a regex anchored to the banner's <code>hex chars):</code> phrase. That gave me six lowercase hex characters, not a full digest.</p>
+<p>The prompt's talk of "known collisions" nudged me toward MD5. I searched for a plaintext whose MD5 digest began with the target and submitted it. The service rejected the candidate and echoed the hash it had computed for the exact submitted input. I compared that echo with local MD5, SHA-1, SHA-2, SHA-3, and BLAKE2 results. SHA-1 matched. The MD5 assumption went in the bin after one live probe. Expanding the MD5 search would only have spent time on the wrong function.</p>
+<p>The target changed when I reconnected. I then searched sequential ASCII integers against SHA-1 locally and submitted a matching plaintext once. The retained account reports <code>Collision found</code> followed by the flag. It does not include the original connection transcript, so I cannot independently repeat that last response.</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>What I tried</th>
+<th>Observation and decision</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ST.1</td>
+<td>Python socket and banner parser</td>
+<td>Read a fresh six-hex target after allowing for a split banner</td>
+</tr>
+<tr>
+<td>ST.2</td>
+<td>MD5-derived candidate</td>
+<td>Rejected; the service echoed its own digest for my input</td>
+</tr>
+<tr>
+<td>ST.2a</td>
+<td>Compare local MD5 with echo</td>
+<td>Mismatch; abandon MD5 as the service algorithm</td>
+</tr>
+<tr>
+<td>ST.3</td>
+<td>Hash that known input under common algorithms</td>
+<td>SHA-1 was the unique local prefix match in the recorded test</td>
+</tr>
+<tr>
+<td>ST.4</td>
+<td>Search sequential integers under SHA-1</td>
+<td>Reported matching plaintext found on a fresh connection</td>
+</tr>
+<tr>
+<td>ST.5</td>
+<td>Submit one plaintext</td>
+<td>Reported acceptance and flag</td>
+</tr>
+</tbody>
+</table>
+<p>I also had mundane tooling trouble. Netcat was absent on the Windows setup, and an interactive REPL or IDE was a poor fit for the socket exchange. A short Python script gave me control over receive timing and the one submission I actually needed. Those detours belong in the record because they explain why the first banner read was incomplete.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>The solve used Python 3 standard-library pieces: <code>socket</code>, <code>hashlib</code>, <code>re</code>, and <code>time</code>. The retained code used a one-second pause before a <code>recv(4096)</code> and this context-anchored pattern:</p>
+<pre><code class="language-python">match = re.search(r'hex chars\): ([0-9a-f]{6})', banner)
+target = match.group(1)
+</code></pre>
+<p>That pattern avoids grabbing an unrelated hex sequence elsewhere in the banner. The fixed sleep was a practical workaround in the recorded session. It does not provide general TCP framing. A reusable client should collect bounded bytes until the expected prompt or a deadline, then check that the regex matched before searching. One <code>recv()</code> never promises a complete application message.</p>
+<p>The decisive diagnostic was smaller than the socket code. I already knew the bytes I had submitted and the prefix the server echoed. Local hashing let me compare candidates without another connection:</p>
+<pre><code class="language-python">for name in ('md5', 'sha1', 'sha224', 'sha256', 'sha384',
+             'sha512', 'sha3_256', 'sha3_512', 'blake2b', 'blake2s'):
+    digest = hashlib.new(name, submitted_bytes).hexdigest()
+    if digest.startswith(server_echo):
+        print(name)
+</code></pre>
+<p>The recorded diagnostic printed SHA-1 as its match. The search then ran over printable decimal strings, <code>str(i).encode()</code>, and checked <code>hashlib.sha1(...).hexdigest().startswith(target)</code>. That byte encoding mattered: a different newline, character encoding, or server-side normalization would change the digest. I had a multi-algorithm fallback prepared, but the confirmed SHA-1 result made it unnecessary. Its first-match behavior could also submit a candidate under the wrong algorithm if multiple functions happened to share a short prefix. I would get another known pair instead.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>A hash maps input bytes to a fixed-length digest. Preimage work starts with a target digest and asks for any input that hashes to it. Collision work asks for two distinct inputs with the same digest. This service accepted <strong>any</strong> input matching a 24-bit prefix, so the task was a truncated preimage search. The word "Collision" in its success response did not change the math.</p>
+<p>For a target that behaves like a random 24-bit prefix, each independent candidate has about a <code>1 / 2^24</code> chance of matching. The expected number of trials is <code>2^24</code>, or 16,777,216. Expected is not guaranteed. A fixed search of 20,000,000 candidates succeeds with probability approximately <code>1 - exp(-20,000,000 / 2^24)</code>, about <strong>69.6%</strong>, under that random-output model. A miss would require more local search or a fresh session. The 200,000 server-guess budget did not constrain an offline search that submitted only one candidate.</p>
+<p>I had estimated the local search at under a second. A local Python run of one million decimal-string SHA-1 hashes measured about 0.86 million candidates per second on this machine, implying roughly 23 seconds for 20 million at that rate. Hardware, interpreter, and target position change the real time. The approximately 30-second idle timeout made the margin worth checking instead of assuming it away.</p>
+<p>SHA-1 has serious collision attacks. <a href="https://shattered.io/">SHAttered</a> demonstrated a practical identical-prefix collision in 2017, and <a href="https://www.usenix.org/conference/usenixsecurity20/presentation/leurent">later research</a> demonstrated a chosen-prefix collision. Those results are important for uses that need collision resistance. They were not the reason this puzzle was easy. A 24-bit comparison would make a SHA-256 version of the same puzzle similarly searchable. The compared length drove the preimage cost.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit/Analysis Mechanics</summary>
+<p>The service took a client-supplied line, hashed it, and compared a short prefix with the target in its banner. A failed submission returned the service's computed digest prefix. That rejection gave me a chosen-input, known-output pair. I tested a small set of standard algorithms locally and selected the one matching the echo. One 24-bit match is strong evidence among a short candidate list, though a second independent pair would be prudent if two algorithms matched by chance or if input normalization was uncertain.</p>
+<p>The reported sequence then needed a fresh connection because the target changed. I searched decimal strings from zero upward until the SHA-1 prefix matched that new target, then sent only that line. The service-side attempt budget counted network submissions. It could not see the local candidate loop. The socket timeout did matter because I still had to finish the local search and send while the connection remained open.</p>
+<p>The production analogy needs care. A public, unkeyed hash can establish equality with an authenticated reference, but it cannot authenticate an untrusted caller on its own. A short comparison makes an already weak gate much easier to satisfy. If a real protocol needs message authentication, I would choose an established keyed MAC construction and a tag length justified by its threat model. Merely swapping SHA-1 for SHA-256 while still comparing six hex characters would leave the 24-bit gate in place.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<p>The failed MD5 attempt was useful because I looked at the whole rejection. I had spent one submission, then learned how the service hashed the same input. That was enough to stop guessing at its algorithm. A longer MD5 loop would have felt productive while solving the wrong problem.</p>
+<p>I would handle the socket setup differently next time. Read until a prompt or deadline, cap the banner size, check the regex match, and keep the offline loop separate from the network exchange. Netcat availability and REPL behavior are environment details, but they can consume the narrow time window of a challenge like this. A small tested socket template helps.</p>
+<p>The search limit also deserves an honest reading. Twenty million candidates gave a substantial chance of a hit, not a guarantee. The solve account reports success, so this run found one. I would not turn that observed success into a claim that every new six-hex target resolves within the same fixed loop. If the first pass missed, I would continue or reconnect with enough time to submit.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<p>This exercise sharpened two skills I use elsewhere: interacting with a bare TCP service without helper libraries, and letting one diagnostic response decide which local computation is worth doing. The same habit applies to other protocol investigations where an error reveals more than the happy path. I also listed JWT algorithm confusion and hash length extension as topics to study next; neither technique occurred in this service. Their mechanics need separate evidence and separate writeups.</p>
+<p>For defenders, I would inspect the verifier before hunting for a high request rate. The recorded solve used one rejected probe and one successful submission on separate sessions. A connection-rate rule could remain quiet while the gate fails. A code review can find short digest comparisons. Application audit events can show the configured comparison length and whether rejection responses expose computed digests. I built <a href="artifacts/digest_compare_review.py">an AST review tool</a> and <a href="artifacts/service_hash_review.py">an event review tool</a> for those two checks.</p>
+<p>I would also ask what property the digest is meant to provide. Content addressing, accidental-corruption checks, authenticated messages, and passwords need different constructions. A six-character display ID may be harmless. A six-character authentication gate is a problem. The <a href="artifacts/README.md">lab guide</a> keeps that distinction visible so a scanner hit starts a review rather than becoming a finding by itself.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The algorithm-fingerprinting decision tree from this solve is short enough to keep beside the socket script:</p>
+<pre><code class="language-text">One submitted input and the service's digest echo
+  -&gt; hash those exact input bytes under plausible algorithms
+  -&gt; one match: test the hypothesis against another pair if needed
+  -&gt; no match: check encoding, newline, normalization, salt, or keyed construction
+  -&gt; several matches: ask for a longer echo or another independent pair
+</code></pre>
+<p>For the search, I used decimal strings because they are easy to reproduce and send as one line. The core local loop is:</p>
+<pre><code class="language-python">for i in range(20_000_000):
+    candidate = str(i)
+    if hashlib.sha1(candidate.encode()).hexdigest().startswith(target):
+        break
+else:
+    candidate = None
+</code></pre>
+<p>I would verify that the search found a candidate, confirm the target still belongs to the open session, and submit once. The retained fallback checked MD5, SHA-1, SHA-256, SHA-224, SHA-384, and SHA-512 in sequence. I did not need that fallback after fingerprinting SHA-1. A per-algorithm first hit cannot prove the service uses that algorithm; the known-input echo was the discriminator.</p>
+<p>The defensive files are separate from the challenge solver. <a href="artifacts/digest_compare_review.py">digest_compare_review.py</a> finds simple Python <code>.startswith()</code> and digest-slice comparisons without running the scanned code. <a href="artifacts/service_hash_review.py">service_hash_review.py</a> reviews normalized <code>issued</code> and <code>rejected</code> events for short comparison length, unkeyed verification, and diagnostic digest echoes. <a href="artifacts/test_defensive_lab.py">Six local tests</a> cover positive, benign, expected false-positive, near-miss, and malformed cases. The <a href="artifacts/fixtures/service_events.jsonl">invented event fixture</a> and <a href="artifacts/README.md">README</a> give the exact schema and expected findings. These are review aids, not proof of a real deployment weakness.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<p>Several framework labels fit poorly when I checked their definitions against this service.</p>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>Fit for this case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MITRE ATT&amp;CK</td>
+<td><a href="https://attack.mitre.org/techniques/T1110/001/">T1110.001</a> is password guessing against accounts. This puzzle had no account password and did its large search locally. <a href="https://attack.mitre.org/techniques/T1600/">T1600</a> concerns weakening encryption on compromised network devices. The actor did not change the service's cryptography. I do not map either as observed behavior.</td>
+</tr>
+<tr>
+<td>MITRE ATLAS</td>
+<td>No ML or AI system is involved.</td>
+</tr>
+<tr>
+<td>OWASP Top 10 / LLM Top 10</td>
+<td>The puzzle used a raw TCP service, with no web or LLM application in scope. A real web verifier would need its own design review.</td>
+</tr>
+<tr>
+<td>CVSS, EPSS, CISA KEV</td>
+<td>No CVE or affected distributed product is identified.</td>
+</tr>
+<tr>
+<td>CIS cloud benchmarks / CSA CCM</td>
+<td>No cloud configuration is in the artifact.</td>
+</tr>
+</tbody>
+</table>
+<p>The same restraint applies to CAPEC and CWE. <a href="https://capec.mitre.org/data/definitions/49.html">CAPEC-49</a> describes password brute forcing; <a href="https://capec.mitre.org/data/definitions/55.html">CAPEC-55</a> concerns rainbow tables. This was neither a password search nor a precomputed table. <a href="https://cwe.mitre.org/data/definitions/916.html">CWE-916</a> is specifically about password hashing effort. The comparison width is the concrete weakness to review here. <a href="https://cwe.mitre.org/data/definitions/327.html">CWE-327</a> can frame an unsafe cryptographic choice in a real application, but the exact mapping depends on that application's protected property and construction.</p>
+<p>I could not substantiate the source's <code>D3-CAV Cryptographic Algorithm Validation</code> identifier in MITRE D3FEND's current technique catalog, so I leave it out of the public mapping. The useful defender action remains plain: inspect the verifier, its comparison length, and its response behavior. STRIDE would belong in a design review of a real service; the puzzle alone does not supply that architecture.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<p>This single puzzle gives me no campaign, infrastructure IOC, malware, or actor identifier to package as STIX or distribute over TAXII. The remote host and port are placeholders in the retained account. A six-hex target changes each session. Publishing it as an indicator would tell another defender nothing useful.</p>
+<p>The standards question is more concrete. <a href="https://csrc.nist.gov/Projects/Hash-Functions/NIST-Policy-on-Hash-Functions">NIST's current SHA-1 transition policy</a> recommends moving away from SHA-1 for all applications and distinguishes earlier restricted uses from the later transition. <a href="https://csrc.nist.gov/pubs/sp/800/131/a/r2/final">SP 800-131A Rev. 2</a> gives cryptographic-transition guidance. It sets no universal 256-bit tag rule. The challenge's 24-bit check fails on its own terms: an untrusted client can search for a match within the service's input window. I would validate a production protocol against its actual requirement instead of attaching an unverified STIG finding ID.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>11a. Standards Mapping (abbreviated)</h3>
+<table>
+<thead>
+<tr>
+<th>Control or guidance</th>
+<th>Connection to a real verifier review</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NIST SP 800-53 Rev. 5 SC-13</td>
+<td>Select and manage cryptographic protection appropriate to the data and threat model.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5 SI-7</td>
+<td>Review software and information integrity controls when a digest is used for that purpose.</td>
+</tr>
+<tr>
+<td>NIST SHA-1 transition policy and SP 800-131A Rev. 2</td>
+<td>Check algorithm status in the actual application and protocol. The 24-bit prefix is a separate design issue.</td>
+</tr>
+<tr>
+<td>CIS Controls v8 Safeguard 16.11</td>
+<td><a href="https://cas8.docs.cisecurity.org/en/latest/source/Controls16/">Leverage vetted modules or services for application security components</a>; review the protocol's comparison and key handling as well as the library call.</td>
+</tr>
+</tbody>
+</table>
+<p>These mappings guide a real verifier review. I did not assess the challenge service for compliance.</p>
+<h3>11b. Mitigation Realization</h3>
+<p>First I would name the property's owner: is the digest a short display identifier, a public integrity checksum, or an authentication tag? For authentication, the service needs a keyed construction such as an HMAC with a protocol-appropriate tag length and sound key management. For a public integrity digest, the expected reference must itself be authenticated if an adversary can replace it. A full-length unkeyed SHA-256 digest alone would not turn this challenge gate into authentication.</p>
+<p>I first considered an AST rule that flagged a <code>.startswith()</code> call only when its argument was a short string literal. This service compared against a <strong>dynamic</strong> six-character target, so that rule would miss the central pattern. <a href="artifacts/digest_compare_review.py">The code-review tool</a> instead flags simple digest <code>.startswith()</code> calls and prefix-slice comparisons, including variable targets. It has explicit blind spots for wrappers and aliases and can flag benign short IDs. A reviewer must confirm the security boundary before calling a hit a defect.</p>
+<p>At runtime, <a href="artifacts/service_hash_review.py">the application-event review</a> checks the configured tag length, whether the verifier is keyed, and whether a rejection response echoed a digest. <a href="artifacts/audit_queries.md">The SPL and KQL templates</a> show the same review over normalized audit fields. The included 128-bit floor is an illustrative local policy, not a universal standard. A production team should set that floor from the protocol design, then test accepted and rejected paths without putting candidate plaintext or raw digests in the logs.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>I would not build an alert on a high connection count from this solve. The retained path used local computation and a single final submission after one diagnostic rejection. Zeek <code>conn.log</code> can show connection duration and packet counts, but it cannot tell me which plaintext was submitted, how many SHA-1 candidates were tried locally, or whether the server echoed a digest. Sysmon Event 3 can attribute a connection to a process when configured; it also does not supply the verifier result. I considered network Sigma rules for high-rate submissions and a long, quiet session. Both would be low-fidelity here, and an <code>attack.t1110.001</code> tag would mislabel this puzzle as password guessing. I have not presented those seeds as working detection rules.</p>
+<p>The defensive proof of concept uses data a real service can supply safely. An <code>issued</code> audit event records a session ID, construction type, and compared bit length. A <code>rejected</code> event records a boolean saying whether the response exposed the computed digest, without recording the digest itself. <a href="artifacts/fixtures/service_events.jsonl">The invented fixture</a> contains a 24-bit raw-hash service with an echo, a 128-bit HMAC service without one, and a full-length raw-hash near miss. <a href="artifacts/service_hash_review.py">The offline tool</a> returns three findings for the weak sample, none for the HMAC sample, and one for the full-length unkeyed sample. That last result matters: length alone does not create authentication.</p>
+<p><a href="artifacts/digest_compare_review.py">The AST reviewer</a> adds a source-code path for teams that own the verifier. <a href="artifacts/test_defensive_lab.py">The six test groups</a> include a dynamic target, a slice comparison, a benign full-digest comparison, an expected short-label false positive, a custom wrapper the scanner misses, and malformed service events. The <a href="artifacts/audit_queries.md">SPL and KQL examples</a> are unexecuted templates. Their one-label-per-event display is documented; the offline reviewer preserves multiple findings. No production source, live service audit, SIEM backend, or false-positive rate was tested.</p>
+<p>The useful operational indicators are configuration and response properties: a short accepted comparison length, an unkeyed verifier used where authentication is expected, or a digest echo on rejection. A numeric input pattern or a long session could also be normal for this service. I would investigate with protocol ownership and outcome data before attributing a client. The <a href="artifacts/README.md">lab guide</a> lists sensor fields, limits, tuning points, and privacy boundaries.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">solve flow above</a> follows the MD5 dead end, the SHA-1 fingerprint, and the local search. The <a href="artifacts/defense_path.svg">defensive cross-section</a> starts with the short comparison, then points to the code and application events a reviewer can actually inspect. It ends with a keyed verifier, a justified tag length, and a rejection path that does not echo the digest.</p>
+<p><img src="artifacts/defense_path.svg" alt="A 24-bit raw-hash gate and digest echo lead to a local search and one final submission. Code and application-audit reviews can identify the weak comparison; a keyed verifier with a justified tag length and no digest echo addresses it."></p>
+<p>I tested these tools on invented inputs after the solve, without connecting them to the challenge service.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://csrc.nist.gov/Projects/Hash-Functions/NIST-Policy-on-Hash-Functions">NIST policy on hash functions and SHA-1 transition</a>; <a href="https://csrc.nist.gov/pubs/sp/800/131/a/r2/final">SP 800-131A Rev. 2</a>; <a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">SP 800-53 Rev. 5</a>.</li>
+<li><a href="https://csrc.nist.gov/news/2022/withdrawal-of-nist-sp-800-107-revision-1">NIST's SP 800-107 Rev. 1 withdrawal notice</a> for the status of older hash-application guidance.</li>
+<li><a href="https://shattered.io/">SHAttered SHA-1 collision research</a> and <a href="https://www.usenix.org/conference/usenixsecurity20/presentation/leurent">Leurent and Peyrin, chosen-prefix collision, USENIX Security 2020</a>.</li>
+<li><a href="https://attack.mitre.org/techniques/T1110/001/">MITRE ATT&amp;CK T1110.001</a> and <a href="https://attack.mitre.org/techniques/T1600/">T1600</a>, both discussed as rejected mappings.</li>
+<li><a href="https://capec.mitre.org/data/definitions/49.html">MITRE CAPEC-49</a> and <a href="https://capec.mitre.org/data/definitions/55.html">CAPEC-55</a>, both discussed as rejected mappings.</li>
+<li><a href="https://cwe.mitre.org/data/definitions/916.html">MITRE CWE-916</a> and <a href="https://cwe.mitre.org/data/definitions/327.html">CWE-327</a> for mapping boundaries.</li>
+<li><a href="https://cas8.docs.cisecurity.org/en/latest/source/Controls16/">CIS Controls v8, Control 16</a>.</li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc3174">RFC 3174, Secure Hash Algorithm 1</a> for SHA-1 algorithm background.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
