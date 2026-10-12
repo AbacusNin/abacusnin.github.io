@@ -1,0 +1,6 @@
+{"time":"2026-01-01T10:00:00Z","kind":"ad_recovery_read","actor":"unexpected-reader","target_id":"host-a","attribute_name":"ms-FVE-RecoveryPassword","approved_case":false}
+{"time":"2026-01-01T10:03:00Z","kind":"ad_recovery_read","actor":"unexpected-reader","target_id":"host-b","attribute_name":"ms-FVE-RecoveryPassword","approved_case":false}
+{"time":"2026-01-01T10:05:00Z","kind":"ad_recovery_read","actor":"unexpected-reader","target_id":"host-c","attribute_name":"ms-FVE-RecoveryPassword","approved_case":false}
+{"time":"2026-01-01T10:06:00Z","kind":"recovery_unlock","actor":"unexpected-reader","approved_case":false}
+{"time":"2026-01-01T10:07:00Z","kind":"ad_recovery_read","actor":"helpdesk","target_id":"host-d","attribute_name":"ms-FVE-RecoveryPassword","approved_case":true}
+{"time":"2026-01-01T10:08:00Z","kind":"ad_recovery_read","actor":"ordinary-reader","target_id":"host-e","attribute_name":"otherAttribute","approved_case":false}

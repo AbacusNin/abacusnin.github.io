@@ -674,5 +674,30 @@
     ],
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/forensics/game-protocol-chat/"
+  },
+  {
+    "title": "The Recovery Key That Survived the Fire",
+    "category": "Forensics",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "BitLocker",
+      "BitLocker To Go",
+      "FVE metadata",
+      "AES-CCM",
+      "recovery password",
+      "structural cryptanalysis",
+      "partial-knowledge attack",
+      "BitCracker",
+      "dislocker"
+    ],
+    "summary": "A burned page left most of a BitLocker recovery password readable. I used the key's numeric structure to narrow the missing piece, recovered the reported unlock, and checked what the volume metadata could actually prove.",
+    "aliases": [
+      "USB encryption",
+      "recovery key",
+      "partial key"
+    ],
+    "status": "Solved-Verified",
+    "url": "/cyber-ops/ctf-writeups/forensics/bitlocker-partial-recovery/"
   }
 ]

@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Recovery Key That Survived the Fire - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="A burned page left most of a BitLocker recovery password readable. I used the key&#x27;s numeric structure to narrow the missing piece, recovered the reported unlock, and checked what the volume metadata could actually prove.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/bitlocker-partial-recovery/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Recovery Key That Survived the Fire">
+  <meta property="og:description" content="A burned page left most of a BitLocker recovery password readable. I used the key&#x27;s numeric structure to narrow the missing piece, recovered the reported unlock, and checked what the volume metadata could actually prove.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/bitlocker-partial-recovery/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Forensics / <span aria-current="page">The Recovery Key That Survived the Fire</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Recovery Key That Survived the Fire</h1>
+        <p class="lead">The page was burned, but the missing piece was smaller than it looked.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Identify the encryption on a USB image and recover access without guessing the strong user password.</p>
+<p><strong>What I did.</strong> I checked the FVE metadata, validated the visible recovery-password structure, narrowed the last group to 909 possibilities, and followed the recorded BitCracker and dislocker verification path.</p>
+<p><strong>The result.</strong> The solve record reports a MAC-verified recovery-password hit and an independently decrypted EXFAT volume. The image metadata and 909-candidate count were checked again here.</p>
+<p><strong>The limit.</strong> The recovered password, extracted hash, and decrypted image are withheld. I could not independently rerun BitCracker, dislocker, or the platform submission in this review.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Image fingerprint; Protector choice; Burned segment; Constrained search; Reference tools">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Image fingerprint</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">FVE signature and three metadata copies</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Protector choice</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Recovery-password VMK beside user-password VMK</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Burned segment</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Two digits visible in the final group</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Constrained search</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">909 structurally valid possibilities</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Reference tools</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Reported MAC hit and EXFAT decryption</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Forensics / disk encryption and key recovery</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>BitLocker, BitLocker To Go, FVE metadata, AES-CCM, recovery password, structural cryptanalysis, partial-knowledge attack, BitCracker, dislocker</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved-Verified in the challenge record</td>
+</tr>
+<tr>
+<td>Material</td>
+<td>50 MiB raw USB image and a transcription of a partly burned numeric page</td>
+</tr>
+<tr>
+<td>Goal</td>
+<td>Identify the encryption product and unlock the volume without the user password</td>
+</tr>
+<tr>
+<td>Checked from the image</td>
+<td><code>-FVE-FS-</code>, three matching metadata blocks, AES-XTS 128, user-password and recovery-password protectors</td>
+</tr>
+<tr>
+<td>Reported outcome</td>
+<td>BitCracker MAC match and dislocker output with an EXFAT boot sector</td>
+</tr>
+<tr>
+<td>Boundary</td>
+<td>The successful key, hash, decrypted content, and platform receipt are not public or independently replayed here</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/bitlocker-partial-recovery/artifacts">browse the tools on GitHub</a> and <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/bitlocker-partial-recovery/fixtures">the invented fixtures</a>.</p>
+<h2>Solve Process Flow</h2>
+<p>The route had two turns worth keeping in view. I gave the technically correct cipher name to a question that expected a product name. Later, a custom recovery-key implementation rejected every candidate, and the reference tool found one in that same set.</p>
+<pre><code class="language-mermaid">flowchart TD
+  A[USB image: FVE signature] --&gt; B[Three FVE metadata blocks]
+  B --&gt; C[AES-XTS 128 and two password protectors]
+  C --&gt; D[Q1: AES-XTS 128 rejected as answer granularity]
+  D --&gt; E[BitLocker To Go from challenge context]
+  E --&gt; F[Seven groups plus 57????]
+  F --&gt; G[909 valid final groups]
+  G --&gt; H[Custom KDF: zero matches]
+  H --&gt; I[Reversed and end-burn readings rejected]
+  I --&gt; J[BitCracker recovery mode with MAC check]
+  J --&gt; K[Reported hit in chunk 31]
+  K --&gt; L[Reported dislocker EXFAT decryption]
+</code></pre>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I had a raw image of a removable drive and a transcription from a partly burned page. The image was 50 MiB. The page looked like a BitLocker recovery password, except that the last six-digit group ended after its first two digits. The challenge stipulated that the ordinary user password was strong enough to take off the table. My route was the recovery protector.</p>
+<p>The story places the drive in a fictional adversary's staging area. My work was offline forensic recovery from acquired evidence, not access to a live system. A burn that leaves seven complete groups and two digits of the eighth may feel thorough. The exact number of remaining possibilities matters more than how damaged the page looks.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I started at the volume header. The OEM signature at offset 3 read <code>-FVE-FS-</code>; offsets at <code>0xB0</code> pointed to three FVE metadata copies. All three copies on the available image agreed on the method and the two password protectors. The method's low 16 bits were <code>0x8004</code>, AES-XTS 128. The two VMK protection types were <code>0x2000</code> for a user password and <code>0x0800</code> for a recovery password. <a href="artifacts/fve_inventory.py">The read-only inventory tool</a> reproduces those checks without printing key blobs.</p>
+<p>I answered the first challenge question with <code>AES-XTS 128</code>. It was rejected because the question expected a product-level answer. I then answered <code>BitLocker To Go</code> in the removable-drive context. The cipher answer was a true observation about the image. My mistake was using the wrong answer level. The shared BitLocker identifier GUID and FVE signature establish the BitLocker format, but <a href="https://github.com/libyal/libbde/blob/main/documentation/BitLocker%20Drive%20Encryption%20(BDE)%20format.asciidoc">the format reference</a> says BitLocker To Go uses the same identifier. The USB context supports the product label here; the GUID alone does not uniquely identify it.</p>
+<p>The recovery-password protector provided the recorded path to its salt and AES-CCM encrypted VMK. The burned transcription provided seven complete groups and a <code>57</code> prefix for the last. Each six-digit group must be divisible by 11, and its quotient must fit a 16-bit value. From <code>570000</code> through <code>579999</code>, 909 values pass both checks. I independently reproduced that count with <a href="artifacts/recovery_structure.py">the structure checker</a>. That count makes the reported offline search credible; it does not reveal which candidate unlocked the image.</p>
+<p>The first full sweep went wrong. A C implementation of the recovery KDF and AES-CCM check ran through all 909 candidates and found nothing. The record then tried reversed input, a burn on the opposite end, and an inter-group checksum theory. Those readings did not match the supplied pattern or subsequent correction. I should have challenged the homemade crypto code before challenging the page. A close reading of the custom routine shows a double SHA-256 of the recovery input, while <a href="https://github.com/libyal/libbde/blob/main/documentation/BitLocker%20Drive%20Encryption%20(BDE)%20format.asciidoc">the format reference</a> specifies one initial SHA-256 for the recovery-password path. That is a concrete suspected error, though I have not isolated it as the only defect by rerunning the C program.</p>
+<p>I changed tools. The recorded solve used <code>bitcracker_hash</code> to extract the recovery-password material and compared it byte for byte with the custom parser's extraction. A candidate list of 909 entries went through BitCracker's recovery mode with MAC checking. Hashcat mode 22100 had rejected the extracted line's format, and the stock John the Ripper build did not list BitLocker support. Building BitCracker with a POCL OpenCL backend required a Makefile flag adjustment and a source brace fix. The run was split into 37 chunks of 25 candidates and tracked with a completion ledger. Early log-grep hits from interrupted workers and concurrent ledger writes were orchestration bugs, not valid cryptographic matches. The reported valid hit appeared in chunk 31, with the last group <code>578589</code>. The full password stays private. Finally, the recorded <code>dislocker-file</code> run decrypted the volume and showed an EXFAT boot sector. I can verify the image structure and candidate arithmetic here; the MAC result and decrypted filesystem are from the retained solve record.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<h3>FVE metadata parser and recovery-password extractor (Python)</h3>
+<p>The solve's parser walked the FVE entry stream, selected VMK protection type <code>0x0800</code>, and extracted the stretch-key salt plus the AES-CCM nonce, tag, and ciphertext. That extraction was useful as a cross-check against BitCracker's canonical extractor, but it also handles sensitive encrypted keying material. For the public lab I use <a href="artifacts/fve_inventory.py">fve_inventory.py</a>, which reports metadata offsets, method, and protector types while withholding those blobs. I ran it against the 50 MiB image and found metadata at <code>0x2100000</code>, <code>0x268f000</code>, and <code>0x2c1d000</code>.</p>
+<h3>Candidate wordlist generator (Python)</h3>
+<p>The private solve joined seven complete groups to each valid final-group candidate under <code>57????</code>. The count is 909. The public <a href="artifacts/recovery_structure.py">recovery_structure.py</a> recognizes complete and partial shapes and reports counts only. It does not emit candidate keys. That is enough to reproduce the narrowing step without publishing a usable recovery-password list.</p>
+<h3>Hash extraction (BitCracker canonical extractor)</h3>
+<p>The recorded command used <code>bitcracker_hash -i &lt;image&gt; -o &lt;output-directory&gt;/</code> and selected its recovery-password output. I kept the hash line private: it contains the exact salt, nonce, tag, and ciphertext needed for offline attempts against this volume. The important comparison was byte-for-byte agreement between the canonical extractor and the independently parsed fields.</p>
+<h3>BitCracker OpenCL attack with MAC verification</h3>
+<p>The recorded attack used <code>bitcracker_opencl</code> with recovery mode <code>-r</code> and MAC comparison <code>-m</code>, reading that private hash and the 909-candidate list. MAC validation tests the AES-CCM authentication tag for each candidate. A random false match would be extraordinarily unlikely for a full 128-bit tag under the expected assumptions. This is stronger evidence than a heuristic plaintext fragment, but the run itself was not repeated during this publication review.</p>
+<h3>Resumable chunked sweep driver (bash)</h3>
+<p>The list was split into 37 chunks at 25 lines each. The ledger made interrupted work resumable. The driver needed to avoid two workers writing the same state, and only a completed run with an authenticated result counted as a hit. An interrupted log line was never a substitute for the tool's successful MAC result. I would keep the ledger atomic and make each chunk's completion idempotent in a longer-lived implementation.</p>
+<h3>Independent verification via dislocker</h3>
+<p>The reported second check used <code>dislocker-file</code> with the recovered password, then inspected the first sector of the output. It began with the <code>EXFAT</code> OEM ID. That provides a separate implementation and recognizable filesystem structure. I do not publish the decrypted image or key, and I did not rerun this check here.</p>
+<h3>Custom KDF reference (bf3.c) - retained for methodology purposes only</h3>
+<p>The custom C attempt matters because it confidently returned 909 failures. Its recovery input was hashed twice before the stretch chain, while the published BDE format describes one initial hash for recovery-password input. The source also implemented its own AES-CCM verification path. Without a known-good vector and a differential rerun, zero matches from that code meant "my implementation did not find a match." It did not eliminate the 909 candidates. I have not turned that failed routine into a reusable public cracking tool.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>The image uses BitLocker full-volume encryption. A VMK sits between one or more protectors and the FVEK that encrypts sectors. The presence of a strong user-password protector does not remove another valid recovery path. On this image, both protector types are present in each of the three matching metadata copies.</p>
+<h3>4.1 Recovery-password structure</h3>
+<p>A BitLocker recovery password contains eight groups of six decimal digits. Each group is 11 times a 16-bit unsigned value. The seven visible groups could therefore be checked structurally before any expensive key derivation. With only <code>57</code> visible in the final group, 10,000 textual completions fall to 909 structurally valid values. A structurally valid value is not necessarily the password for this drive.</p>
+<h3>4.2 Recovery-password KDF</h3>
+<p>The eight quotients become a 16-byte little-endian recovery input. The format reference describes a single SHA-256 of that input, followed by a salted, chained SHA-256 stretch of <code>2^20</code> rounds for this protector path. That work factor makes blind recovery expensive. It did not protect against a page that had already disclosed almost the whole secret. The double-hash in my custom code is a likely explanation for its false negative, but I cannot assign sole cause without replay.</p>
+<h3>4.3 VMK decryption via AES-CCM tag verification</h3>
+<p>The derived key attempts authenticated decryption of the protected VMK. The stored CCM tag supplies a direct validity test for a candidate. A candidate that verifies the full tag and yields a useful VMK has much stronger support than one that merely produces printable bytes. The solve record's BitCracker run used that verification mode.</p>
+<h3>4.4 Why partial-knowledge recovery is feasible</h3>
+<p>The complete recovery password encodes 128 bits through eight 16-bit pieces. Seven pieces and two digits of the last were already visible. The remaining search was a few hundred valid encodings, so the expensive KDF could still be applied to every plausible completion. No cipher or hash primitive was broken.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit/Analysis Mechanics</summary>
+<p>My decision chain was: identify the container; find the recovery-password VMK; validate the page's seven complete groups; enumerate the valid last groups; check candidates through the protector's authenticated decrypt; then confirm the plaintext volume through another implementation. <a href="artifacts/fve_inventory.py">The image inventory</a> covers the first two steps and <a href="artifacts/recovery_structure.py">the structure checker</a> covers the arithmetic. The final two steps remain recorded rather than independently replayed here.</p>
+<p>The case is best understood as recovery from exposed key material. The damage to the page reduced the number of known digits but left enough information to identify a tiny candidate set. The source's first <code>AES-XTS 128</code> answer was a true property at the wrong product granularity. The BitLocker GUID is shared with To Go, so I cannot use that field as a unique product discriminator. The scenario's removable-media context is the reason for the To Go label.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<h3>What the exercise validated</h3>
+<p>Checking the container first kept me out of a plaintext-filesystem rabbit hole. Three matching metadata copies strengthened the structural read. Cross-checking the private salt/nonce/tag extraction against BitCracker made the eventual search about candidate logic instead of a misplaced byte offset. The reported MAC hit and dislocker EXFAT output gave the solve two distinct checks.</p>
+<h3>What the exercise surfaced as gaps</h3>
+<p>The homemade KDF swept all 909 entries and found nothing. My Python transcription agreed with it, but both could share the same misunderstanding. The double-hash in the recovery path is a suspected defect supported by the format reference. I should have tested against a reference implementation sooner. The reversed-string, opposite-burn, and checksum detours came after an unverified negative result. I also learned to treat interrupted-worker log text and duplicate ledger entries as run-state problems, not evidence about the key.</p>
+<h3>Transferable principles</h3>
+<p>An expensive cryptographic check only helps after the candidate representation is right. A completed, authenticated result should be recorded separately from worker logs. And when a challenge asks for a technology "type," I should answer at the level the question expects while keeping the byte-level fact in my notes.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<p>Outside a puzzle, this pattern could appear in a lost printout, a photo of a recovery card, an unprotected ticket attachment, or a document export. The defender's first job would be to preserve the artifact and determine which volume or protector it belongs to. A partial string can be sensitive even when it cannot immediately unlock a drive. Search-space estimation tells responders whether it is effectively compromised.</p>
+<p>Encryption at rest did its job on the sectors. The recovery workflow became the exposed path. In a real response I would limit access to any found recovery material, identify all copies and historical escrow records, establish a new authorized recovery method, verify it, and retire the affected protector by ID. Rotating one protector does not erase old printouts, old AD escrow entries, or other copies. It also does not by itself sanitize the medium. The <a href="https://learn.microsoft.com/en-us/windows/security/operating-system-security/data-protection/bitlocker/recovery-overview">Microsoft recovery guidance</a> notes that AD may retain historical recovery passwords, so inventorying those records matters.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<h3>8.1 Triage decision tree for a recovered partial recovery-password</h3>
+<p>Start by separating a transcription from a live secret. Does it have eight groups? Which are complete, and do they pass the divisibility and 16-bit tests? What does the image itself show about protectors? Estimate the remaining candidates before choosing a compute path. If the key material is already publicly exposed, handle it as an incident. <a href="artifacts/README.md">The lab guide</a> keeps the checks and telemetry prerequisites together.</p>
+<h3>8.2 BitLocker recovery-password structural validator</h3>
+<p><a href="artifacts/recovery_structure.py">The structure scanner</a> reads a bounded UTF-8 document and returns shape counts and completion counts, never the matched string. The <a href="fixtures/sample_note.txt">invented partial note</a> supplies one structurally valid shape and one numeric-looking near miss. It reports 909 completions for the <code>57</code> prefix. A structural match is a lead for secure investigation, not proof of an unlock.</p>
+<h3>8.3 Single-edit-distance perturbation generator</h3>
+<p>The source proposes changing one digit at a time when a seemingly complete transcription fails. I would only do that on authorized evidence after checking for transcription errors and protector mismatch. Every generated group still needs <code>% 11 == 0</code> and quotient <code>&lt; 65536</code>, followed by a reference-tool authenticated check. I left this generator as a method rather than a public key-producing script because the public lab is meant to triage exposure without reproducing this volume's secret.</p>
+<h3>8.4 Solve checklist for BitLocker partial-knowledge recovery</h3>
+<p>Confirm the FVE signature and all three metadata offsets. Record the method and protector types. Check every visible group. Compute the candidate count. Compare any custom extraction to a maintained reference. Prefer authenticated verification over a heuristic hit. If a candidate succeeds, verify the volume through a second tool and keep the password, hash, and decrypted data out of public work. <a href="artifacts/test_recovery_lab.py">The test suite</a> covers positive, benign, near-miss, and malformed synthetic cases; it does not crack a real volume.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<h3>Tier 1 - Completeness checklist</h3>
+<p>The case did not show an adversary executing a digital ATT&amp;CK technique. The physical burn in the story is not <a href="https://attack.mitre.org/techniques/T1485/">T1485 Data Destruction</a> as ATT&amp;CK defines it. My raw-image reading and decryption are defender actions, so I do not label them T1006 or T1140 attacker behavior. If an attacker stole a digital recovery-key file in a real environment, <a href="https://attack.mitre.org/techniques/T1552/001/">T1552.001 Credentials In Files</a> could frame that separate observed action. Here there is no such observed theft. ATLAS, OWASP, cloud mappings, CVSS, EPSS, and KEV add no case-specific signal because there is no ML system, web exploit, cloud service, or CVE.</p>
+<h3>Tier 2 - Applied where they add depth</h3>
+<p><a href="https://d3fend.mitre.org/technique/d3f%3AFileAnalysis/">D3FEND File Analysis</a> fits the metadata inspection method. <a href="https://next.d3fend.mitre.org/technique/d3f%3ADiskEncryption/">D3FEND Disk Encryption</a> describes the sector protection that was present. I do not map D3-DA to decryption: that identifier is Dynamic Analysis. CAPEC-97 Cryptanalysis would imply a cryptographic weakness or application failure; this case instead starts with a mostly disclosed recovery secret. NIST SP 800-53 SC-12, SC-13, SC-28, MP-6, and IR-4 give useful control areas, but none is an assessment finding from this image alone.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<h3>10.1 STIX 2.1 sample bundle</h3>
+<p>I would not turn this fictional page into a shareable indicator bundle. A generic file name for a recovery-key document is neither unique nor reliable, and there is no infrastructure, actor, malware, or campaign observable to distribute through TAXII. The source's sample bundle used placeholder identifiers and broad claims. The useful intelligence here is a case note: partial recovery material can leave a tractable search space. Keep any actual recovered key in protected incident records, not STIX.</p>
+<h3>10.2 STIG references</h3>
+<p>A Windows removable-media encryption baseline and recovery-key handling policy are relevant, but exact DISA rule IDs must match the deployed OS and current benchmark revision. The two Windows 10 IDs originally associated with drive encryption in my notes referred to preboot PIN requirements; I will not present them as removable-media encryption checks. This case does not establish STIG compliance or failure.</p>
+<h3>10.3 CIS Controls v8</h3>
+<p><a href="https://www.cisecurity.org/controls/cis-controls-navigator/v8">CIS Control 3</a> is the useful family: 3.6 covers encryption on end-user devices, 3.9 covers removable media, and 3.11 covers sensitive data at rest. For recovery, 11.1 establishes a recovery process and 11.3 protects recovery data. The image demonstrates encryption and multiple protectors. It cannot tell me whether an organization had documented procedures, safe escrow, or proper disposal.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>11a. Standards Mapping</h3>
+<p>NIST SP 800-53 SC-12/SC-13/SC-28 cover key management and information at rest. MP-6 and its verification enhancement address sanitization, while IR-4 covers response. <a href="https://csrc.nist.gov/pubs/sp/800/88/r2/final">NIST SP 800-88 Rev. 2</a> is the current media-sanitization reference and supersedes Rev. 1. CIS 3.9 and 11.3 bring removable-media encryption and protection of recovery data into the same operational story. CMMC MP.L2-3.8.1 and MP.L2-3.8.3 may matter for an organization handling scoped CUI; this challenge alone is not a CMMC assessment.</p>
+<h3>11b. Mitigation Realization</h3>
+<p>I would require encryption for removable drives where policy calls for it, escrow recovery material to an access-controlled service, and test that authorized recovery works before retiring any protector. For a suspected exposed printout, the response sequence matters: establish a replacement recovery method; verify it and its escrow; remove the old protector by its ID; account for historical AD records, paper, screenshots, and tickets; then document the result. <a href="https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/manage-bde-protectors">Microsoft's protector command reference</a> describes the management operations. Rotating a protector changes an unlock path. Existing data and copies of the old secret still require separate handling.</p>
+<p>For monitoring, <a href="artifacts/recovery_unlock_sigma.yml">the experimental Sigma rule</a> looks for recovery-password unlock commands in Windows process creation data. It will also see legitimate helpdesk and IR work. I would join it with approved cases, suppress secret-bearing command lines downstream, and alert on unusual context rather than treating a command invocation as a successful compromise.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>The case provides a format and a defender workflow, not a stable IOC. A <code>.BEK</code> file, a recovery-key document title, or the <code>HKLM\SOFTWARE\Policies\Microsoft\FVE</code> policy path can be useful triage context, but none proves exfiltration or misuse. The strongest prospective signals are unusual reads of the AD recovery-password attribute and a recovery-password unlock attempt outside an approved workflow.</p>
+<h3>12.1 Illustrative IOCs</h3>
+<p>I would record a discovered recovery document's location, custody, associated device, and exposure path in the incident case. I would not publish the actual recovery password or turn a generic filename into an indicator feed. A process command line may itself contain the 48-digit secret. Logging pipelines need redaction and restricted access before analysts share results.</p>
+<h3>12.2 YARA - printed recovery-key documentary artifact</h3>
+<p>A regular expression for eight six-digit groups can find leads in exported text, but a syntactic YARA hit alone will include training notes and unrelated numeric strings. The <a href="artifacts/recovery_structure.py">bounded structure checker</a> supplies the stronger post-filter: all complete groups must pass the 11 and 16-bit invariants. Its <a href="fixtures/sample_note.txt">synthetic note</a> deliberately includes a near miss. The scanner does not read images of paper, perform OCR, or decide whether a document is sensitive in context. I did not publish a standalone YARA rule because the executable validator adds the case-specific check that a plain regex lacks.</p>
+<h3>12.3 Sigma - bulk read of msFVE-RecoveryInformation in AD</h3>
+<p><code>ms-FVE-RecoveryInformation</code> is an AD object class. The password value is <code>ms-FVE-RecoveryPassword</code>. A real Event 4662 rule needs Directory Service Access auditing, a SACL on the relevant object/attribute, and schema-GUID enrichment to know what was read. Sigma alone does not express a portable rolling distinct-target count across backends. I therefore keep this as a normalized event hunt in <a href="artifacts/recovery_events.py">recovery_events.py</a>, with <a href="fixtures/sample_events.jsonl">synthetic events</a>, instead of publishing a misleading raw-4662 aggregation rule. The separate <a href="artifacts/recovery_unlock_sigma.yml">process Sigma rule</a> covers the command side.</p>
+<h3>12.4 SIEM queries</h3>
+<p><a href="artifacts/detection_queries.md">The KQL and SPL templates</a> show a distinct-target recovery read count and an unapproved recovery-unlock view over a documented normalized schema. The sample threshold is three distinct targets in 15 minutes. The offline detector uses a rolling window; the SIEM examples use fixed time bins, so boundary behavior differs. Neither query was run against a production backend. Neither projects the raw command line or password.</p>
+<h3>12.5 Log source and data pipeline requirements</h3>
+<p>Endpoint process creation needs command-line collection through an appropriate EDR, Sysmon Event 1, or Windows 4688 configuration. AD attribute reads require domain-controller Directory Service Access telemetry and a SACL; Event 4662 does not appear for every read by default. The normalization layer should resolve schema GUIDs, join independently approved cases, protect recovery values, and deduplicate repeated reads before alerting. <a href="artifacts/README.md">The lab guide</a> documents the expected fields and limitations.</p>
+<h3>12.6 Detection engineering notes</h3>
+<p>I ran <a href="artifacts/test_recovery_lab.py">six local test groups</a>: a valid partial shape, numeric near miss, expected helpdesk activity, repeated or out-of-window reads, a malformed timestamp, and false or out-of-bounds image metadata. The positive event stream produces one read-spike finding and one unlock-attempt finding. The benign and near-miss events do not. This establishes the offline logic on invented data. It does not measure production accuracy, prove an unlock succeeded, validate a SIEM backend, or justify a universal threshold.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">solve flow above</a> shows where the failed custom check sent me sideways before the reference tool brought the search back to the 909 candidates. <a href="artifacts/key_paths.svg">The key-path diagram</a> shows the other part of the case: an encrypted sector stays protected until one of the VMK protectors releases the key chain. A real defender needs controls around both the volume and every copy of its recovery material.</p>
+<p><img src="artifacts/key_paths.svg" alt="Partial recovery password narrowed to 909 final groups; recovery and user password protectors both reach the VMK, FVEK, and encrypted sectors. Escrow and unlock telemetry are defensive observables."></p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://github.com/libyal/libbde/blob/main/documentation/BitLocker%20Drive%20Encryption%20(BDE)%20format.asciidoc">libbde BitLocker format reference</a>, including the shared identifier, encryption method, protectors, and recovery KDF.</li>
+<li><a href="https://github.com/e-ago/bitcracker">BitCracker project</a>, recovery-password and MAC-check options.</li>
+<li><a href="https://learn.microsoft.com/en-us/windows/security/operating-system-security/data-protection/bitlocker/recovery-overview">Microsoft BitLocker recovery overview</a> and <a href="https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/manage-bde-protectors">protector management reference</a>.</li>
+<li><a href="https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/event-4662">Microsoft Event 4662 auditing reference</a>, for the SACL requirement and object access fields.</li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/88/r2/final">NIST SP 800-88 Rev. 2</a> and <a href="https://www.cisecurity.org/controls/cis-controls-navigator/v8">CIS Controls v8</a>.</li>
+<li><a href="https://attack.mitre.org/techniques/T1485/">MITRE ATT&amp;CK T1485</a> and <a href="https://attack.mitre.org/techniques/T1552/001/">T1552.001</a> for mapping boundaries; <a href="https://d3fend.mitre.org/technique/d3f%3AFileAnalysis/">D3FEND File Analysis</a> and <a href="https://next.d3fend.mitre.org/technique/d3f%3ADiskEncryption/">Disk Encryption</a> for defensive methods.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
