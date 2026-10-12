@@ -975,5 +975,29 @@
     ],
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/crypto/structural-xor/"
+  },
+  {
+    "title": "The Drawing Hidden in the Deltas",
+    "category": "Forensics",
+    "difficulty": "Easy",
+    "date": "2026-10",
+    "tags": [
+      "side-channel",
+      "HID telemetry",
+      "motion data",
+      "signal integration",
+      "sensor forensics",
+      "AR/VR",
+      "IMU"
+    ],
+    "summary": "I accumulated 782 relative-motion samples, drew only the pen-down segments, and recovered a readable message from a headset motion trail.",
+    "aliases": [
+      "relative motion",
+      "gesture state",
+      "airbrush trail",
+      "input privacy"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/forensics/motion-delta-reconstruction/"
   }
 ]

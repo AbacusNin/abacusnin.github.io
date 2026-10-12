@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Drawing Hidden in the Deltas - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="I accumulated 782 relative-motion samples, drew only the pen-down segments, and recovered a readable message from a headset motion trail.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/motion-delta-reconstruction/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Drawing Hidden in the Deltas">
+  <meta property="og:description" content="I accumulated 782 relative-motion samples, drew only the pen-down segments, and recovered a readable message from a headset motion trail.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/motion-delta-reconstruction/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Forensics / <span aria-current="page">The Drawing Hidden in the Deltas</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Drawing Hidden in the Deltas</h1>
+        <p class="lead">The file had no picture in it. It had the movements that made the picture.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Recover a message from a CSV of time, dx, dy, and pen state, without an image or absolute coordinates.</p>
+<p><strong>What I did.</strong> Check the fields, sum each delta in order, gate line segments by pen state, and inspect the result with equal axis scale.</p>
+<p><strong>The result.</strong> The path rendered a legible flag-shaped message; the recorded submission was accepted by the platform.</p>
+<p><strong>The limit.</strong> I recorded an accepted submission but did not keep a platform screenshot. The flag-bearing image and CSV stay private; the linked files use invented fixtures.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Inspect four fields; Accumulate dx and dy; Gate by pen state; Check axis and aspect; Verify the answer">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Inspect four fields</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Time and signed motion deltas</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Accumulate dx and dy</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Recover a path up to translation</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Gate by pen state</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Keep strokes and hide transit</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Check axis and aspect</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Read the rendered message</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Verify the answer</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Accepted submission recorded</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>At-a-Glance Mental Model</h2>
+<p>I started with a log, not a drawing. Each row said how far the pointer moved, and one bit said whether the airbrush was on. I added the movements in order. Then I drew a line only for rows with <code>pen_down=1</code>. The path resolved into readable text without another decoding layer. <a href="#analysis-flow">The flow above</a> shows the entire solve.</p>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Forensics (sensor / HID telemetry reconstruction)</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Easy</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>side-channel, HID telemetry, motion data, signal integration, sensor forensics, AR/VR, IMU</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved</td>
+</tr>
+<tr>
+<td>Evidence</td>
+<td>783 CSV lines including the header; 782 movement rows, 756 pen-down rows, 26 rendered stroke segments</td>
+</tr>
+<tr>
+<td>Result</td>
+<td>A readable flag-shaped drawing and a recorded accepted submission; no platform screenshot retained</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/motion-delta-reconstruction/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>The challenge gave me a CSV from a virtual airbrush trail. Its fields were <code>time_ms</code>, <code>dx</code>, <code>dy</code>, and <code>pen_down</code>. I had no screenshot or absolute position channel. I needed to recover what the user had drawn from the movements alone.</p>
+<p>This was a reconstruction puzzle. I had no evidence of an attacker, a stolen file, or a diagnostic uploader in the challenge. The security question it raises is still useful: a log of input movements can retain content even when it never stores an image. The drawing here depended on a complete, ordered stream and a pen-state bit. I would check those assumptions before making the same claim about another device.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I inspected the header and early rows before plotting anything. The two signed decimal columns were small movements; the last column held zeros and ones. Most sample intervals were 16 ms, which is about 62.5 samples per second, close to the rough 60 Hz impression from the first inspection. The first record moved the cursor while the pen was up. That mattered: the cursor still travels during a pen-up row, even though I draw no ink for it.</p>
+<p>I treated <code>dx</code> and <code>dy</code> as relative changes and kept running <code>x</code> and <code>y</code> totals. Then I joined the previous and current point only when the current row had <code>pen_down=1</code>. A continuous path through the pen-up rows would have drawn transit lines across the letters. The math-space plot was legible. An inverted Y view is a quick orientation check if a reconstruction looks mirrored, but this drawing needed no additional transform or cipher.</p>
+<p>The CSV has 782 data rows, 756 active rows, and 26 stroke segments. The accumulated bounds are about <code>x=-0.002..174.529</code> and <code>y=0..15.936</code> when the arbitrary origin is included. Those numbers establish the reconstruction's shape and scale. They do not spell out the message by themselves. The visible drawing supplied the reading. I recorded an accepted submission, although I did not retain the platform screen.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>The first pass can be as simple as <code>head -n 20 trackpad_deltas.csv</code> and a numeric range check. I use the standard <code>csv</code> reader rather than splitting on commas by hand. This is the decisive transform:</p>
+<pre><code class="language-python">x = y = 0.0
+previous = (x, y)
+segments = []
+for row in rows_in_time_order:
+    x += float(row[&quot;dx&quot;])
+    y += float(row[&quot;dy&quot;])
+    current = (x, y)
+    if int(row[&quot;pen_down&quot;]) == 1:
+        segments.append((previous, current))
+    previous = current
+</code></pre>
+<p>The previous point must update on every row, including pen-up moves. Otherwise a new stroke reconnects to the end of the old one. My earlier plotting code used Matplotlib, equal aspect ratio, and no axes. It rendered the accepted path with the ordinary math-space Y convention.</p>
+<p>For reuse, I wrote a bounded <a href="artifacts/motion_delta_review.py">motion CSV reviewer</a>. Its default output is a numeric summary, so a quick triage run does not print the recovered content. An analyst can explicitly request an SVG in either Y convention. The <a href="artifacts/fixture_motion.csv">neutral motion fixture</a> and <a href="artifacts/test_pocs.py">tests</a> exercise stroke gating and axis choice. Any SVG produced from real user input is content-bearing and needs the same handling as the source data.</p>
+<p>I had a fallback in mind for a non-legible plot: verify row order and units, then check whether the fields were polar movement, scaled deltas, or a different coordinate frame. Quaternion and IMU traces would need a different model. I did not need that fallback for this CSV.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>The CSV stored differences. If a point moves by <code>d_i = p_i - p_(i-1)</code>, adding the differences gives <code>p_k = p_0 + sum(d_i)</code> through row <code>k</code>. I can set the starting point to <code>(0,0)</code> because moving the entire drawing across a page does not change the shapes of its letters.</p>
+<p>That statement depends on the data. Missing rows, clipping, quantization, changing units, or a reset in the device frame can spoil the path. An IMU's acceleration is also different from a cursor-position delta; getting position from acceleration takes additional integration and drift handling. I would not call every motion log lossless.</p>
+<p>The pen-state bit carries its own information. It marks where a line ends and another begins. In this file, I still add pen-up movement to the cursor position, but I hide those transit segments in the drawing. Plot axes add another choice: screen coordinates often put positive Y downward, while a math plot puts it upward. Equal scale on both axes matters as much as orientation; stretching one axis can turn a readable letter into a poor clue.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit/Analysis Mechanics</summary>
+<p>I parsed four typed fields, verified increasing time, accumulated each axis, and segmented strokes on <code>pen_down</code>. The current row's state controls the movement from the previous point to the new one. That convention is explicit in the <a href="artifacts/motion_delta_review.py">reviewer's code</a>, since other devices may timestamp the state differently.</p>
+<p>The result was a wide path, roughly 174.5 by 15.9 motion units. Rendering the 26 active segments at equal aspect produced readable characters. I read the answer from the image and checked its flag shape. I recorded that the submitted answer was accepted, though I did not keep a platform screenshot. Repeating the calculation against the retained CSV confirmed the counts, bounds, and legible drawing. I keep that drawing private because the pixels reveal the answer.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<p>The schema gave me the right first question. The numbers were too small and too regular to be a finished drawing, but they made sense as changes in position. I could test that idea with one running sum. I also learned to keep the gesture bit in the first plot. If I had drawn every move, the pen-up travel would have made the message harder to read.</p>
+<p>Orientation was a cheap check. A path can be mathematically right and look wrong because a screen and a plotting library disagree about Y. I now set equal axis scale and compare conventions before changing the reconstruction logic. In this case the retained math-space view was already readable.</p>
+<p>The useful operational lesson is about retention. A motion log may need the same review as the content it can reconstruct. That depends on what fields it stores, whether the stream is complete, and who can retrieve it. I would not classify every device diagnostic file as an input-capture incident from its name alone.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<p>For my own work, this is a compact exercise in discrete integration, segmentation, sampling, and coordinate frames. The same shape of reasoning helps with deltas in event logs or drawing tools. A mouse or stylus path is a closer match than an IMU acceleration trace, which needs more modeling and can drift.</p>
+<p>In a SOC or incident response case, I would start with the data path: which process received the input, whether it wrote reconstructible deltas, where the file went, and whether an upload occurred. Accessibility tools, game controllers, design software, and vendor diagnostics may all have legitimate reasons to touch these sensors. A hunt needs device-access telemetry and process identity, followed by review of file content and destination policy. A file name such as <code>motion.csv</code> is only a lead.</p>
+<p>For intelligence work, repeated collection of precise motion traces could reveal sensitive drawings or timing habits. This puzzle gives no basis for biometric attribution or a real SIGINT claim. Those would need consent, multiple comparable samples, and error measurements that the challenge never supplied.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<h3>Triage flowchart for unknown CSV-shaped telemetry</h3>
+<p>I inspect the schema, row count, numeric ranges, and time order first. If signed fields cluster near zero, I try a cumulative plot. If a column instead appears to be absolute position, I plot it directly. A categorical field may be a state gate. When the geometry is plausible but mirrored, I compare Y conventions; when the geometry itself fails, I return to units, dropped samples, and encoding.</p>
+<h3>Reusable primitive: state-gated trajectory integrator</h3>
+<p>The <a href="artifacts/motion_delta_review.py">offline reviewer</a> implements the running sum and pen-state gate with bounded input, finite-number checks, and explicit SVG output. Its <a href="artifacts/fixture_motion.csv">invented CSV</a> makes two short strokes without a hidden answer. The <a href="artifacts/README.md">README</a> gives inputs, commands, output sensitivity, and parser limits. This tool reviews a motion file; it does not prove why that file was collected.</p>
+<p>I also built an <a href="artifacts/telemetry_sequence_hunt.py">event-sequence hunt</a> for the defender side. It correlates a direct input-access event, a telemetry-file write, and a network connection under one stable process identity. The <a href="artifacts/fixture_events.jsonl">invented event fixture</a> includes a positive lead, a benign two-event case, and a process mismatch. The <a href="artifacts/test_pocs.py">tests</a> include an expected false positive: legitimate software can complete all three steps.</p>
+<h3>Solve-pattern checklist</h3>
+<p>I save and hash the file, check field meanings and time order, accumulate the deltas, gate active strokes, render at equal scale, compare axes, and read the result against the challenge's expected answer form. For a real investigation, I keep the content-bearing render in a controlled evidence location and document any missing samples or coordinate assumptions.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<h3>ATT&amp;CK</h3>
+<p><a href="https://attack.mitre.org/techniques/T1056/">T1056, Input Capture</a> is a useful analogy if an adversary deliberately records a user's input stream. The puzzle did not show that behavior. <a href="https://attack.mitre.org/techniques/T1056/002/">T1056.002, GUI Input Capture</a> emphasizes deceptive GUI prompts for credentials, which makes it a poor match for this motion file. <a href="https://attack.mitre.org/techniques/T1005/">T1005, Data from Local System</a> would require an adversary collecting the local log, and <a href="https://attack.mitre.org/techniques/T1119/">T1119, Automated Collection</a> would require an automated collector. Neither happened here. <a href="https://attack.mitre.org/techniques/T1041/">T1041</a> specifically requires an existing command-and-control channel; an ordinary diagnostic upload would not establish it. A real web-service theft might fit <a href="https://attack.mitre.org/techniques/T1567/">T1567</a> after the transfer is observed.</p>
+<h3>D3FEND</h3>
+<p><a href="https://d3fend.mitre.org/technique/d3f:InputDeviceAnalysis/">D3-IDA, Input Device Analysis</a> fits the question of how input is observed and controlled. <a href="https://d3fend.mitre.org/technique/d3f:FileAnalysis/">D3-FA, File Analysis</a> fits inspection of retained motion files. I would choose additional D3FEND techniques only after defining a deployed sensor or countermeasure. The lab has no endpoint authorization mechanism.</p>
+<h3>CAPEC</h3>
+<p><a href="https://capec.mitre.org/data/definitions/569.html">CAPEC-569, Collect Data as Provided by Users</a> could describe an attacker planting a collection mechanism for genuine input. <a href="https://capec.mitre.org/data/definitions/117.html">CAPEC-117, Interception</a> would need an intercepted channel. This CSV alone supports neither attack finding. OWASP application risks and a full STRIDE model would need an actual product boundary to assess.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<h3>STIX 2.1 sample SDOs</h3>
+<p>I would not share this puzzle's CSV schema as a threat indicator. It is a normal-looking data format, and no actor, campaign, malicious hash, or destination was observed. A real incident could justify a <a href="https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html">STIX 2.1</a> attack pattern and course of action after the behavior and confidence are documented. An indicator should describe an observed, discriminating pattern, with valid IDs and timestamps. I did not create a TAXII collection or publish the redacted placeholder objects as usable intelligence.</p>
+<h3>STIG and CIS Benchmarks</h3>
+<p>An organization handling controlled drawings should review the applicable host baseline, audit settings, device access policy, and diagnostic retention. I cannot name a STIG finding or a CIS Benchmark failure without the OS, version, benchmark revision, and configuration evidence. The general <a href="https://www.cisecurity.org/controls/v8">CIS Controls</a> themes are data handling, logging, and network monitoring. They are design inputs here, not assessed compliance results.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>11a. Standards Mapping</h3>
+<p>The most relevant <a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5</a> families are AC-20 for use of external systems, SI-4 for monitoring, AU-2 for selecting events, CM-7 for limiting unnecessary services, and SC-7 for network boundaries. In a real environment I would map these to a named host, logging pipeline, and approved diagnostic destination. A generic 90-day retention number or blanket service-disable instruction would need the organization's policy and legal requirements. PE-19 concerns information leakage, but this case is a stored telemetry-content question; I would not assign that control without a system-specific assessment.</p>
+<h3>11b. Mitigation Realization</h3>
+<p>The practical control starts before the SIEM: avoid retaining raw motion traces when the product only needs a summary. If raw data is necessary, define access, encryption, retention, and an approved upload path. At the endpoint, log actual sensor or device access with a stable process identity, file creation, and network connections. Compare destination and process against an approved diagnostic workflow. No control was deployed in this challenge.</p>
+<p>On Windows, Sysmon Event 1 is process creation, Event 7 is a DLL image load, Event 11 is file creation, and Event 3 is a network connection. Loading <code>hid.dll</code> or <code>user32.dll</code> does not prove a process subscribed to raw input. A host firewall, proxy, or MDM rule also cannot be assumed to enforce binary-signature and user-agent identity; I would verify the actual product capability before claiming it. The <a href="artifacts/telemetry_sequence_hunt.py">event-sequence hunt</a> therefore expects a distinct <code>input_open</code> event from an appropriate EDR or OS audit source.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<h3>Indicators (sanitized / illustrative)</h3>
+<p>The CSV header and four numeric columns are useful triage clues. The challenge supplies no malware hash, host path, domain, cloud bucket, or actor IOC. A file named for motion, a renderer process, or a network connection alone would be noisy. I would preserve file provenance, schema, process identity, and destination policy with any alert.</p>
+<h3>YARA: on-disk HID delta CSV signature</h3>
+<p>A YARA rule matching <code>time_ms,dx,dy</code> can find candidate text files. It cannot establish that the values are relative motion, that a drawing is recoverable, or that the file is malicious. The <a href="artifacts/motion_delta_review.py">CSV reviewer</a> checks the fields and time order more deeply and can count active strokes without writing the image. It still needs analyst interpretation. I did not claim a YARA engine run or a production precision rate.</p>
+<h3>Sigma: HID-API consumer with disk write and outbound connection</h3>
+<p>A single Sigma event selection cannot make a three-event temporal correlation merely by combining Event 7, 11, and 3 fields. Event 7 also lacks the direct device-access evidence this hunt needs. I kept the intended sequence in the <a href="artifacts/telemetry_sequence_hunt.py">normalized event hunt</a> and <a href="artifacts/fixture_events.jsonl">event fixture</a>. A production implementation needs a trustworthy input-access sensor and a backend capable of joining by stable process identity and time. This local script is a review lead generator, not a shipped Sigma detector.</p>
+<h3>Splunk SPL: anomalous HID consumers writing telemetry</h3>
+<p>The useful SPL plan is to normalize three event kinds, then join <code>input_open -&gt; telemetry_write -&gt; network_connection</code> by host and process GUID within a measured window. A raw <code>ProcessId</code> can be reused, and fields such as <code>TargetFilename</code> do not exist on every Sysmon event. An implementation must preserve event order, source names, and the absence of any direct upload proof. The <a href="artifacts/README.md">README</a> defines the small normalized schema that I tested. I did not run an SPL backend.</p>
+<h3>KQL: equivalent for Microsoft Sentinel / Defender</h3>
+<p>The same evidence requirement applies to KQL. Defender file and network events may support two legs of a hunt, but a <code>DeviceImageLoadEvents</code> row for <code>user32.dll</code> is not an HID-subscription row. I would map the input-open event first, then verify the process identifier and time fields in the tenant's actual schema before writing the join. No Sentinel or Defender tenant was available for query validation.</p>
+<h3>Log source and data-pipeline requirements</h3>
+<p>The file-analysis path needs the actual CSV bytes. The behavioral path needs direct input or sensor-access events, file writes, network connections, clock normalization, and stable host/process identity. Sysmon 3 and 11 can supply two legs on Windows; an additional sensor must supply the input-access leg. Zeek or proxy logs can help with destination context, but without endpoint attribution they cannot prove which process sent the file. Cloud object logs matter only if an upload destination is part of a real case.</p>
+<h3>Detection engineering notes</h3>
+<p>The <a href="artifacts/test_pocs.py">five local tests</a> cover a positive correlation, a benign partial sequence, a process mismatch, bad ordering, and a legitimate full sequence that alerts anyway. The motion parser tests cover a neutral drawing, axis choice, invalid pen state, non-increasing time, and a nonfinite delta. The real challenge CSV replay produced the expected counts and readable path. None of this measures production false positives or proves exfiltration. I would tune on approved diagnostic clients and destinations, review the content and transfer evidence, then decide whether an alert is warranted.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">analysis flow above</a> shows the actual reconstruction. For a defender, the layers are the retained motion file, the process that collected it, the policy that allowed storage or upload, and the telemetry needed to check that path. The first layer was demonstrated here. The endpoint and network layers are proposed tests for a real environment.</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>What I would verify</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>File</td>
+<td>Schema, complete deltas, pen state, recoverable content, access controls</td>
+</tr>
+<tr>
+<td>Process</td>
+<td>Direct sensor access and a stable process identity</td>
+</tr>
+<tr>
+<td>Transfer</td>
+<td>File read or upload evidence, destination, approved workflow</td>
+</tr>
+<tr>
+<td>Response</td>
+<td>Retention, access review, and any required containment</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://attack.mitre.org/techniques/T1056/">MITRE ATT&amp;CK Input Capture</a>, <a href="https://attack.mitre.org/techniques/T1056/002/">GUI Input Capture</a>, <a href="https://attack.mitre.org/techniques/T1005/">Data from Local System</a>, <a href="https://attack.mitre.org/techniques/T1119/">Automated Collection</a>, <a href="https://attack.mitre.org/techniques/T1041/">Exfiltration Over C2</a>, and <a href="https://attack.mitre.org/techniques/T1567/">Exfiltration Over Web Service</a></li>
+<li><a href="https://d3fend.mitre.org/technique/d3f:InputDeviceAnalysis/">MITRE D3FEND Input Device Analysis</a> and <a href="https://d3fend.mitre.org/technique/d3f:FileAnalysis/">File Analysis</a></li>
+<li><a href="https://capec.mitre.org/data/definitions/569.html">MITRE CAPEC-569</a> and <a href="https://capec.mitre.org/data/definitions/117.html">CAPEC-117</a></li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5</a>, <a href="https://www.cisecurity.org/controls/v8">CIS Controls v8</a>, and <a href="https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html">STIX 2.1</a></li>
+<li><a href="https://learn.microsoft.com/en-us/windows/security/operating-system-security/sysmon/sysmon-events">Microsoft Sysmon events</a></li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>

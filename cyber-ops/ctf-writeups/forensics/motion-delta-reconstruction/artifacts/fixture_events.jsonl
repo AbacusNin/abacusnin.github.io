@@ -1,0 +1,8 @@
+{"time_ms":1000,"host":"lab-a","process_guid":"case-positive","kind":"input_open","device_path":"synthetic-device"}
+{"time_ms":2000,"host":"lab-a","process_guid":"case-positive","kind":"telemetry_write","path":"synthetic-motion.csv"}
+{"time_ms":3000,"host":"lab-a","process_guid":"case-positive","kind":"network_connection","destination":"example.invalid"}
+{"time_ms":1000,"host":"lab-a","process_guid":"case-benign","kind":"input_open","device_path":"synthetic-device"}
+{"time_ms":2000,"host":"lab-a","process_guid":"case-benign","kind":"telemetry_write","path":"local-profile.csv"}
+{"time_ms":1000,"host":"lab-a","process_guid":"case-near","kind":"input_open","device_path":"synthetic-device"}
+{"time_ms":2000,"host":"lab-a","process_guid":"case-near","kind":"telemetry_write","path":"synthetic-motion.csv"}
+{"time_ms":3000,"host":"lab-a","process_guid":"different-process","kind":"network_connection","destination":"example.invalid"}
