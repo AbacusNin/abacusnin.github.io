@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Flag Was Drawn in the Green Bits - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="I found a hand-drawn flag by checking the PNG container, comparing RGB bit planes, and rendering the unusually compressible green LSB plane after byte decoding failed.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/drawn-green-lsb/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Flag Was Drawn in the Green Bits">
+  <meta property="og:description" content="I found a hand-drawn flag by checking the PNG container, comparing RGB bit planes, and rendering the unusually compressible green LSB plane after byte decoding failed.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/drawn-green-lsb/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Forensics / <span aria-current="page">The Flag Was Drawn in the Green Bits</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Flag Was Drawn in the Green Bits</h1>
+        <p class="lead">The bits were not spelling characters. They were drawing them.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Recover a flag hidden in one color channel of a provided PNG image.</p>
+<p><strong>What I did.</strong> I checked the container, compared per-channel LSB planes, ruled out a packed text stream, and rendered the green plane at full resolution.</p>
+<p><strong>The result.</strong> The green bit-0 plane showed handwritten glyphs. The case record reports that the operator resolved two ambiguous characters and received platform acceptance.</p>
+<p><strong>The limit.</strong> The accepted flag and submission transcript are withheld. The carrier and rendered plane support the visual recovery, while the platform result remains operator-reported.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Carrier; Triage; Dead end; Render; Read; Confirm">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Carrier</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Inspect PNG chunks and image mode</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Triage</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Compare RGB bit-0 compressibility</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Dead end</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Packed ASCII reads as noise</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Render</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Map green bits to black and white</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Read</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Inspect drawn glyphs at native size</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Confirm</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Operator-reported acceptance</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Forensics - Steganography</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>PNG, LSB steganography, bit-plane analysis, green channel, visual payload, steganalysis triage</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved</td>
+</tr>
+<tr>
+<td>Available material</td>
+<td>One 8-bit RGBA PNG and a hint about a color channel</td>
+</tr>
+<tr>
+<td>Goal</td>
+<td>Recover the flag drawn into a bit plane</td>
+</tr>
+<tr>
+<td>Reported result</td>
+<td>Operator submitted a corrected reading and received platform acceptance</td>
+</tr>
+<tr>
+<td>Verification boundary</td>
+<td>Local PNG and plane checks confirm the hidden drawing; acceptance was not replayed</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for image triage: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/drawn-green-lsb/artifacts">browse the offline tools and tests on GitHub</a> and <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/drawn-green-lsb/fixtures">the invented carrier, rendered example, and control images</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I had one color PNG and a hint pointing toward a color channel. The task was to recover a flag from the image, not to interact with a service. I could work entirely offline with the file. The image was an RGBA bat cutout; at ordinary viewing size, the visible picture gave no obvious text away.</p>
+<p>This was a steganography puzzle with no observed adversary or defender. A hidden bit plane could be used as a covert media channel elsewhere, but this challenge gave me no exfiltration path, host telemetry, or campaign to investigate. I keep that operational idea labeled as a proposed analogy in the later sections.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I started outside the pixels. The carrier was an 8-bit RGBA PNG. Its chunk sequence was <code>IHDR</code>, a run of <code>IDAT</code> chunks, then <code>IEND</code> at the exact end of the file. There was no appended payload and no <code>tEXt</code>, <code>zTXt</code>, or <code>iTXt</code> chunk to explain the hint. I hashed the file before processing so a later render would not replace the evidence. The container check narrowed my attention to pixel values; it did not prove the image lacked every possible hidden technique.</p>
+<p>I extracted bit 0 from red, green, and blue and compared how well each raw 0/1 plane compressed. Green stood out. In the retained carrier, zlib compressed its raw plane to 18,688 bytes, against 300,013 for red and 299,645 for blue. That makes green about 6% of the next-smallest plane under this particular test. It agreed with the hint and gave me a reason to inspect green first. Transparent black space and ordinary image structure can also affect bit-plane statistics, so I used the ratio as a lead, then looked at the plane.</p>
+<p>My first decoding idea was wrong. I treated the green LSBs as packed ASCII, trying both bit orders and row- and column-major pixel orders. The results were noise. Searching the stream for flag-shaped fragments produced statistical false positives. I stopped treating the bits as bytes and rendered them in their original spatial positions. The plane contained a hand-drawn flag. The source account says the first transcription missed two leetspeak-like glyphs; the operator's accepted submission settled that reading. I can independently see the drawing in the retained image, but the exact accepted value and submission transcript are not part of this public record.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>The first pass walked the PNG signature and chunk lengths. That is how I separated container hiding from a pixel payload. The <a href="artifacts/extract_green_lsb.py">offline extractor</a> makes this check more careful: it bounds the file and image size, verifies each chunk CRC, requires <code>IHDR</code> first and <code>IEND</code> last, rejects bytes after <code>IEND</code>, and renders one chosen channel and bit. The <a href="artifacts/README.md">tool guide</a> explains its input and output. It uses Pillow and Python's standard library; NumPy is not required.</p>
+<pre><code class="language-sh">python -B artifacts/extract_green_lsb.py fixtures/fixture_green_lsb.png view.png --channel g --bit 0
+</code></pre>
+<p>That command writes an 8-bit grayscale PNG whose pixel values are only 0 and 255. It reads the <a href="fixtures/fixture_green_lsb.png">invented carrier</a> and reveals the <a href="fixtures/fixture_green_lsb_extracted.png">invented rendered message</a>, <code>GREEN_LSB_DEMO</code>. The command refuses to overwrite an existing <code>view.png</code>.</p>
+<p>For the channel check, the <a href="artifacts/lsb_triage.py">triage script</a> reports per-channel set-bit fraction, binary entropy, and zlib size of the raw plane bytes. Its result is a short list for manual review, not an answer reader. The <a href="artifacts/make_fixture.py">deterministic fixture generator</a>, <a href="artifacts/test_lsb_lab.py">tests</a>, <a href="fixtures/benign_random.png">random baseline</a>, <a href="fixtures/benign_stripes.png">harmless striped image</a>, and <a href="fixtures/near_miss_random_payload.png">random-looking near miss</a> make its behavior visible. All included code runs offline.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>The <a href="https://www.w3.org/TR/png-3/">PNG specification</a> describes a signature and a sequence of typed chunks. <code>IHDR</code> records the image properties, <code>IDAT</code> carries compressed image data, and <code>IEND</code> closes the datastream. Text chunks are optional. A valid end marker at the end of the file helps rule out appended data. It does not tell me what individual decoded pixels contain.</p>
+<p>An 8-bit red, green, blue, or alpha channel stores a value from 0 to 255 at each pixel. Bit 0 changes that value by one. With the composite image on screen, that difference is usually hard to notice. Isolating bit 0 from one channel gives me one binary value for every original pixel. Mapping zero to black and one to white preserves the spatial arrangement, so drawn strokes reappear where they were placed.</p>
+<p>Random-looking bit planes usually resist compression, while broad strokes and blank space often compress well. That is the reason I compared channels before decoding text. It is a heuristic, not a general law of photographs: transparency, flat colors, synthetic art, and image processing can produce structured planes without a hidden message. The <a href="fixtures/benign_stripes.png">striped control</a> demonstrates that false positive. A payload whose bits still look random can evade this test; the <a href="fixtures/near_miss_random_payload.png">near-miss carrier</a> demonstrates that limit.</p>
+<p>The final distinction is representation. A sequence of bits might encode characters in a byte order, or the bit positions might make a picture of characters. My failed ASCII pass and the visible green-plane glyphs separated those possibilities in this case.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>The author changed the green channel's least-significant bit per pixel so the bit plane itself drew the answer. A normal view mixed that one bit with the rest of the image. My recovery kept every pixel in place and applied the same operation at each point:</p>
+<pre><code class="language-text">green_bit_0(x, y) = green(x, y) &amp; 1
+visible(x, y) = 255 * green_bit_0(x, y)
+</code></pre>
+<p>This is lossless for that bit plane. No stream ordering, byte alignment, character set, or XOR key is needed to see a drawing. The green compressibility lead, the rendered strokes, and the flag-shaped text support the recovery from different angles. The extracted plane is legible but handwritten. Two characters were ambiguous on the first read, so visual inspection alone did not establish the exact accepted string. The case record says the operator corrected the transcription and the platform accepted it.</p>
+<p>Only bit 0 of green carried the drawn payload here. A different image might hide bytes, use another bit, spread data across channels, or preserve noise-like statistics. The <a href="artifacts/extract_green_lsb.py">extractor</a> can render a chosen channel and bit, but it does not interpret every possible steganography scheme.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned</summary>
+<p>The order saved time: identify the file, check the container, compare bit planes, then decide whether to read bits as bytes or as a picture. The green-plane ratio was the cheap discriminator. I still needed to render it. A low compressed size on its own could have meant ordinary flat or synthetic image content.</p>
+<p>The wrong ASCII path was useful evidence. Both bit orders and both traversal directions produced noise, and the flag-shaped search hits did not survive inspection. Once I treated spatial placement as part of the encoding, the drawing made sense. The two uncertain handwritten glyphs were a separate problem. I would record candidate readings before submission and keep the operator's acceptance distinct from my visual guess.</p>
+<table>
+<thead>
+<tr>
+<th>Exercise observation</th>
+<th>Operational analogy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>One RGB channel's bit plane contained a drawing</td>
+<td>Media could carry covert content in pixel bits</td>
+</tr>
+<tr>
+<td>Cross-channel compressibility singled out green</td>
+<td>A file scanner could prioritize unusual planes for review</td>
+</tr>
+<tr>
+<td>A human read the rendered glyphs</td>
+<td>A detector may need an analyst to confirm the content</td>
+</tr>
+</tbody>
+</table>
+<p>Those are proposed uses of the method. The puzzle itself did not show an exfiltration event.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Operational Extrapolation</summary>
+<h3>Individual Practitioner Development</h3>
+<p>This case tied together PNG structure, pixel-channel extraction, simple statistics, and visual reading. A useful next exercise is to sweep every channel and bit plane, then compare the rankings on a labeled set of ordinary and stego images. The <a href="artifacts/lsb_triage.py">current triage script</a> reports one RGB bit index at a time. It has not been evaluated on a representative corpus.</p>
+<h3>Security Operations</h3>
+<p>A realistic use is a file-triage pipeline that already collects media under an authorized investigation or gateway policy. It could compute per-channel bit-plane statistics, queue unusual images, and let an analyst render the candidate plane. It should preserve the original file, hash, acquisition context, and review decision. The <a href="artifacts/lsb_triage.py">local proof of concept</a> shows the selection logic and an expected false positive. It has no mail gateway, DLP feed, host sensor, or measured detection rate behind it.</p>
+<h3>Intelligence Operations</h3>
+<p>Covert media is a possible collection topic, but this challenge supplies no actor, source network, or campaign. I would not promote the drawn flag or its image hash as threat intelligence. In a real case, any intelligence conclusion would depend on the carrier's provenance, surrounding communications, and independent evidence of intent.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The reusable primitive is the <a href="artifacts/extract_green_lsb.py">bit-plane extractor</a>. Its inputs are a bounded 8-bit RGB/RGBA PNG, an output path, <code>--channel {r,g,b,a}</code>, and <code>--bit {0..7}</code>. It validates the container, leaves the source untouched, and writes a visible black-and-white plane. The output includes dimensions, chunk names, and set-pixel count. The <a href="fixtures/fixture_green_lsb.png">positive synthetic carrier</a> and <a href="fixtures/fixture_green_lsb_extracted.png">rendered view</a> let anyone reproduce the visual step without a challenge answer.</p>
+<p>The <a href="artifacts/lsb_triage.py">RGB triage script</a> ranks one bit across red, green, and blue by raw-byte zlib size and reports binary entropy. The <a href="artifacts/make_fixture.py">fixture generator</a> creates an invented positive, <a href="fixtures/benign_random.png">benign random baseline</a>, <a href="fixtures/benign_stripes.png">striped false positive</a>, and <a href="fixtures/near_miss_random_payload.png">random-looking missed payload</a>. The <a href="artifacts/test_lsb_lab.py">tests</a> and <a href="artifacts/README.md">guide</a> record expected behavior and commands. Three local test groups passed, including container tampering, the visible positive, and the controls. These tools need Python and Pillow; no network service or NumPy package is required.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Applicability and Mapping</summary>
+<p><a href="https://attack.mitre.org/techniques/T1027/003/">MITRE ATT&amp;CK T1027.003, Steganography</a>, describes information concealed in another file. It is an analogical fit for the bit-plane method. The challenge was an offline puzzle, so I did not observe an adversary using steganography for defense evasion. I would not attach a campaign or tactic claim to this image alone.</p>
+<p>OWASP web categories have no target here. STRIDE needs a system and trust boundaries beyond the single file. A D3FEND or control mapping could be useful for a real media pipeline, but none was assessed in this challenge. The practical defensive output is the bounded file triage and its evidence limits in Section 12.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intelligence and Standards Integration</summary>
+<p>There is no production IOC, actor, infrastructure, or sharing context for STIX/TAXII. A STIX attack-pattern object would repeat the generic steganography concept without adding facts from this case. The accepted flag is an answer, not an indicator. The <a href="https://www.w3.org/TR/png-3/">PNG standard</a> is the useful technical reference for file structure, and <a href="https://pillow.readthedocs.io/en/stable/reference/Image.html">Pillow's image API</a> describes the channel operations used by the local tool.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<p>The challenge does not identify an organization, a media-ingest service, or an assessed control. Assigning NIST, CIS, STIG, CMMC, PCI DSS, or HIPAA control status to it would overstate the evidence. For a real pipeline, I would propose a review step for anomalous media, safe image decoding, bounded resource use, original-file preservation, and an analyst decision before treating a carrier as malicious. That is an implementation idea, not an implemented control or a claim that this heuristic alone prevents covert content.</p>
+<p>The <a href="artifacts/README.md">guide</a> gives the tool's data contract and false-positive cases. The <a href="artifacts/lsb_triage.py">triage script</a> is a seed for evaluating this proposal, with threshold selection left to a representative clean and stego image set.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>This case's signal lives in pixels, not logs. A YARA byte pattern, Sigma rule, KQL query, or SPL search would lack the discriminating data unless a separate image-analysis pipeline had already extracted its features. The proposed hunt is simple: among media files collected under a legitimate workflow, compare RGB bit-0 planes and review a channel whose raw plane compresses far more than the others. The <a href="artifacts/lsb_triage.py">triage script</a> names a channel only when its compressed size is at most one quarter of the next-smallest RGB plane. That threshold is a local demonstration setting.</p>
+<p>The <a href="fixtures/fixture_green_lsb.png">positive fixture</a> selects green and renders a visible synthetic message. The <a href="fixtures/benign_random.png">random baseline</a> stays clear. The <a href="fixtures/benign_stripes.png">striped image</a> also selects green even though it carries no secret, an expected false positive. The <a href="fixtures/near_miss_random_payload.png">random-looking near miss</a> stays clear despite its constructed payload bits. These checks show why a candidate needs visual review and why a clear result cannot exclude all steganography. Production validation would need labeled ordinary and stego files, documented thresholds, acquisition provenance, and measured review workload. None of that was available in the puzzle.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow diagram above</a> follows the file-to-pixel decision: container check, channel ranking, failed byte interpretation, green-plane rendering, and operator-reported acceptance. For a safe visual example, the <a href="fixtures/fixture_green_lsb_extracted.png">synthetic rendered plane</a> shows how drawn text appears after bit isolation:</p>
+<p><img alt="Synthetic green LSB plane spelling GREEN_LSB_DEMO" src="fixtures/fixture_green_lsb_extracted.png" /></p>
+<p>The actual handwritten flag is intentionally absent from this visual. The <a href="artifacts/extract_green_lsb.py">extractor</a> lets a reader repeat the transform on the invented carrier.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://attack.mitre.org/techniques/T1027/003/">MITRE ATT&amp;CK T1027.003, Steganography</a>: analogical technique mapping in Section 9.</li>
+<li><a href="https://www.w3.org/TR/png-3/">W3C, Portable Network Graphics Specification, Third Edition</a>: PNG chunks, signature, and datastream structure in Sections 3 and 4.</li>
+<li><a href="https://doi.org/10.1017/CBO9781139192903">Jessica Fridrich, Steganography in Digital Media</a>: background on image steganography and statistical triage in Sections 4 and 12.</li>
+<li><a href="https://pillow.readthedocs.io/en/stable/reference/Image.html">Pillow Image module documentation</a>: channel extraction and grayscale rendering used by the proof of concept.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>

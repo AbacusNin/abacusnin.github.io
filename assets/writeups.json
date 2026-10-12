@@ -541,5 +541,27 @@
     ],
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/forensics/cat048-track-spoofing/"
+  },
+  {
+    "title": "The Flag Was Drawn in the Green Bits",
+    "category": "Forensics",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "PNG",
+      "LSB steganography",
+      "bit-plane analysis",
+      "green channel",
+      "visual payload",
+      "steganalysis triage"
+    ],
+    "summary": "I found a hand-drawn flag by checking the PNG container, comparing RGB bit planes, and rendering the unusually compressible green LSB plane after byte decoding failed.",
+    "aliases": [
+      "image forensics",
+      "covert image channel",
+      "drawn flag"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/forensics/drawn-green-lsb/"
   }
 ]
