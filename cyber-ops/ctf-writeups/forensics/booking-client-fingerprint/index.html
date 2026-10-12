@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Booking Client That Kept Its Rhythm - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="A booking client changed its User-Agent, then its IP, but kept polling the same endpoint every sixty seconds before paired reservation requests. I followed the rhythm through three days of HTTP logs.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/booking-client-fingerprint/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Booking Client That Kept Its Rhythm">
+  <meta property="og:description" content="A booking client changed its User-Agent, then its IP, but kept polling the same endpoint every sixty seconds before paired reservation requests. I followed the rhythm through three days of HTTP logs.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/booking-client-fingerprint/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Forensics / <span aria-current="page">The Booking Client That Kept Its Rhythm</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Booking Client That Kept Its Rhythm</h1>
+        <p class="lead">The first IP disappeared on day three. The sixty-second rhythm did not.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Identify the suspected automated client in a three-day shared-equipment booking log and explain how it used the reservation workflow.</p>
+<p><strong>What I did.</strong> I ranked requests to the booking endpoints, checked intervals and paired POSTs, then searched day three for the behavior after both familiar identifiers disappeared.</p>
+<p><strong>The result.</strong> The available 1,290-line log independently reproduces the two source candidates, exact polling cadence, and same-second POST pairs described in the challenge record.</p>
+<p><strong>The limit.</strong> The log has no account identifier, request body, response body, or booking state. The two IPs are linked by behavior, not a verified account join; HTTP 200 does not prove a reservation was granted.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Endpoint-scoped count; Behavioral signature; Rotated fields; Day-three hunt; Defensive response">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Endpoint-scoped count</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">One source stands out on days one and two</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Behavioral signature</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Sixty-second polls and a paired POST burst</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Rotated fields</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">User-Agent changes, then source IP changes</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Day-three hunt</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">A second source repeats the same signature</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Defensive response</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Account limits, outcome logs, cadence review</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Forensics / HTTP log analysis</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Easy</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>http-log-forensics, cadence-analysis, behavioral-fingerprinting, ua-spoofing, ip-rotation, business-logic-abuse, detection-engineering</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved-Verified in the challenge record; log behavior independently replayed</td>
+</tr>
+<tr>
+<td>Source material</td>
+<td>Three-day Apache Combined access log, 1,290 events from 253 source IPs</td>
+</tr>
+<tr>
+<td>Goal</td>
+<td>Identify the suspected booking automation and explain the observable mechanism</td>
+</tr>
+<tr>
+<td>Verified here</td>
+<td>Endpoint counts, timing, User-Agent shifts, same-second POST pairs, and local detector results</td>
+</tr>
+<tr>
+<td>Evidence limit</td>
+<td>No account identity, request or response bodies, booking state, or submission receipt in the available record</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/booking-client-fingerprint/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>A member-run facility shared equipment through a first-come reservation site. Staff suspected that one member had been taking an unfair share of available time over three days. My only artifact was the web server access log. It had 1,290 lines and 253 source IPs, with no account name in the ident or authuser fields. I needed to find a client that behaved like a booking script and explain the evidence without pretending the log could name the member.</p>
+<p>The suspected abuse uses legitimate site functions. A client can poll for free equipment, then submit reservations as soon as a slot opens. No stolen credential, injection, or server compromise appears in this record. The affected resource is the booking opportunity. The site itself remained reachable.</p>
+<p>I could see timestamps, paths, methods, statuses, IPs, and User-Agent strings. I could not see request bodies, response bodies, session tokens, booking IDs, or the resulting schedule. That missing application context matters all the way through this case. Two POSTs returning <code>200</code> are two accepted HTTP responses; they are not proof of two successful reservations.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>My first instinct was to rank all requests by source IP. It would have sent me toward two ordinary sources with 24 requests each. The relevant source had 21 and ranked third. I changed the question from "who was busiest?" to "who kept using the equipment endpoint?" On the availability path, one source had 17 GETs, while the next highest had five. On the reservation path it had four POSTs, while the next highest had two. That endpoint-scoped view gave me a candidate worth reading line by line.</p>
+<p>Day one was unusually clear. The candidate made six availability GETs one minute apart, then two reservation POSTs in the same second as the last poll. Its User-Agent was <code>python-requests/2.32.5</code>. That field was a useful lead, but a client can set it to any string. I used the full request set to look for behavior that would be harder to change accidentally: only the two booking paths, exact one-minute intervals, and a paired POST burst.</p>
+<p>On day two, the same IP returned with an MSIE 7.0 / Windows CE User-Agent. For a moment, a different person behind a shared IP was a possible explanation. The new string did not come with new behavior. Eleven availability GETs still fell exactly sixty seconds apart. Two reservation POSTs again landed in the same second, one second after the last poll. The same narrow endpoint set remained. I treated a single client changing a header as the stronger explanation, while keeping shared-IP attribution as an unresolved possibility.</p>
+<p>I then made the mistake that shaped the rest of the investigation. Searching day three for the first IP returned nothing. Searching for the Python User-Agent returned nothing either. I initially read those empty results as the activity stopping. Both searches depended on identifiers the client had already changed. I went back to the behavior: rank day-three availability GETs, then check intervals and POST timing. A second IP had five polls, compared with a next-highest day-three count of three, and it repeated the sixty-second rhythm and same-second two-POST burst.</p>
+<table>
+<thead>
+<tr>
+<th>Day</th>
+<th>Source label</th>
+<th>User-Agent shown</th>
+<th style="text-align: right;">Availability GETs</th>
+<th style="text-align: right;">Reservation POSTs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>ACTOR-IP-A</code></td>
+<td><code>python-requests/2.32.5</code></td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">2</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>ACTOR-IP-A</code></td>
+<td>MSIE 7.0 / Windows CE claim</td>
+<td style="text-align: right;">11</td>
+<td style="text-align: right;">2</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>ACTOR-IP-B</code></td>
+<td>Android 2.3.5 / Chrome 50 claim</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">2</td>
+</tr>
+</tbody>
+</table>
+<p>The log establishes those source-level patterns. It does not establish that <code>ACTOR-IP-A</code> and <code>ACTOR-IP-B</code> belong to one authenticated member. The repeated combination makes that a strong investigative hypothesis, not a deterministic identity join. It also shows the order of the visible changes: User-Agent first, IP as well on day three. Why the client changed either field remains unknown.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>The recorded solve used shell one-liners. The <a href="artifacts/booking_hunt.py">offline Python hunt</a> was written afterward as a defensive proof of concept and replayed against the available log. I did not use it during the original challenge.</p>
+<pre><code class="language-bash"># The broad count put the useful source in third place.
+awk '{print $1}' access.log | sort | uniq -c | sort -rn | head
+
+# Scope the count to the function under review.
+grep 'GET &lt;AVAIL_ENDPOINT&gt; ' access.log | awk '{print $1}' | sort | uniq -c | sort -rn
+grep 'POST &lt;RESERVE_ENDPOINT&gt;' access.log | awk '{print $1}' | sort | uniq -c | sort -rn
+
+# Read the candidate's whole request set and then its poll timestamps.
+grep '&lt;ACTOR-IP-A&gt;' access.log
+grep '&lt;ACTOR-IP-A&gt;' access.log | grep 'GET &lt;AVAIL_ENDPOINT&gt; ' | awk '{print $4}'
+
+# Check whether the two identity fields can support an account join.
+awk '{print $2, $3}' access.log | sort -u
+</code></pre>
+<p>The last command yields only <code>- -</code> in this log. In a real service I would ask for protected account and reservation-outcome logs before treating IP correlation as person-level attribution. The <a href="artifacts/README.md">lab guide</a> states the analyzer's input format, fields, bounds, and output. Its paths are illustrative so the public code does not expose the challenge's local endpoint names.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>An availability poll asks the server whether a resource has become free. A script that sleeps for sixty seconds between checks can ask at a perfectly even pace. A person, a browser tab that auto-refreshes, or a legitimate partner integration can also create repeated requests. The timing alone is a lead. The same-second reservation pair after a long run of endpoint-only polling gives it more weight.</p>
+<p>I measured the spread in the gaps between polls using the coefficient of variation: standard deviation divided by the mean interval. Each day-long candidate session had sixty-second gaps and a measured CV of <code>0.0</code>. The session boundary is important. The first source had a 86,691-second overnight gap between days one and two. Treating that gap as a polling interval gives a CV near <code>3.96</code> and makes a plainly regular client look irregular. Split on idle gaps first; score the sessions second.</p>
+<p>The two POSTs in one timestamp second leave an important question open. They may be two distinct reservations that the policy allows. They may be requests contending for the same item or racing a state check. The access log has no body or result details to separate those cases. A <code>200</code> response can even contain an application-level refusal. I would inspect booking IDs, account IDs, and application outcomes before calling this a race condition or claiming the equipment was actually reserved twice.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>The visible sequence is compact: poll the availability path, keep doing it at a machine-regular interval, then send two reservation requests close together. On day two the client presents a different User-Agent. On day three a different source IP presents yet another one while repeating the same request rhythm. Those are observations. The idea of a script using <code>sleep(60)</code> and changing headers or its route is a plausible mechanism, not recovered code.</p>
+<p>The design risk is that a member might exercise an allowed booking function more often or in more parallel than the service intends. <a href="https://cwe.mitre.org/data/definitions/799.html">CWE-799</a> describes inadequate control of interaction frequency. <a href="https://cwe.mitre.org/data/definitions/770.html">CWE-770</a> describes allocations without adequate limits. Both are useful review questions here; this log alone cannot prove the application's actual limits or whether allocations completed. I would test the policy in application state before filing either as a confirmed vulnerability.</p>
+<p>The client did not have to flood the server to gain an advantage. Even one poll a minute may be early enough to reach a newly free slot before a person browsing manually. A crude "one request per minute" limit would let a request spaced at exactly sixty seconds through at its nominal boundary. A per-account booking policy and an atomic reservation operation address the allocation itself, regardless of where the traffic originates.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<p>The useful part of this solve was changing my unit of analysis. Total volume told me who generated the most lines. Endpoint-scoped counts told me who was unusually focused on the booking workflow. Then timing and request order let me keep looking after the User-Agent and IP changed.</p>
+<p>I also have to keep the failed turns in view. The empty day-three IP search was a real dead end. I almost filled it with a story about the client stopping after noticing scrutiny. The log did not contain that motive. It contained no matches for one IP. Repeating the same search with the User-Agent family failed for the same reason. The behavior-based pivot found the day-three candidate.</p>
+<p>The first defensive analyzer written for this case had a more embarrassing problem: it was described as working before anyone ran it. On replay, it missed <code>ACTOR-IP-A</code>. Its seventeen polls produced fifteen sixty-second intervals and one overnight gap. That gap inflated the aggregate CV to about <code>3.96</code>. Splitting sessions after an idle gap fixed the local test. I have kept that failure in the <a href="artifacts/test_booking_hunt.py">published tests</a>, because a detector that misses the very case it explains should not be presented as ready to use.</p>
+<p>This exercise gives me a short checklist for the next access-log case: rank the affected function, inspect complete candidate traffic, split sessions before timing analysis, and treat an empty search on a mutable identifier as a reason to try another discriminant. I would still verify the application outcome before writing an incident conclusion about a person or a successful booking.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<p>For a SOC hunt, I would start with a question that a different booking, ticketing, or inventory service can answer: which accounts poll an availability-like endpoint with low timing variance and then issue tightly clustered state-changing requests? That demands web and application telemetry at the same time. IP-only logs can generate candidates, as they did here, but cannot resolve shared IPs or rotations to a member.</p>
+<p>For the response team, the immediate work is to preserve the access log, obtain reservation outcomes and account identifiers, then check whether the suspected periods actually crowded out other members. A ban on the two source IPs would be fragile when the client already appears under a second one. The service should enforce fair-use limits on the authenticated principal and keep its own audit trail of granted, rejected, and canceled bookings.</p>
+<p>The visible sequence of User-Agent and IP changes might suggest someone adjusted the client over time. It does not reveal intent, awareness of detection, a particular tool author, or a wider campaign. The transferable lesson is narrower and useful: request timing and workflow choice can persist after self-reported fields change. I would test that hypothesis against local baselines before promoting it to an alert.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<h3>Triage decision tree</h3>
+<p>I use this order for an authorized booking-service review:</p>
+<pre><code class="language-text">Access log
+  -&gt; scope to availability GET and reservation POST paths
+  -&gt; rank sources or accounts on those paths
+  -&gt; inspect full request sets, including navigation and outcomes
+  -&gt; split polls into sessions after a measured idle gap
+  -&gt; score timing regularity inside each session
+  -&gt; seek a same-second or near-second reservation pair
+  -&gt; compare other days by behavior when IP or User-Agent stops matching
+  -&gt; verify account, item, and booking result in application records
+</code></pre>
+<p>That last line is the gate between a traffic candidate and a member-level finding. With the present log, the analysis stops before it.</p>
+<h3>Cadence primitive (sessionized)</h3>
+<p>The <a href="artifacts/booking_hunt.py">offline analyzer</a> implements the session split, CV test, and POST-pair check. It reads bounded Apache Combined logs and prints JSON candidate summaries. Its <a href="artifacts/test_booking_hunt.py">four local test groups</a> cover the positive rotation case, a benign auto-refresh client without booking, a near miss with irregular polls and spaced POSTs, and malformed input. The <a href="artifacts/README.md">README</a> documents the parser and the expected fields.</p>
+<p>The lab defaults are a ten-minute idle gap, at least four polls, <code>CV &lt; 0.05</code>, and POSTs no more than one second apart within five seconds after the final qualifying poll. A three-poll floor is mathematically possible but gives only two intervals, a weak basis for a variance judgment. The public implementation uses four as a modest minimum. These numbers came from a small synthetic exercise, not a measured production baseline. The tool groups by source IP because the exercise lacks accounts; a deployed version should group by authenticated account and preserve IP as context.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<h3>Tier 1 - completeness checklist</h3>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>Where this case fits</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MITRE ATT&amp;CK</td>
+<td><a href="https://attack.mitre.org/techniques/T1036/012/">T1036.012, Browser Fingerprint</a>, is an analogy for the visible User-Agent changes. It does not establish a compromised host or an ATT&amp;CK campaign.</td>
+</tr>
+<tr>
+<td>MITRE ATLAS</td>
+<td>No ML or AI component is involved.</td>
+</tr>
+<tr>
+<td>OWASP</td>
+<td><a href="https://api-security.owasp.org/editions/2023/en/0xa4-unrestricted-resource-consumption/">API4:2023</a> provides a useful limit-design lens. OWASP Top 10 A04:2021 Insecure Design is broader. The log does not prove a missing server-side cap.</td>
+</tr>
+<tr>
+<td>OWASP Top 10 for LLM Applications</td>
+<td>No LLM component is involved.</td>
+</tr>
+<tr>
+<td>CVSS, EPSS, CISA KEV</td>
+<td>No CVE or distributed product vulnerability is identified.</td>
+</tr>
+<tr>
+<td>CIS Benchmarks and CSA CCM</td>
+<td>The artifact does not establish a particular cloud platform or deployed configuration.</td>
+</tr>
+</tbody>
+</table>
+<p>I rejected several tempting ATT&amp;CK labels. <a href="https://attack.mitre.org/techniques/T1499/003/">T1499.003</a> concerns application exhaustion; 21 requests from the first source over two days did not exhaust this server. T1059.006 describes Python execution on a victim system, while any script here ran on the client side. T1071.001 is a command-and-control technique, and this record has no C2 channel. T1190 concerns gaining access through exploitation; the scenario gives the actor legitimate access. Those mappings would turn a booking fairness problem into a different incident.</p>
+<h3>Tier 2 - applied where they add value</h3>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>Why I kept it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://cwe.mitre.org/data/definitions/799.html">CWE-799</a></td>
+<td>Interaction-frequency control is the right design question for regular polling.</td>
+</tr>
+<tr>
+<td><a href="https://cwe.mitre.org/data/definitions/770.html">CWE-770</a></td>
+<td>Allocation limits are the right question for concurrent holdings, pending application-state verification.</td>
+</tr>
+<tr>
+<td><a href="https://capec.mitre.org/data/definitions/227.html">CAPEC-227</a></td>
+<td>Sustained Client Engagement describes keeping a resource tied up with repeated benign-looking use. MITRE currently labels this entry <strong>Meta</strong>, so I do not call it a Base pattern.</td>
+</tr>
+<tr>
+<td><a href="https://capec.mitre.org/data/definitions/210.html">CAPEC-210</a></td>
+<td>Abuse Existing Functionality is a broad category. CAPEC-227 describes the resource-sharing story more closely.</td>
+</tr>
+<tr>
+<td><a href="https://next.d3fend.mitre.org/technique/d3f%3AResourceAccessPatternAnalysis/">D3FEND D3-RAPA</a></td>
+<td>Compare per-account resource access with an appropriate baseline.</td>
+</tr>
+<tr>
+<td>D3FEND D3-NTA / D3-PMAD / D3-ACH</td>
+<td>Network timing, protocol metadata, and application configuration are possible defender workstreams. Their fit depends on the deployed sensors and service architecture.</td>
+</tr>
+</tbody>
+</table>
+<p>STRIDE could help a future design review. CACAO and OpenC2 would need an actual response workflow to encode. I did not invent one just to fill a framework row.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<p>I would not publish the two source IPs or the three User-Agent strings as a transferable intelligence feed. The source labels changed inside a three-day exercise, and the User-Agent field is easy to forge. A STIX indicator that matches only an availability GET would hit normal users. The durable part is a timing-plus-workflow hypothesis, and that requires local correlation logic and a baseline. There is no outside infrastructure, malware family, actor identity, or campaign here to share through TAXII.</p>
+<p>I also leave STIG requirement IDs out of this case. I have an access-log visibility gap and a booking-policy question, not evidence of a reviewed STIG benchmark or its applicable findings. The controls below name the audit and monitoring ideas I can actually connect to this record. They are review mappings, not a compliance determination.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>11a. Standards Mapping (abbreviated)</h3>
+<table>
+<thead>
+<tr>
+<th>Standard</th>
+<th>Review connection</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NIST SP 800-53 Rev. 5 SC-5</td>
+<td>Evaluate limits that protect the booking function and shared resources.</td>
+</tr>
+<tr>
+<td>SI-4 and AU-6</td>
+<td>Monitor booking traffic and review anomalous cadence with application context.</td>
+</tr>
+<tr>
+<td>AU-3</td>
+<td>Record enough event content to associate requests with an authenticated account and outcome, with proper protection.</td>
+</tr>
+<tr>
+<td>CIS Controls v8 8.2 and 8.5</td>
+<td>Collect useful web and application audit detail; the missing member identity is the concrete gap here.</td>
+</tr>
+<tr>
+<td>CIS Controls v8 16.10</td>
+<td>Design fair-use and atomic reservation rules into the application.</td>
+</tr>
+</tbody>
+</table>
+<h3>11b. Mitigation Realization</h3>
+<p>An IP-keyed reverse-proxy limit can reduce casual polling, but it cannot enforce member fairness when IPs are shared or rotated. A one-request-per-minute setting may even admit a client that lands exactly on sixty-second boundaries. I would set the actual limits from service policy and expected browser behavior, then enforce a per-account reservation cap in the application.</p>
+<p>The reservation decision should lock a stable account or quota row and the selected item inside one transaction, count active holdings under that lock, and commit the item transition atomically. Locking only existing reservation rows is insufficient when the member currently has none: two concurrent requests can both see an empty set. The quota cap answers the permitted-by-design case; the item transaction answers a race on the same slot. Neither weakness is proven by the access log, so both need an application test.</p>
+<p>Finally, I would add a protected account identifier, item identifier, and application outcome to the audit event. That would let an analyst join activity across source IPs and tell a successful booking from a <code>200</code> response carrying a rejection message. Keep those fields access-controlled and minimize personal data. The <a href="artifacts/detection_queries.md">hunt templates</a> describe how to use the resulting telemetry.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>The offline candidate detector was run against the available exercise log. The Sigma and SIEM files are starting points, with no backend or production validation. I keep those maturity levels separate.</p>
+<h3>Validation run</h3>
+<p>The first, unsessionized CV check missed the main source. Its seventeen polls produce fifteen sixty-second gaps and one 86,691-second overnight gap. The combined mean was about 5,474 seconds and CV about <code>3.96</code>, far above the <code>0.05</code> candidate threshold. Once I split on idle gaps, the <a href="artifacts/booking_hunt.py">offline hunt</a> returned exactly two sources in the 1,290-event, 253-source log:</p>
+<table>
+<thead>
+<tr>
+<th>Source label</th>
+<th style="text-align: right;">Total polls</th>
+<th style="text-align: right;">Best session</th>
+<th style="text-align: right;">Mean gap</th>
+<th style="text-align: right;">CV</th>
+<th style="text-align: right;">Paired POST bursts</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ACTOR-IP-A</code></td>
+<td style="text-align: right;">17</td>
+<td style="text-align: right;">11 polls</td>
+<td style="text-align: right;">60 seconds</td>
+<td style="text-align: right;">0.0</td>
+<td style="text-align: right;">2</td>
+</tr>
+<tr>
+<td><code>ACTOR-IP-B</code></td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">5 polls</td>
+<td style="text-align: right;">60 seconds</td>
+<td style="text-align: right;">0.0</td>
+<td style="text-align: right;">1</td>
+</tr>
+</tbody>
+</table>
+<p>Against the challenge's labeled candidates, that is two of two found and no other source returned. It is a result for this one synthetic log, not a production false-positive rate. The <a href="artifacts/test_booking_hunt.py">invented test cases</a> add a positive rotation case, a benign auto-refresh case, and an irregular near miss. They test code behavior, not live traffic.</p>
+<h3>IOCs (sanitized / illustrative)</h3>
+<table>
+<thead>
+<tr>
+<th>Signal</th>
+<th>Value in this case</th>
+<th>How I would use it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Behavioral</td>
+<td>Regular availability polls inside a session, then a same-second reservation pair</td>
+<td>Hunt candidate requiring local baseline and outcome review</td>
+</tr>
+<tr>
+<td>Source IP</td>
+<td><code>ACTOR-IP-A</code>, then <code>ACTOR-IP-B</code></td>
+<td>Case-scoped enrichment only; not a durable blocklist</td>
+</tr>
+<tr>
+<td>User-Agent</td>
+<td><code>python-requests/2.32.5</code>, then browser-claim strings</td>
+<td>Case-scoped context. The claimed browser versions are unusual, but a UA is self-reported and not identity proof.</td>
+</tr>
+</tbody>
+</table>
+<h3>Sigma</h3>
+<p><a href="artifacts/availability_poll_sigma.yml">The Sigma selector</a> matches an availability GET in normalized webserver fields and is labeled informational. A single matching request is ordinary. This rule cannot calculate cadence or join reservation outcomes. It feeds a correlation pipeline that can do both. The selector parsed locally, but its backend mapping still needs validation.</p>
+<h3>Splunk SPL - cadence plus burst correlation</h3>
+<p><a href="artifacts/detection_queries.md">The SPL and KQL templates</a> join endpoint-scoped polling with a same-second POST pair, then calculate interval variation by source and day. Their day partition prevents the overnight gap that broke the first Python attempt. It is an approximation: a real session can cross midnight, and production code should assign an idle-gap session ID. The queries have not been executed in Splunk or Sentinel. Their normalized field names and time handling must be mapped and tested against the actual environment before alerting.</p>
+<h3>Telemetry requirements</h3>
+<p>I need method, path, timestamp with at least one-second precision, source, and a protected account ID. I also want reservation item and application outcome. Standard Combined logs gave me the first four but no account or outcome. If a pipeline rounds timestamps to a minute, it destroys both the exact cadence and same-second burst signals. If a reverse proxy masks the client IP, I need a trusted forwarded-address configuration or an application-level principal instead of treating the proxy as the actor.</p>
+<h3>Tuning</h3>
+<p>The lab uses at least four polls, a ten-minute idle-gap split, <code>CV &lt; 0.05</code>, and a POST pair no more than one second apart within five seconds after the final poll. Those values separated the two labeled sources in this exercise. They are not universal bot thresholds. Auto-refresh pages, monitoring probes, and approved integrations can be regular. A human double-click can create nearby POSTs. Review the account, item, and result before escalation. A same-second pair after regular polling is a stronger combination, but still a triage signal.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow near the top</a> keeps the short three-day sequence visible. It shows why the day-three pivot worked: the two self-reported identifiers changed, while endpoint choice, one-minute cadence, and paired POST timing remained. The <a href="artifacts/README.md">lab guide</a> and each linked file above carry the defensive follow-through. No diagram can fill the log's missing account and outcome fields.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://attack.mitre.org/techniques/T1036/012/">MITRE ATT&amp;CK T1036.012, Browser Fingerprint</a> and <a href="https://attack.mitre.org/techniques/T1499/003/">T1499.003, Application Exhaustion Flood</a> for the accepted analogy and a rejected mapping.</li>
+<li><a href="https://capec.mitre.org/data/definitions/227.html">MITRE CAPEC-227, Sustained Client Engagement</a> and <a href="https://capec.mitre.org/data/definitions/210.html">CAPEC-210, Abuse Existing Functionality</a>.</li>
+<li><a href="https://cwe.mitre.org/data/definitions/799.html">MITRE CWE-799</a> and <a href="https://cwe.mitre.org/data/definitions/770.html">CWE-770</a> for the design review questions.</li>
+<li><a href="https://next.d3fend.mitre.org/technique/d3f%3AResourceAccessPatternAnalysis/">MITRE D3FEND Resource Access Pattern Analysis</a>.</li>
+<li><a href="https://api-security.owasp.org/editions/2023/en/0xa4-unrestricted-resource-consumption/">OWASP API Security Top 10 2023, API4</a>.</li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5</a> and <a href="https://www.cisecurity.org/controls/v8">CIS Controls v8</a>.</li>
+<li><a href="https://sigmahq.io/sigma-specification/specification/sigma-rules-specification.html">Sigma rule specification</a> and <a href="https://sigmahq.io/sigma-specification/specification/sigma-correlation-rules-specification.html">Sigma correlation specification</a>.</li>
+<li><a href="https://requests.readthedocs.io/en/latest/user/advanced/#session-objects">Python requests documentation</a> for the client-library context; the log's User-Agent is still only a claim from the client.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>

@@ -723,5 +723,28 @@
     ],
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/forensics/loopback-http-png-reassembly/"
+  },
+  {
+    "title": "The Booking Client That Kept Its Rhythm",
+    "category": "Forensics",
+    "difficulty": "Easy",
+    "date": "2026-10",
+    "tags": [
+      "http-log-forensics",
+      "cadence-analysis",
+      "behavioral-fingerprinting",
+      "ua-spoofing",
+      "ip-rotation",
+      "business-logic-abuse",
+      "detection-engineering"
+    ],
+    "summary": "A booking client changed its User-Agent, then its IP, but kept polling the same endpoint every sixty seconds before paired reservation requests. I followed the rhythm through three days of HTTP logs.",
+    "aliases": [
+      "booking automation",
+      "Apache access log",
+      "availability polling"
+    ],
+    "status": "Solved-Verified",
+    "url": "/cyber-ops/ctf-writeups/forensics/booking-client-fingerprint/"
   }
 ]

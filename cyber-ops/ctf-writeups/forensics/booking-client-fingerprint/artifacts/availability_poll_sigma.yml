@@ -1,0 +1,18 @@
+title: Scheduling Availability Endpoint Request for Cadence Triage
+id: b8a89f41-30a7-4ccb-b4d2-117ac44aeac0
+status: experimental
+description: Selects availability GET events for downstream cadence and reservation-burst correlation. A single match is benign by itself.
+references:
+  - https://cwe.mitre.org/data/definitions/799.html
+author: AbacusNin
+date: 2026-10-11
+logsource:
+  category: webserver
+detection:
+  selection:
+    cs-method: GET
+    cs-uri-stem: /availability
+  condition: selection
+falsepositives:
+  - Normal browsing, auto-refreshing pages, monitoring probes, and integrations
+level: informational
