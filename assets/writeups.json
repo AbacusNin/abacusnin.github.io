@@ -1023,5 +1023,29 @@
     ],
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/reversing/tampered-elf-static-recovery/"
+  },
+  {
+    "title": "The PNG Behind the Password",
+    "category": "Reversing",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "Mach-O",
+      "ARM64",
+      "repeating-key XOR",
+      "known-plaintext attack",
+      "static analysis",
+      "malware-loader pattern"
+    ],
+    "summary": "I found an XOR-encoded PNG in an ARM64 Mach-O loader and used the fixed PNG header to recover a key candidate. The image could be decoded offline without running the loader.",
+    "aliases": [
+      "embedded PNG",
+      "argv key",
+      "native loader",
+      "known plaintext",
+      "encoded asset"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/reversing/macho-xor-png-loader/"
   }
 ]

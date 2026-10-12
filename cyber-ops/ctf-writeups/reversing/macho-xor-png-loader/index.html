@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The PNG Behind the Password - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="I found an XOR-encoded PNG in an ARM64 Mach-O loader and used the fixed PNG header to recover a key candidate. The image could be decoded offline without running the loader.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/reversing/macho-xor-png-loader/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The PNG Behind the Password">
+  <meta property="og:description" content="I found an XOR-encoded PNG in an ARM64 Mach-O loader and used the fixed PNG header to recover a key candidate. The image could be decoded offline without running the loader.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/reversing/macho-xor-png-loader/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Reversing / <span aria-current="page">The PNG Behind the Password</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The PNG Behind the Password</h1>
+        <p class="lead">The program wanted a password. Its own output filename told me where to look for one.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Recover the PNG hidden inside a native loader binary without supplying its password or executing it.</p>
+<p><strong>What I did.</strong> Type the file, inspect strings and imports, locate the encoded blob, XOR its first bytes with the PNG header, and validate the full decode.</p>
+<p><strong>The result.</strong> I recovered and viewed a PNG containing the flag; the exact key, image, flag, and grading receipt are not retained here.</p>
+<p><strong>The limit.</strong> The loader and decoded image are unavailable for independent replay. Linked defensive proofs of concept use invented bytes and validate only their local logic.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Type the loader; Follow the clues; Locate the blob; XOR the PNG header; Check the full decode">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Type the loader</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Mach-O ARM64 PIE</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Follow the clues</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">PNG name and encrypted symbol</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Locate the blob</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">__TEXT.__const at 0x720</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">XOR the PNG header</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Recover a key prefix</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Check the full decode</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">PNG structure and image</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>At-a-Glance Attack Chain</h2>
+<p>I had a program that would write an image only if given the right argument. It was easier to examine what the program carried than to make it cooperate. The output filename pointed to PNG. The <code>_encrypted</code> symbol pointed to a byte array in <code>__TEXT.__const</code>. PNG supplies 16 known opening bytes, so I could XOR those against the stored bytes and see a readable key prefix. I then checked a candidate key against the entire asset. <a href="#analysis-flow">The flow above</a> follows the work from the outside in.</p>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Reverse Engineering / Applied Cryptanalysis</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>Mach-O, ARM64, repeating-key XOR, known-plaintext attack, static analysis, malware-loader pattern</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved</td>
+</tr>
+<tr>
+<td>Recorded result</td>
+<td>Decoded PNG with flag text; it needed rotation to read</td>
+</tr>
+<tr>
+<td>Verification limit</td>
+<td>No retained binary, exact key, decoded PNG, flag, or platform receipt for independent replay</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/reversing/macho-xor-png-loader/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>The challenge handed me a small native executable. It accepted a password argument and, when that argument worked, wrote a PNG. I needed the image without knowing the password or running the program. The file was a roughly 33 KB ARM64 Mach-O PIE. I had the on-disk image and whatever names the linker left in it. There was no source or network service.</p>
+<p>This shape resembles a loader that hides an asset until it gets a key. The resemblance matters to defenders because an encoded payload can survive static inspection and appear only after an argument or environment value is supplied. Here the protected content was a CTF image. I did not observe a malicious second stage, a victim host, or an adversary deployment.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I started with <code>file</code>, then ran <code>strings -n 6</code> and inspected symbols and imports. The usage text mentioned a password argument; an output name ended in <code>.png</code>; <code>_encrypted</code> named a stored blob. Imports included <code>fopen</code>, <code>fputc</code>, <code>strlen</code>, <code>fclose</code>, <code>fprintf</code>, and <code>perror</code>. I did not see obvious <code>strcmp</code>, <code>memcmp</code>, CommonCrypto, or OpenSSL imports. That absence suggested a small custom routine, but it did not prove how the password was used. A compiler could inline a comparison or resolve functions another way.</p>
+<p>LIEF placed <code>_encrypted</code> in <code>__TEXT.__const</code>. The extraction coordinates recorded for this image were file offset <code>0x720</code> and size <code>0x18B4</code> (6,324 bytes). I treated those as this binary's coordinates, not a Mach-O rule. The output filename made PNG a strong plaintext guess. I XORed the first 16 blob bytes with the PNG signature, fixed <code>IHDR</code> length, and <code>IHDR</code> type. The resulting keystream began as readable ASCII. I used that prefix to choose a repeating-key candidate and decoded the whole blob.</p>
+<p>The decoded bytes had PNG magic, an <code>IHDR</code>, and an <code>IEND</code> trailer with a reported valid CRC. I viewed the image and rotated it to read the flag text. The rotation was a viewing step, not part of the cipher. I did not retain the key, decoded image, exact flag, or a platform acceptance receipt in this case record, so I cannot recheck that final result now.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<h3>3.1 Triage one-liners</h3>
+<p><code>file ./sample</code>, <code>nm -gU ./sample</code> (or <code>llvm-nm -gU</code>), and <code>strings -n 6 ./sample | sort -u</code> supplied the first clues. <code>nm</code> on an unstripped Mach-O and <code>strings</code> on raw bytes can miss names; I treated their output as leads. A <code>Counter</code>-based Shannon entropy calculation is useful for choosing sections to inspect, although I did not record a measured entropy score for this blob. A single high value would not identify encryption: compressed assets can look similar.</p>
+<h3>3.2 Section enumeration via LIEF</h3>
+<p>I used LIEF to walk section names, offsets, sizes, virtual addresses, and named symbols. <code>_encrypted</code> led to the <code>__TEXT.__const</code> bytes at <code>0x720</code> for <code>0x18B4</code> bytes. I checked the file range before reading it. A symbol virtual address is not automatically a file offset; the section or segment mapping supplies that conversion. The <a href="artifacts/xor_png_review.py">review script</a> expects a blob range established this way and checks its bounds. It does not parse the Mach-O itself.</p>
+<h3>3.3 Known-plaintext recovery against a PNG-bearing blob</h3>
+<p>The constant I used was <code>89504e470d0a1a0a0000000d49484452</code>: eight signature bytes, the four-byte length 13, and <code>IHDR</code>. For each opening byte, <code>candidate_keystream[i] = ciphertext[i] XOR known_png[i]</code>. A key of 16 bytes or fewer can be fully observed and checked for repetition in this span. A longer key yields only a prefix. A readable prefix such as <code>exposeTheNega</code> might suggest <code>exposeTheNegative</code>, but that suggestion is a hypothesis until a full-file decode passes checks.</p>
+<p>The <a href="artifacts/xor_png_review.py">bounded PNG reviewer</a> tries periodic candidates up to 16 bytes. It can also test a longer candidate supplied through a local key file. It reports key length without printing the key or its hash. It checks chunk bounds and CRCs, terminal <code>IEND</code>, and a bounded IDAT zlib stream. Its <a href="artifacts/README.md">README</a> explains the remaining image-validation limits and the optional output file.</p>
+<h3>3.4 Fallback: brute-force key length when no known plaintext is available</h3>
+<p>I kept normalized Hamming-distance key-length ranking as a fallback, but I did not need it for this solve. It can suggest repeating periods from a longer ciphertext. It does not by itself recover a key, and frequency scoring aimed at English text is a poor fit for compressed PNG bytes. I would turn to it only after known-format candidates failed and I had enough ciphertext to compare multiple blocks.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<h3>4.1 XOR as a cipher</h3>
+<p>For a repeating key, <code>C[i] = P[i] XOR K[i mod m]</code>. The same XOR operation decodes it. Reuse of key bytes is the weakness here: one known plaintext byte exposes the matching key byte. XOR is useful as an operation, but this particular repeated-key construction did not protect a known-format image from offline inspection and provided no authentication.</p>
+<h3>4.2 The known-plaintext attack</h3>
+<p>I knew the PNG opening bytes and had the corresponding encoded bytes. XORing them gave me the first 16 keystream bytes. If the key period is at most 16, that span covers a whole cycle. A 17-byte phrase such as <code>exposeTheNegative</code> needs one more byte of evidence or an inferred suffix checked against the rest of the file. Readable ASCII helped me choose a candidate; the later PNG checks did the validation work.</p>
+<h3>4.3 Why PNG is the perfect known-plaintext target</h3>
+<p><a href="https://www.w3.org/TR/png-3/">The PNG specification</a> fixes the eight-byte signature, requires <code>IHDR</code> first, and gives <code>IHDR</code> a 13-byte data field. Those facts make the first 16 bytes predictable. The next fields describe dimensions and image format, but they are not fixed across all PNGs. A longer key may be approachable by enumerating plausible dimensions and valid IHDR values, then testing the full decode. I would not assume a guessed width or a human-readable suffix is correct on its own.</p>
+<h3>4.4 The same primitive applies to most container formats</h3>
+<p>The opening of a ZIP local-file record (<code>50 4b 03 04</code>), GZIP stream (<code>1f 8b 08</code>), ELF (<code>7f 45 4c 46</code>), little-endian Mach-O 64 (<code>cf fa ed fe</code>), PE (<code>4d 5a</code>), and PDF (<code>%PDF-</code>) can seed the same XOR check. Their reliable known lengths differ. ELF identification fields vary after the magic; JPEG marker sequences and PDF version bytes vary too. A useful format table marks only bytes the format actually guarantees, then lets parser checks decide the rest.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>The gate relied on a secret argument, but the image's format gave me a way to test the encoding without asking the loader for output. I found the candidate ciphertext by symbol and section location. The <code>.png</code> output name led to a precise 16-byte plaintext guess. I XORed that guess against the first 16 encoded bytes and inspected the keystream for a repeating period or a plausible longer phrase. Then I decoded all 6,324 bytes with a candidate key and checked structure before opening the image.</p>
+<p>This computation is linear in the blob length for each key candidate. It does not prove that the binary compares its argument to a constant, nor that it uses no other transformation. The full decoded structure and visible image supplied the case-specific confirmation. A PNG signature and <code>IEND</code> string alone would have been too weak; chunk lengths and CRCs matter, and an image decoder is still needed to confirm the pixels.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<h3>6.1 What the exercise validated</h3>
+<p>The exported name and the output filename shortened the search. I did not have to start with a full disassembly. The fixed PNG header let me recover key material directly from the encoded blob, and structural checks kept an English-looking prefix from becoming a premature answer.</p>
+<h3>6.2 What the exercise surfaced as gaps</h3>
+<p>I initially leaned too hard on the absence of imported comparison calls. That is a weak negative signal; an inline loop would leave no <code>strcmp</code> import. I also want to retain exact key bytes, image hash, parser result, and submission status next time. Without them, the final solve can be described but not independently replayed.</p>
+<h3>6.3 Operational mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Step here</th>
+<th>Use in a real review</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>File typing, names, and imports</td>
+<td>Cheap orientation before deeper reversing; no conclusion from missing imports alone.</td>
+</tr>
+<tr>
+<td>Section and symbol mapping</td>
+<td>Extract a precise byte range with provenance and bounds.</td>
+</tr>
+<tr>
+<td>Known-format XOR test</td>
+<td>Try a narrow hypothesis without executing an unknown loader.</td>
+</tr>
+<tr>
+<td>CRC and image validation</td>
+<td>Separate a plausible prefix from a useful decoded asset.</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<h3>7.1 Individual practitioner skill development</h3>
+<p>This case joined Mach-O section navigation with a simple cryptanalytic attack. I would repeat it with a stripped binary, a blob whose output type is unknown, and a key longer than the available known prefix. Those variations would force me to distinguish format identification, key-length ranking, and actual validation.</p>
+<h3>7.2 Security operations (SOC, IR, threat hunting)</h3>
+<p>For a suspicious native file, I would preserve its hash and signer, inspect sections and imports, then test extracted large data ranges against likely file headers. High entropy can prioritize a range, but does not prove encryption or maliciousness. A successful known-plaintext decode is a stronger lead. I would still inspect what the decoded file contains and how the program uses it. On an endpoint, process creation followed by a file write can guide collection; telemetry alone does not expose the encoded blob or prove it was decrypted with an argv key.</p>
+<h3>7.3 Intelligence operations</h3>
+<p>If multiple authorized samples decode with the same key or carry the same asset, I would compare their code, section layout, signatures, and provenance before linking them. Reused key text is a useful search pivot, not an attribution verdict. Metadata in a decoded image might offer another lead, but I would inspect actual bytes before claiming EXIF, URLs, or author information. None of those appeared as a verified finding here.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<h3>8.1 Static-first triage decision tree</h3>
+<p>I start with file type, hash, signature, imports, strings, and section ranges. A descriptive symbol or output name gives me a candidate payload format. I extract only the relevant range, test fixed plaintext bytes against it, then validate a full decode. If the path fails, I return to disassembly or a controlled dynamic lab with the failed hypothesis recorded. <a href="artifacts/README.md">The artifact guide</a> documents the local version of the extraction-and-test path.</p>
+<h3>8.2 Format-magic known-plaintext table (drop-in)</h3>
+<p>The <a href="artifacts/xor_png_review.py">review script</a> embeds only the 16-byte PNG constant that this case used. For a broader table I would record a format name, exact fixed prefix, variable fields, and parser to run on a full candidate. ZIP, GZIP, ELF, Mach-O, PE, PDF, and JPEG have useful opening bytes, but few offer 16 unconditional bytes like PNG.</p>
+<h3>8.3 Generic repeating-XOR oracle</h3>
+<p>The reusable operation is short: XOR the selected ciphertext prefix with known plaintext; test candidate key periods; decode the whole blob; parse the result. The script's five <a href="artifacts/test_pocs.py">synthetic tests</a> cover a six-byte periodic key, a 17-byte key supplied after inference, random bytes, a CRC failure, and trailing data. English-frequency scoring remains a possible fallback for text payloads. I would not use it to rank PNG-compressed bytes.</p>
+<h3>8.4 Triage checklist</h3>
+<p>Preserve the binary and its hash. Record file type and architecture, names and imports, section and symbol mapping, blob offset and length, candidate plaintext format, recovered keystream span, complete candidate key test, all chunk and CRC results, actual image render, and result verification. The blob range and key must remain tied to the specific sample. This makes the outcome reviewable without turning an inferred word into proof.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<h3>9.1 MITRE ATT&amp;CK</h3>
+<p>An actual adversary hiding a payload this way would fit <a href="https://attack.mitre.org/techniques/T1027/013/">T1027.013, Encrypted/Encoded File</a>. If a loader decoded the asset at runtime, <a href="https://attack.mitre.org/techniques/T1140/">T1140</a> would describe that adversary-side action. <a href="https://attack.mitre.org/techniques/T1480/">T1480, Execution Guardrails</a> might fit a target-specific argument gate, but this case only establishes an argument used to release an image. I do not assign it as observed attacker behavior.</p>
+<h3>9.2 MITRE D3FEND</h3>
+<p><a href="https://d3fend.mitre.org/technique/d3f%3AFileAnalysis/">D3-FA, File Analysis</a> covers the static review. <a href="https://d3fend.mitre.org/technique/d3f%3AFileContentRules/">D3-FCR, File Content Rules</a> is a route for a future tested file rule. D3-SFA means <em>System File Analysis</em>, so I would not use that ID to label this one-off Mach-O review.</p>
+<h3>9.3 MITRE CAPEC</h3>
+<p><a href="https://capec.mitre.org/data/definitions/97.html">CAPEC-97, Cryptanalysis</a> describes the known-plaintext method. It is an analogy for what I did as an analyst, not evidence that a real attacker used it. I do not need CAPEC-189 or CAPEC-191 to describe the case; the recovered asset was an encoded PNG, not a demonstrated sensitive constant stolen from a deployed executable.</p>
+<h3>9.4 Frameworks not applied</h3>
+<p>I did not find a web application surface for OWASP categories. STRIDE could help design a real product that distributes protected assets, but this challenge gave me a finished binary and a recovery goal, not a design review.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<h3>10.1 STIX 2.1 representation</h3>
+<p>I did not retain a sample hash, exact key, or decoded asset fingerprint that would support a case-specific indicator. If I had those and permission to share, a <a href="https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html">STIX 2.1</a> Indicator could describe a tested file-content pattern with valid IDs, producer, timestamps, confidence, and a precise pattern. A TAXII exchange would require a real collection and recipient. I have neither in this case, so I am not publishing a STIX object.</p>
+<h3>10.2 STIG references</h3>
+<p>The challenge does not establish an in-scope system, applicable STIG release, approved crypto requirement, or assessed implementation. I would select an actual Application Security and Development STIG check only during a review of a deployed application. A sample's custom XOR scheme raises a design concern; it cannot support a CAT finding by itself.</p>
+<h3>10.3 CIS Controls v8</h3>
+<p><a href="https://www.cisecurity.org/controls/cis-controls-navigator/v8">CIS 16.11</a> favors vetted modules or services for application security components. A product trying to keep an embedded asset confidential should review the threat model and key delivery before choosing a vetted authenticated cipher. CIS 3.11 applies when the asset is sensitive data at rest in an enterprise setting; the CTF image is not evidence of that setting. These are design mappings, not controls deployed here.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>11a. Standards Mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Case-fit application</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NIST SP 800-53 SC-12 / SC-13</td>
+<td>Key management and cryptographic protection for a real system with an actual confidentiality requirement.</td>
+<td>Design proposal; no compliance decision.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 SC-28</td>
+<td>Protect sensitive stored content if the product scope requires it.</td>
+<td>Conditional.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 SA-11</td>
+<td>Test the chosen design and implementation.</td>
+<td>Proposed product review.</td>
+</tr>
+<tr>
+<td>CIS 16.11 / 3.11</td>
+<td>Vetted security components; encryption of sensitive data at rest where applicable.</td>
+<td>Conditional design mapping.</td>
+</tr>
+</tbody>
+</table>
+<h3>11b. Mitigation Realization</h3>
+<p>I would first ask who may read the asset and where its decryption key comes from. An asset placed in a binary that every recipient can inspect cannot stay secret merely because the binary asks for a password. If the product has a real confidentiality requirement, use a vetted AEAD implementation and a key-delivery design that does not ship the secret alongside the ciphertext. A human password would need a suitable password-to-key derivation and must withstand offline guessing; Argon2id alone cannot make a weak password strong. Integrity would come from authenticated encryption and separate build/provenance checks as appropriate. Linkage to a library or an AEAD tag alone would not certify a control.</p>
+<p>For a build pipeline, I would add a review gate for homegrown XOR used as a confidentiality control, plus test vectors for the selected design. An ASCII-prefix check could flag a weak example, but it would miss nonprintable keys and many formats. I would not label a passing build "KPA safe." The <a href="artifacts/xor_png_review.py">local reviewer</a> serves analyst triage; it cannot certify a design.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<h3>12.1 IOCs</h3>
+<p>I have no case-specific hash, key, host, or path to share. <code>_encrypted</code>, <code>__TEXT.__const</code>, <code>0x720</code>, and <code>0x18B4</code> are investigative details from this binary, not durable campaign indicators. A future hunt would need file bytes or a trusted extraction from a collected sample. Entropy above 7.0, no crypto imports, and a large const section are hypotheses, not measured traits of this sample.</p>
+<h3>12.2 YARA rule</h3>
+<p>A YARA rule can cheaply select Mach-O files or byte ranges for review, but entropy and missing library names cannot prove repeating XOR. I have not compiled a YARA rule for this case. The <a href="artifacts/xor_png_review.py">tested Python proof of concept</a> checks the actual encoded bytes against a PNG hypothesis and parses the resulting candidate. It still needs a correctly extracted range and analyst interpretation.</p>
+<h3>12.3 Sigma rule</h3>
+<p>A single Sigma process-creation rule cannot join that event to a file-create event, count arguments accurately in every shell quoting case, or show that the argument became a decryption key. I would use process and file telemetry as separate inputs to a backend correlation after validating a shared process identity and event timing. I have not published a standalone Sigma detector that claims the full chain.</p>
+<h3>12.4 SIEM queries</h3>
+<p>The useful normalized event model is <code>process_start(host, process_guid, time, image, argv)</code> followed by <code>file_create(host, process_guid, time, path)</code> within a justified window. Then I would retrieve and inspect the binary and created file. A join only on device or PID can mix processes; a filename extension alone can describe a legitimate utility. SPL path alternatives need explicit grouping, and KQL field names require checking against the actual connector. Without that schema and sample events, I cannot present either as a validated deployment query.</p>
+<h3>12.5 Log source and data pipeline requirements</h3>
+<p>Endpoint process and file events need stable process identity, host identity, ordered timestamps, command-line capture policy, file path, and a way to collect file bytes. The static reviewer needs the exact blob offset and length from a parser or analyst. Its JSON contains a candidate method, key length, blob fingerprint, PNG dimensions, chunk list, and review result. No macOS or SIEM events were provided to validate a live correlation.</p>
+<h3>12.6 Detection engineering notes</h3>
+<p>The <a href="artifacts/test_pocs.py">invented test cases</a> cover a positive short-key decode, a longer candidate-key path, random benign bytes, corrupted CRC, and trailing data. Five tests passed locally. They do not measure false positives or prove the original loader's behavior. Legitimate applications can embed encoded or compressed assets; an alert would need signer, source, expected product behavior, and the decoded content reviewed together.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow above</a> keeps the important sequence visible: hints in the native file led to a byte range, then a fixed PNG header led to a key candidate, then the whole image had to pass checks. A defensive deployment would add collection and review around those steps. The case did not test an endpoint rule or a production crypto redesign.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://www.w3.org/TR/png-3/">W3C PNG Specification, Third Edition</a>, for signature, IHDR, chunk CRC, IDAT, and IEND rules.</li>
+<li><a href="https://attack.mitre.org/techniques/T1027/013/">MITRE ATT&amp;CK T1027.013</a>, <a href="https://attack.mitre.org/techniques/T1140/">T1140</a>, and <a href="https://attack.mitre.org/techniques/T1480/">T1480</a>, for conditional adversary analogies.</li>
+<li><a href="https://d3fend.mitre.org/technique/d3f%3AFileAnalysis/">MITRE D3FEND File Analysis</a> and <a href="https://d3fend.mitre.org/technique/d3f%3AFileContentRules/">File Content Rules</a>.</li>
+<li><a href="https://capec.mitre.org/data/definitions/97.html">MITRE CAPEC-97</a>, for the cryptanalysis pattern.</li>
+<li><a href="https://www.cisecurity.org/controls/cis-controls-navigator/v8">CIS Controls v8 Navigator</a>, for Safeguards 3.11 and 16.11.</li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5</a>, for SC-12, SC-13, SC-28, and SA-11.</li>
+<li><a href="https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html">OASIS STIX 2.1</a>, for indicator requirements.</li>
+<li><a href="https://lief.re/doc/latest/formats/macho/index.html">LIEF documentation</a>, for Mach-O section and symbol inspection.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
