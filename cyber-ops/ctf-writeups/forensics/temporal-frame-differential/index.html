@@ -1,0 +1,1025 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Message Between the Frames - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="A 25-second static video looked like independent noise. Comparing frames two apart exposed a repeated glyph mask and the 25-character message it carried.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/temporal-frame-differential/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Message Between the Frames">
+  <meta property="og:description" content="A 25-second static video looked like independent noise. Comparing frames two apart exposed a repeated glyph mask and the 25-character message it carried.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/temporal-frame-differential/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Forensics / <span aria-current="page">The Message Between the Frames</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Message Between the Frames</h1>
+        <p class="lead">I spent too long treating this video like a file container. The useful question was whether any two frames had a relationship.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Recover a concealed 25-character string from a 300x300 static video with no audio.</p>
+<p><strong>What I did.</strong> I checked the container and pixel distribution, abandoned a file-container hypothesis, scanned frame pairs for correlation, then used their XOR masks and structural checks to read the glyphs.</p>
+<p><strong>The result.</strong> The recorded solve recovered a 25-character candidate. Independent replay confirmed the frame geometry, 25 glyph windows, and repeated XOR masks; no submission receipt is present here.</p>
+<p><strong>The limit.</strong> The candidate string is withheld. The offline scanner is a triage proof of concept tested on synthetic cases and the supplied carrier; it has not been measured on production media.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Triage the video; Test file-container idea; Compare frame pairs; Segment the cadence; Read exact masks; Check the reading">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Triage the video</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">300x300 static at 60 fps</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Test file-container idea</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">No padded tail or magic</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Compare frame pairs</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">500 hits at offset two</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Segment the cadence</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">25 nonzero windows</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Read exact masks</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Glyphs repeat within windows</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Check the reading</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">OCR needs human review</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Video forensics / steganalysis</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Hard</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>steganography, video forensics, steganalysis, all-intra, frame differential, XOR accumulation, correlation scan, OCR cross-validation</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved-Verified</td>
+</tr>
+<tr>
+<td>Recorded result</td>
+<td>The 1,500 frames resolve into 500 triplets. Twenty-five nonzero windows carry repeated glyph masks; the case record reports a 25-character read.</td>
+</tr>
+<tr>
+<td>Evidence boundary</td>
+<td>I replayed the supplied carrier's geometry, frame differences, and mask equality. The character read and challenge acceptance were not independently established here.</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/temporal-frame-differential/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>Solve Process Flow</h2>
+<pre><code class="language-mermaid">flowchart TD
+    ST1[&quot;ST.1 triage - ffprobe, atom parse&lt;br/&gt;out: 300x300, 1500 frames, all-I, pristine container&quot;] --&gt; ST2[&quot;ST.2 extract - ffmpeg rawvideo gray&lt;br/&gt;out: 1500 x 90000 luma&quot;]
+    ST2 --&gt; ST3[&quot;ST.3 histogram - verify_bit_depth()&lt;br/&gt;out: mid-band 0.000% =&gt; 1 bpp&quot;]
+    ST3 -. reject .-&gt; ST3a[&quot;ST.3a temporal stats family&lt;br/&gt;mean/var/skew/FFT/slit-scan&lt;br/&gt;zero-mean carrier - dead end&quot;]
+    ST3 -. reject .-&gt; ST4a[&quot;ST.4a bit-planes, per-frame anomaly&lt;br/&gt;all planes random - dead end&quot;]
+    ST3 -. reject .-&gt; ST5a[&quot;ST.5a metadata, strings, magic, entropy&lt;br/&gt;stock encoder tag - dead end&quot;]
+    ST3 --&gt; ST7a[&quot;ST.7a HYPOTHESIS: static IS an encoded file&lt;br/&gt;bin2video/StaticMaker family&quot;]
+    ST7a -. reject .-&gt; ST7b[&quot;ST.7b deflate + magic sweep&lt;br/&gt;5 orient x 2 pol x 2 order x 8 shift&lt;br/&gt;zero hits - dead end&quot;]
+    ST7a --&gt; ST8{&quot;ST.8 FALSIFIER: padding tail?&lt;br/&gt;every frame ~50%, no tail&quot;}
+    ST8 -. pivot .-&gt; ST9[&quot;ST.9 relatedness scan - frame_relatedness_scan()&lt;br/&gt;Gram matrix, analytic floor 1/sqrt(m)&lt;br/&gt;out: 500 pairs, offset +2&quot;]
+    ST9 --&gt; ST10[&quot;ST.10 hash frames - md5 packbits&lt;br/&gt;out: 500 triplets, 251 ABA / 249 ABC&quot;]
+    ST10 -. reject .-&gt; ST11a[&quot;ST.11a read ABA/ABC as 500-bit payload&lt;br/&gt;periodic 10/10 = blanking clock - dead end&quot;]
+    ST10 --&gt; ST12[&quot;ST.12 popcount - segment_runs()&lt;br/&gt;out: 0 or run-constant magnitude&quot;]
+    ST12 --&gt; ST13[&quot;ST.13 run segment&lt;br/&gt;out: 25 glyph windows, 1 per second&quot;]
+    ST13 --&gt; ST14[&quot;ST.14 compare exact XOR masks, then render&lt;br/&gt;out: 25 glyph masks&quot;]
+    ST14 --&gt; ST15[&quot;ST.15 read - tesseract + cross_validate()&lt;br/&gt;out: candidate string&quot;]
+    ST15 --&gt; ST16([&quot;ST.16 check - 15 repeated positions constrained&quot;])
+</code></pre>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I received one file, <code>static.mp4</code>: a 300x300 video at 60 fps for 25 seconds, with 1,500 frames and no audio. It looked like television static. I needed to recover a concealed 25-character string. The prompt's "static analysis" pun gave me a theme, but it did not tell me where the string lived.</p>
+<p>This was a puzzle, with no observed adversary. For defensive work, I would treat it as an example of media steganalysis on a file at rest. <a href="https://attack.mitre.org/techniques/T1027/003/">MITRE ATT&amp;CK T1027.003</a> includes video among possible carriers. A DFIR analyst who receives a suspicious attachment or file from a share may face the same constraints I did: the file itself, with no host or network record and no known embedding tool.</p>
+<p>The useful information appeared when I compared frames. Each frame alone looked like a roughly balanced binary noise field. The repeated relationship between frames gave the puzzle away.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I inspected a media file offline. There was no program to execute or live service to query. My validation came from decoding the frames and comparing their pixels.</p>
+<p>I first chased a file-container explanation. It cost me several tests. The log below keeps that wrong turn because the reason I abandoned it matters as much as the final XOR operation.</p>
+<pre><code class="language-text">ST.1  [triage]     container/codec characterization - ffprobe, custom atom parser
+                   in: static.mp4 -&gt; out: 300x300, 60fps, 1500 frames, mpeg4 Part 2,
+                   has_b_frames=0, nb_streams=1, standard atom tree, no container slack
+                   result: accept (hypothesis space bounded)
+ST.2  [extract]    decode to raw luma - ffmpeg -pix_fmt gray
+                   in: static.mp4 -&gt; out: 1500 x 300 x 300 uint8 (135,000,000 bytes)
+                   result: accept (byte count == frames*w*h, no drops)
+ST.3  [analyze]    value histogram - verify_bit_depth()
+                   in: 4 sampled frames -&gt; out: mid-band 112-143 = 0.000%, peaks at 0 and 255
+                   result: accept (near-binary luma; compare after thresholding)
+ST.3a [reject]     temporal statistics family - numpy: mean over all/first-12/first-30/sliding,
+                   variance, std, skew, kurtosis, per-pixel temporal FFT, 2D spatial FFT,
+                   slit-scan, temporal median, frac-white
+                   why rejected: all returned noise or low-frequency DCT DC-drift blobs.
+                   Structurally doomed - the carrier is zero-mean (dead end)
+ST.4a [reject]     all 8 bit-planes; per-frame chi-square/std/smoothness anomaly hunt
+                   why rejected: every plane random across time (var 0.25); no outlier frame
+                   (smoothness 247 +/- 0.67 across all 1500) (dead end)
+ST.5a [reject]     metadata, strings, embedded-file magic scan, entropy sliding window,
+                   MPEG-4 bitstream start codes (B2/B0/B5) - exiftool, ffprobe, custom
+                   why rejected: stock encoder tags only; no embedded files; entropy uniform
+                   ~7.8; only standard VOL-header extradata (dead end)
+ST.7a [hypothesis] &quot;the static IS an encoded binary file&quot; - bin2video/StaticMaker family
+                   in: 1 bpp finding -&gt; out: reference decoder built from source
+                   result: REJECT (see ST.8)
+ST.7b [reject]     raw DEFLATE / zlib / gzip / magic recovery across bit alignments
+                   5 orientations x 2 polarities x 2 bit orders x 8 bit-shifts x 9 window-bits
+                   why rejected: zero decompression hits, zero magic hits (dead end)
+ST.8  [falsify]    padding/uniform-tail discriminator - numpy
+                   in: thresholded bits -&gt; out: per-frame density 0.4940..0.5054 across ALL
+                   frames; final frame trailing constant run = 4 px
+                   result: PIVOT -&gt; ST.9. This contradicts the padded reference decoder tested
+ST.9  [pivot]      technique-agnostic linear relatedness scan - frame_relatedness_scan()
+                   in: 1500 x 20000 subsampled bits -&gt; out: 500 pairs &gt; 6 sigma, ALL at
+                   offset +2; max |corr| 1.0000 vs analytic floor 0.0071
+                   result: accept (the pivot: a frame-pair relation)
+ST.10 [structure]  exact frame hashing - md5(np.packbits)
+                   in: thresholded frames -&gt; out: 1249 unique of 1500; 500 triplets:
+                   251 ABA (A==C exactly), 249 ABC
+                   result: accept
+ST.11a [reject]    read the ABA/ABC sequence as a 500-bit payload
+                   why rejected: run-length decodes to (1,11),(0,10),(1,10),(0,10)... -
+                   a strictly periodic 1 Hz blanking cadence carrying no information.
+                   Payload is one level down, in the MAGNITUDE of the nonzero differences
+                   (dead end - and a near-repeat of the ST.7a failure mode)
+ST.12 [measure]    per-triplet Hamming distance - segment_runs()
+                   in: triplets -&gt; out: 0 (x251) or 2684..12183 (x249)
+                   result: accept
+ST.13 [segment]    run-length segmentation on RAW distance
+                   in: distances -&gt; out: 50 runs alternating; 25 nonzero runs of ~10 triplets,
+                   each holding ONE repeated popcount (9946 x10, 6505 x10, ...)
+                   result: accept (replayed XOR masks are identical within all 25 glyph runs)
+ST.14 [recover]    compare XOR masks, then render with blur for legibility
+                   in: 25 runs -&gt; out: 25 exact repeated glyph masks
+                   result: accept
+ST.15 [read]       OCR + equivalence-class cross-validation - tesseract --psm 10,
+                   cross_validate()
+                   in: 25 masks + popcounts -&gt; out: candidate string
+                   result: accept (OCR alone was wrong on 5 of 25 - see §6)
+ST.16 [verify]     full consistency check - cross_validate()
+                   in: candidate + 25 popcounts -&gt; out: 0 conflicts, 1 declared mirror-pair
+                   result: 25-character candidate; 10 singleton positions still need visual reading
+</code></pre>
+<h3>Tool / Code Timeline</h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Phase</th>
+<th>Tool / Code</th>
+<th>Artifact ref</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ST.1</td>
+<td>triage</td>
+<td><code>ffprobe</code>, custom atom parser</td>
+<td>-</td>
+</tr>
+<tr>
+<td>ST.2</td>
+<td>extract</td>
+<td><code>ffmpeg -pix_fmt gray</code></td>
+<td><code>solve_temporal_xor.py:extract_luma()</code></td>
+</tr>
+<tr>
+<td>ST.3</td>
+<td>analyze</td>
+<td>numpy histogram</td>
+<td><code>solve_temporal_xor.py:verify_bit_depth()</code></td>
+</tr>
+<tr>
+<td>ST.3a-ST.5a</td>
+<td>reject</td>
+<td>numpy, exiftool, ffprobe</td>
+<td>- (dead ends)</td>
+</tr>
+<tr>
+<td>ST.7a-ST.7b</td>
+<td>reject</td>
+<td><code>cc</code>, reference decoder, zlib</td>
+<td>- (dead ends)</td>
+</tr>
+<tr>
+<td>ST.8</td>
+<td>falsify</td>
+<td>numpy</td>
+<td>-</td>
+</tr>
+<tr>
+<td>ST.9</td>
+<td>pivot</td>
+<td>numpy BLAS sgemm</td>
+<td><code>solve_temporal_xor.py:frame_relatedness_scan()</code></td>
+</tr>
+<tr>
+<td>ST.10</td>
+<td>structure</td>
+<td>hashlib</td>
+<td>-</td>
+</tr>
+<tr>
+<td>ST.12-ST.13</td>
+<td>segment</td>
+<td>numpy, itertools.groupby</td>
+<td><code>solve_temporal_xor.py:segment_runs()</code></td>
+</tr>
+<tr>
+<td>ST.14</td>
+<td>recover</td>
+<td>numpy, PIL</td>
+<td><code>solve_temporal_xor.py:accumulate_glyph()</code></td>
+</tr>
+<tr>
+<td>ST.15-ST.16</td>
+<td>read/verify</td>
+<td>tesseract, custom</td>
+<td><code>solve_temporal_xor.py:cross_validate()</code></td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>I wrote the solver below to derive the period and offset from correlated frame pairs. It reproduces the recorded triplet geometry and glyph windows. I also built a separate <a href="./artifacts/frame_relation_review.py">offline frame-relation reviewer</a> for defensive triage. Its <a href="./artifacts/README.md">usage and test notes</a> describe the input it expects and the benign duplicate-frame case.</p>
+<pre><code class="language-python">#!/usr/bin/env python3
+&quot;&quot;&quot;
+Temporal XOR / frame-differential steganography recovery.
+
+Recovers a glyph sequence hidden in the RELATIONSHIP between frames of an
+all-intra binary-noise video. Nothing is visible in any single frame and
+nothing useful appeared in the frame averages I tried. The payload exists in the XOR of frame pairs
+at a fixed temporal offset.
+
+Usage:
+  python3 solve_temporal_xor.py -i static.mp4 -o out/ --width 300 --height 300
+
+Requires: ffmpeg in PATH, numpy, pillow. ffprobe is needed if geometry is not supplied.
+Tesseract is optional.
+&quot;&quot;&quot;
+
+import argparse, itertools, json, os, shutil, subprocess, sys
+import numpy as np
+from PIL import Image, ImageFilter, ImageOps
+
+
+def probe(path):
+    &quot;&quot;&quot;Read geometry from the container rather than assuming it.&quot;&quot;&quot;
+    cmd = [&quot;ffprobe&quot;, &quot;-v&quot;, &quot;error&quot;, &quot;-select_streams&quot;, &quot;v:0&quot;,
+           &quot;-show_entries&quot;, &quot;stream=width,height,nb_frames,has_b_frames&quot;,
+           &quot;-of&quot;, &quot;json&quot;, path]
+    d = json.loads(subprocess.run(cmd, capture_output=True, text=True,
+                                  check=True, timeout=30).stdout)
+    s = d[&quot;streams&quot;][0]
+    return int(s[&quot;width&quot;]), int(s[&quot;height&quot;]), int(s.get(&quot;nb_frames&quot;, 0) or 0)
+
+
+def extract_luma(path, w, h):
+    &quot;&quot;&quot;Decode to raw grayscale for the binary-luma comparison.&quot;&quot;&quot;
+    if w &gt; 1024 or h &gt; 1024 or os.path.getsize(path) &gt; 100_000_000:
+        raise ValueError(&quot;carrier exceeds this review script's size limits&quot;)
+    cap = min(3000, 500_000_000 // (w * h))
+    cmd = [&quot;ffmpeg&quot;, &quot;-v&quot;, &quot;error&quot;, &quot;-i&quot;, path, &quot;-frames:v&quot;, str(cap),
+           &quot;-f&quot;, &quot;rawvideo&quot;, &quot;-pix_fmt&quot;, &quot;gray&quot;, &quot;-&quot;]
+    raw = subprocess.run(cmd, capture_output=True, check=True, timeout=90).stdout
+    if len(raw) &gt; 500_000_000 or len(raw) % (w * h):
+        raise ValueError(&quot;decoded byte count exceeds limit or frame geometry&quot;)
+    n = len(raw) // (w * h)
+    if n &gt; 3000:
+        raise ValueError(&quot;too many frames for this review script&quot;)
+    return np.frombuffer(raw, dtype=np.uint8).reshape(n, h, w)
+
+
+def verify_bit_depth(frames, sample=4):
+    &quot;&quot;&quot;
+    Confirm 1 bpp BEFORE thresholding. The claim that matters is not &quot;0 and 255
+    are common&quot; but &quot;the decision boundary is sparsely occupied.&quot; Check
+    thresholded pair equality separately; a sample histogram proves neither
+    losslessness nor the behavior of every frame.
+    &quot;&quot;&quot;
+    idx = np.linspace(0, len(frames) - 1, sample).astype(int)
+    c = np.bincount(frames[idx].reshape(-1), minlength=256).astype(float)
+    tot = c.sum()
+    return {&quot;mid_band_112_143_pct&quot;: 100 * c[112:144].sum() / tot,
+            &quot;low_0_15_pct&quot;: 100 * c[0:16].sum() / tot,
+            &quot;high_240_255_pct&quot;: 100 * c[240:256].sum() / tot}
+
+
+def frame_relatedness_scan(bits, sample_size=20000, sigma=6.0, seed=0):
+    &quot;&quot;&quot;
+    Technique-agnostic linear-correlation screen over sampled frame pairs.
+    It does not detect every possible relation. Map {0,1} -&gt; {-1,+1} and take a normalized
+    Gram matrix; for independent uniform bits the off-diagonal has mean 0 and
+    std 1/sqrt(m) under the independent fair-bit model. The threshold is a
+    screening choice; corpus false positives still need measurement.
+    &quot;&quot;&quot;
+    rng = np.random.default_rng(seed)
+    idx = rng.choice(bits.shape[1], min(sample_size, bits.shape[1]), replace=False)
+    X = (bits[:, idx].astype(np.float32) * 2 - 1) / np.sqrt(len(idx))
+    C = X @ X.T
+    np.fill_diagonal(C, 0.0)
+    floor = 1.0 / np.sqrt(len(idx))
+    hits = [(i, j, float(C[i, j]))
+            for i, j in zip(*np.where(np.abs(C) &gt; sigma * floor)) if i &lt; j]
+    return hits, floor
+
+
+def infer_geometry(hits, n_frames):
+    &quot;&quot;&quot;Derive (period, offset) from the hits instead of assuming a triplet.&quot;&quot;&quot;
+    if not hits:
+        return None, None
+    offs = [j - i for i, j, _ in hits]
+    offset = int(np.bincount(offs).argmax())
+    starts = sorted(i for i, j, _ in hits if j - i == offset)
+    if len(starts) &lt; 2:
+        return None, offset
+    diffs = np.diff(starts)
+    period = int(np.bincount(diffs).argmax()) if len(diffs) else None
+    if period and n_frames % period != 0:
+        for p in range(1, 13):
+            if n_frames % p == 0 and p &gt; offset:
+                period = p
+                break
+    return period, offset
+
+
+def segment_runs(bits, period, offset):
+    &quot;&quot;&quot;
+    Group-wise XOR popcount, then run-length segment on the RAW distance.
+    Collapsing to a zero/nonzero predicate first would preserve only the
+    blanking cadence and destroy the per-character fingerprint.
+    &quot;&quot;&quot;
+    n_groups = bits.shape[0] // period
+    d = [int(np.count_nonzero(bits[period * t] != bits[period * t + offset]))
+         for t in range(n_groups)]
+    runs = []
+    for value, grp in itertools.groupby(enumerate(d), key=lambda x: x[1]):
+        grp = list(grp)
+        runs.append((value, grp[0][0], len(grp)))
+    return d, runs
+
+
+def accumulate_glyph(bits3d, period, offset, start, length, blur=2.0, rel_thresh=0.35):
+    &quot;&quot;&quot;
+    Render the repeated XOR mask for OCR. In this carrier, each XOR is the
+    same exact mask within a glyph run. Blurring helps OCR but does not recover
+    a signal missing from a single pair.
+    &quot;&quot;&quot;
+    h, w = bits3d.shape[1], bits3d.shape[2]
+    acc = np.zeros((h, w), np.float32)
+    for t in range(start, start + length):
+        acc += (bits3d[period * t] ^ bits3d[period * t + offset])
+    acc /= max(length, 1)
+    im = Image.fromarray((acc * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(blur))
+    a = np.array(im, dtype=np.float32)
+    peak = a.max() if a.max() &gt; 0 else 1.0
+    return ((a &gt; peak * rel_thresh) * 255).astype(np.uint8)
+
+
+def cross_validate(candidate, distances):
+    &quot;&quot;&quot;
+    In this carrier, exact XOR masks repeat within each glyph window. A repeated
+    character should map to one popcount, but different glyphs can collide.
+    Brace mirrors are one plausible collision, not a uniqueness proof.
+
+    LIMITATION (see writeup §6): this constrains REPEATED characters only.
+    A character appearing exactly once is unconstrained -- the check is a
+    consistency test, not a uniqueness proof.
+    &quot;&quot;&quot;
+    if len(candidate) != len(distances):
+        return False, [&quot;length mismatch&quot;]
+    fwd, rev, conflicts = {}, {}, []
+    for ch, dist in zip(candidate, distances):
+        fwd.setdefault(dist, set()).add(ch)
+        rev.setdefault(ch, set()).add(dist)
+    for dist, chars in sorted(fwd.items()):
+        if len(chars) &gt; 1 and chars != {&quot;{&quot;, &quot;}&quot;}:
+            conflicts.append(&quot;popcount %d -&gt; %s&quot; % (dist, sorted(chars)))
+    for ch, ds in rev.items():
+        if len(ds) &gt; 1:
+            conflicts.append(&quot;char %r -&gt; %s&quot; % (ch, sorted(ds)))
+    return not conflicts, conflicts
+
+
+def ocr_glyph(mask, path):
+    &quot;&quot;&quot;OCR is a NOISY channel here; never trust it standalone (see writeup §6).&quot;&quot;&quot;
+    im = Image.fromarray(255 - mask)
+    ImageOps.expand(im, 60, 255).save(path)
+    if not shutil.which(&quot;tesseract&quot;):
+        return &quot;&quot;
+    wl = (&quot;abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ&quot;
+          &quot;0123456789_{}!@#$%^&amp;*&quot;)
+    r = subprocess.run([&quot;tesseract&quot;, path, &quot;stdout&quot;, &quot;--psm&quot;, &quot;10&quot;,
+                        &quot;-c&quot;, &quot;tessedit_char_whitelist=&quot; + wl],
+                       capture_output=True, text=True)
+    return r.stdout.strip().replace(&quot; &quot;, &quot;&quot;)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument(&quot;-i&quot;, &quot;--input&quot;, required=True)
+    ap.add_argument(&quot;-o&quot;, &quot;--outdir&quot;, default=&quot;out&quot;)
+    ap.add_argument(&quot;--sample&quot;, type=int, default=20000)
+    ap.add_argument(&quot;--sigma&quot;, type=float, default=6.0)
+    ap.add_argument(&quot;--width&quot;, type=int)
+    ap.add_argument(&quot;--height&quot;, type=int)
+    a = ap.parse_args()
+    os.makedirs(a.outdir, exist_ok=True)
+
+    if (a.width is None) != (a.height is None):
+        ap.error(&quot;supply both --width and --height or neither&quot;)
+    w, h = (a.width, a.height) if a.width else probe(a.input)[:2]
+    frames = extract_luma(a.input, w, h)
+    print(&quot;[+] %d frames of %dx%d&quot; % (len(frames), w, h))
+
+    depth = verify_bit_depth(frames)
+    print(&quot;[+] sampled mid-band 112-143: %.3f%%  (verify pair equality separately)&quot;
+          % depth[&quot;mid_band_112_143_pct&quot;])
+    if depth[&quot;mid_band_112_143_pct&quot;] &gt; 5.0:
+        print(&quot;[!] boundary not empty -- thresholding will inject errors&quot;)
+
+    bits3d = (frames &gt;= 128).astype(np.uint8)
+    bits = bits3d.reshape(len(frames), -1)
+
+    hits, floor = frame_relatedness_scan(bits, a.sample, a.sigma)
+    print(&quot;[+] relatedness: %d pairs &gt; %.1f sigma (floor %.4f)&quot; % (len(hits), a.sigma, floor))
+    if not hits:
+        print(&quot;[!] no related frames under this sampled linear-correlation test&quot;)
+        return 1
+
+    period, offset = infer_geometry(hits, len(frames))
+    print(&quot;[+] inferred geometry: period=%s offset=%s&quot; % (period, offset))
+    if not period:
+        return 1
+
+    d, runs = segment_runs(bits, period, offset)
+    glyph_runs = [r for r in runs if r[0] != 0]
+    print(&quot;[+] %d runs, %d glyph windows&quot; % (len(runs), len(glyph_runs)))
+
+    masks, dists, ocr = [], [], []
+    for k, (dist, start, length) in enumerate(glyph_runs):
+        m = accumulate_glyph(bits3d, period, offset, start, length)
+        masks.append(m); dists.append(dist)
+        ocr.append(ocr_glyph(m, os.path.join(a.outdir, &quot;g%02d.png&quot; % k)))
+
+    cols = min(13, len(masks)) or 1
+    rows = (len(masks) + cols - 1) // cols
+    cell = 120
+    grid = Image.new(&quot;L&quot;, (cell * cols, cell * rows), 0)
+    for i, m in enumerate(masks):
+        grid.paste(Image.fromarray(m).resize((cell, cell), Image.LANCZOS),
+                   ((i % cols) * cell, (i // cols) * cell))
+    grid.save(os.path.join(a.outdir, &quot;glyphs.png&quot;))
+
+    print(&quot;[+] popcounts: %s&quot; % dists)
+    print(&quot;[+] OCR (UNRELIABLE alone): %r&quot; % &quot;&quot;.join(ocr))
+    print(&quot;[+] %d distinct popcounts over %d glyphs -- repeated counts need visual review&quot;
+          % (len(set(dists)), len(dists)))
+    return 0
+
+
+if __name__ == &quot;__main__&quot;:
+    sys.exit(main())
+</code></pre>
+<p>The recorded solver output (with the candidate withheld) was:</p>
+<pre><code class="language-text">[+] 1500 frames of 300x300
+[+] sampled mid-band 112-143: 0.000%  (verify pair equality separately)
+[+] relatedness: 500 pairs &gt; 6.0 sigma (floor 0.0071)
+[+] inferred geometry: period=3 offset=2
+[+] 50 runs, 25 glyph windows
+[+] popcounts: [9946, 6505, 8098, 7348, 6529, 8098, 8991, ...]
+[+] OCR (UNRELIABLE alone): '[withheld]'
+[+] 17 distinct popcounts over 25 glyphs -- repeats are repeated chars
+</code></pre>
+<p>For the codec check at ST.1, I used:</p>
+<pre><code class="language-bash">ffprobe -v error -select_streams v -show_entries frame=pict_type -of csv=p=0 static.mp4 \
+  | sort | uniq -c
+# 1500 I   &lt;- all-intra: no motion vectors, no B-frames, no inter-frame residuals
+</code></pre>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<h3>The carrier</h3>
+<p>After decoding, the luma is almost a binary field. Each 300x300 frame has 90,000 pixels, with roughly half on each side of 128. MPEG-4 Part 2 introduces values around the extremes. The four frames sampled in the original check contained <strong>zero pixels in 112-143</strong>. Across all 1,500 decoded frames, I counted <strong>493 mid-band pixels out of 135 million</strong>. That is a tiny fraction, but the four-frame sample should not have been described as a universal empty boundary. The 251 exact A/C pairs below show that thresholding preserved those pairs' equality in this decode; they do not prove every source bit survived compression.</p>
+<h3>The embedding</h3>
+<p>I grouped frames into triplets <code>(A, B, C)</code>. In a blank triplet, thresholded <code>C</code> equals <code>A</code>. In a glyph triplet, <code>A XOR C</code> yields a glyph-shaped mask. <code>B</code> acts as unrelated filler. I initially described <code>C</code> as independently rerandomized inside the glyph. The decoded frames contradict that: <strong>all XOR masks within each of the 25 glyph windows are exactly identical</strong>, including their pixel positions. In this file, <code>C</code> is better described as a deterministic toggle of the mask on <code>A</code>.</p>
+<p>The payload is therefore:</p>
+<pre><code class="language-text">XOR(A, C) = 0                        in blank triplets
+XOR(A, C) = fixed glyph mask         in each glyph window
+</code></pre>
+<h3>Why this defeats every standard steganalysis reflex</h3>
+<p>This explains why so many of my first tests went nowhere.</p>
+<p><strong>Frame averaging failed here.</strong> I averaged raw frames, expecting the noise to settle and a persistent picture to appear. Instead the average approached a flat gray field. That operation discarded the pair identity I needed. Averaging the <strong>XOR masks</strong>, by contrast, preserves the glyph, though one pair is enough in this carrier.</p>
+<p><strong>Per-frame statistics gave me no lead.</strong> White-pixel density across all 1,500 frames ranged from 0.4940 to 0.5054. None crossed my broad 0.45-0.55 check. That observation describes this file; it does not establish that every possible per-frame detector would fail.</p>
+<p><strong>Entropy did not distinguish my hypotheses.</strong> The packed bitstream measured 7.997 bits per byte. Compressed material and random material can both look like that. I treated the number as confirmation for too long.</p>
+<p><strong>My byte-signature sweep found nothing.</strong> I checked five orientations, two polarities, two bit orders, eight shifts, and nine zlib window settings, with no magic or decompression hit. This rules out those tested layouts. It does not rule out every possible intra-frame encoding.</p>
+<p>The decisive structure was in <strong>which two frames I compared</strong>. A global mean or histogram threw that pairing away. Once I kept frame order and tested relationships directly, the signal was large.</p>
+<h3>The detection primitive that does work</h3>
+<p>I mapped sampled bits from <code>{0,1}</code> to <code>{-1,+1}</code> and compared frame vectors with a normalized dot product. Under an independent fair-bit model, a pair has expected correlation near zero and standard deviation <code>1/sqrt(m)</code>. With <code>m = 20,000</code>, that scale is about <code>0.0071</code>; the strong pairs reached <code>1.0000</code>. The <code>6/sqrt(m)</code> cutoff is a useful screen, but I would measure false positives on a real media set before treating it as calibrated detection.</p>
+<p>The test made fewer assumptions about the embedding than my container decoder did. It still has a boundary: a linear correlation screen will miss some nonlinear relationships. Here it found 500 related pairs, all at lag two.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<h3>The invariant that was violated</h3>
+<p>I tested the video's apparent story: 1,500 independent frames of random static. Its per-frame balance looked plausible. Its pairwise behavior did not. Five hundred frame pairs at lag two passed the relatedness threshold. The exact mask repetitions within glyph windows make the dependence even clearer. Ordinary animation can also repeat frames, so the relation is an investigation lead, not a verdict by itself.</p>
+<h3>Derivation</h3>
+<p><strong>Step 1 - establish the bit field (ST.3).</strong> I thresholded decoded luma at 128 after checking the distribution. Four sampled frames had no 112-143 values; the full decode had 493. I then checked equality and XOR behavior on the thresholded frames rather than assuming a globally lossless reconstruction.</p>
+<p><strong>Step 2 - challenge the specific file-container model (ST.8).</strong> The reference decoder I was following expected a padded tail. The final frame ended with a constant run of only <strong>4 pixels</strong>, while every frame stayed near 50% white. That contradicted this implementation's expected layout. It did not exclude all schemes that hide files in video.</p>
+<p><strong>Step 3 - detect relatedness (ST.9).</strong> The sampled correlation scan found 500 pairs at offset <code>+2</code>, repeating every three frames. That gave me the triplet structure <code>(A, B, C)</code>.</p>
+<p><strong>Step 4 - recover exact structure (ST.10).</strong> I hashed the <strong>thresholded</strong> frames and counted 251 <code>ABA</code> triplets, 249 <code>ABC</code> triplets, and 1,249 unique frames. "Exact" here means exact after decoding and thresholding at 128; the classification depends on that representation.</p>
+<p><strong>Step 5 - separate clock from payload (ST.11a -&gt; ST.12).</strong> I briefly treated the <code>ABA</code>/<code>ABC</code> sequence as 500 payload bits. Its runs were <code>(1,11),(0,10),(1,10),(0,10)...</code>. Twenty triplets take <strong>one second</strong> at 60 fps. That regularity showed a blanking clock. The nonzero windows carried the glyph information in their XOR masks and Hamming distances.</p>
+<p><strong>Step 6 - segment (ST.13).</strong> I kept each raw Hamming distance and found 25 nonzero windows: 24 held ten triplets, and the final one held nine. Each window repeated one popcount. Equal counts alone would not prove equal spatial masks; different masks can share a count. I checked the masks themselves and found exact equality within <strong>all 25</strong> windows. A zero/nonzero-only sequence would have hidden that per-glyph structure.</p>
+<p><strong>Step 7 - render the glyph (ST.14).</strong> The original solver averaged <code>XOR(A, C)</code> over a run, blurred it, and applied a threshold at 0.35 of the peak for OCR. On this carrier, averaging identical masks changes nothing about the recovered pixels. The blur can make a glyph easier for OCR to read, but a single frame pair already contains the full binary mask. That was the largest correction I made after replaying the file.</p>
+<p><strong>Step 8 - read and cross-validate (ST.15/ST.16).</strong> Tesseract gave me a noisy reading. The repeated popcounts provided a consistency check on repeated characters, with the limits described in Section 6.</p>
+<h3>The fingerprint channel</h3>
+<p>Because each glyph window repeats one exact XOR mask in this file, <code>popcount(XOR(A,C))</code> is constant within the window. The 25 glyph positions yielded 17 distinct counts. Repeated counts gave me a possible character-class skeleton before OCR, although count collisions can join different glyphs:</p>
+<table>
+<thead>
+<tr>
+<th>Popcount</th>
+<th>Positions</th>
+<th>Inference</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>8098</td>
+<td>3, 6</td>
+<td>the two identical letters of the 6-char prefix</td>
+</tr>
+<tr>
+<td>7348</td>
+<td>4, 8, 20</td>
+<td>one letter appearing 3x</td>
+</tr>
+<tr>
+<td>6529</td>
+<td>5, 24</td>
+<td>one letter appearing 2x</td>
+</tr>
+<tr>
+<td>8991</td>
+<td>7, 25</td>
+<td>opening and closing brace - <strong>mirror glyphs share a pixel count</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The recorded reading puts braces at positions 7 and 25, both with count 8991. Mirrored glyph shapes can share a count, so this is consistent with the reading. It does not prove those two characters from popcount alone.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<h3>What the exercise validated</h3>
+<p><strong>A broad relation test gave me the pivot.</strong> I had tried twelve technique-specific checks without finding the message. The pairwise scan took about thirty seconds in the recorded run and found the lag-two pattern. I should have asked about frame relationships earlier.</p>
+<p><strong>The null model gave me a scale.</strong> <code>1/sqrt(m)</code> told me how small independent-frame correlations should be under a fair-bit model. The observed 1.0000 peaks were far away. I would still validate the cutoff on a representative media set before using it as an alert threshold.</p>
+<p><strong>Exact comparison before aggregation.</strong> Hashes and XOR preserved the frame-pair signal that my raw-frame averages had erased.</p>
+<h3>What the exercise surfaced as gaps</h3>
+<p><strong>I stayed with the wrong precedent too long.</strong> The 1-bit field led me to a video-as-file-container tool family. Its diagnostics returned a bad metadata version, bad checksum, impossible block size, a measured block size of one, and a stock encoder tag where that reference used a custom tag. I treated each as a parameter issue. I then swept 17 parameter values and many decompression layouts. I should have written the reference implementation's expected padded-tail behavior down first. A single tail check would have sent me back to the video much sooner.</p>
+<p><strong>I gave entropy too much weight.</strong> A result of 7.997 bits per byte fits both compressed data and random data. It could not decide between those explanations. I nevertheless treated it as support for a compressed payload and prolonged the dead end. I have no measured likelihood ratio for those specific hypotheses; the point is that this one number did not discriminate them.</p>
+<p><strong>I nearly did it again with the ABA/ABC sequence.</strong> I packed the pattern as a candidate payload before checking its runs. The 10/10 cadence showed it was a clock. This time I caught the mistake before feeding it into a decoder.</p>
+<p><strong>I trusted OCR, then overstated the correction.</strong> Tesseract misread five of 25 glyphs, including an empty first character and <code>$</code> for a closing brace. Visual review and the popcount classes helped correct the reading, but the class check cannot catch every bad character. Seven repeated-count classes cover <strong>15 positions</strong>. The other <strong>10 are singletons</strong>, and changing one of those characters passes the class check. I proved that with a negative control. The class map is a consistency test for repeated positions; the singleton readings still depend on the rendered glyphs.</p>
+<p><strong>I used the wrong codec term once.</strong> I called this a B-frame difference. The stream has <code>has_b_frames=0</code>, and the frame census reports <strong>1,500 I frames</strong>. This is a comparison between decoded frames in an all-intra stream. The term matters because B-frames would imply a codec structure that is absent here.</p>
+<p><strong>The replay corrected my mask model too.</strong> Constant Hamming distance led me to describe fresh randomization inside each glyph. When I compared the actual XOR arrays, each run repeated one exact mask. I now separate the observed mask equality from the mechanism I once inferred.</p>
+<h3>Exercise behavior mapped to operational behavior</h3>
+<table>
+<thead>
+<tr>
+<th>Exercise behavior</th>
+<th>Operational analogue</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Eventually tested the reference decoder's padded-tail expectation</td>
+<td>State disconfirming evidence for an attribution or encoding hypothesis before a broad parameter sweep</td>
+</tr>
+<tr>
+<td>Asked whether frames were related</td>
+<td>Use broad triage before matching an unfamiliar file to one known tool</td>
+</tr>
+<tr>
+<td>Used the <code>1/sqrt(m)</code> null scale</td>
+<td>Start with an explicit model, then tune and validate on the operational dataset</td>
+</tr>
+<tr>
+<td>Checked OCR against repeated-count classes</td>
+<td>Corroborate a noisy read with another observable, within that observable's coverage</td>
+</tr>
+<tr>
+<td>Changed a singleton as a negative control</td>
+<td>Measure what a validator actually rejects</td>
+</tr>
+<tr>
+<td>Mistook entropy for confirmation</td>
+<td>Keep high entropy as a description, not a payload diagnosis</td>
+</tr>
+</tbody>
+</table>
+<h3>Transferable principles</h3>
+<ol>
+<li><strong>Write down the falsifier.</strong> I should have checked for the expected padding before the parameter sweep.</li>
+<li><strong>Revisit a hypothesis when its diagnostics disagree repeatedly.</strong> Sweeps can be useful, but only after the core model survives basic checks.</li>
+<li><strong>Preserve pair identity.</strong> Hash or XOR frame pairs before reducing them to averages.</li>
+<li><strong>Test the validator with a wrong answer it ought to reject.</strong> My singleton mutation showed exactly where the popcount check stops helping.</li>
+</ol>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<h3>Individual practitioner skill development</h3>
+<p>This exercise pushed me past the first reflexes of LSB checks, <code>steghide</code>, and <code>binwalk</code>. I had to retain order and compare samples. The same habit helps with near-duplicate image review, reused-keystream clues in cryptography, and timing-channel analysis. Those problems need different tests, but all can hide structure in relationships rather than in one isolated object.</p>
+<h3>Security operations (SOC, IR, threat hunting)</h3>
+<p>For a real adversarial file at rest, <a href="https://attack.mitre.org/techniques/T1027/003/">T1027.003</a> is a relevant technique class. <a href="https://attack.mitre.org/techniques/T1001/002/">T1001.002</a> would be relevant if steganography were used in a command-and-control channel; no such channel appears in this challenge. ATT&amp;CK documents real media-steganography cases, but this puzzle does not establish an actor or campaign.</p>
+<p>I have <strong>no host or network telemetry for this case</strong>. I cannot name a process, command line, registry event, or beacon from the file alone. A real operator who generated, opened, or transferred such a file might leave those traces; they would require separate collection.</p>
+<p>What it does produce is a <strong>threat-hunt hypothesis</strong> for media at rest:</p>
+<ul>
+<li><em>Hypothesis:</em> a media file transiting an egress path or resting on a share carries a covert channel in frame-pair relationships rather than pixel content.</li>
+<li><em>Collection:</em> the media files themselves. Not logs.</li>
+<li><em>Analytic:</em> decode to frames, quantize only after checking the pixel distribution, then examine correlation and exact equality at repeated lags. A regular lag-two, period-three pattern deserves review. Legitimate animation, test footage, and duplicated frames can produce relatedness too.</li>
+<li><em>Triage clue:</em> this file is about 58 MB for 25 seconds at 300x300, roughly 18.7 Mbit/s. That is high for its apparent content, but bitrate depends on codec settings and is only a prioritization cue. I did not measure a threefold compression penalty against a comparable encode.</li>
+</ul>
+<h3>Intelligence operations (SIGINT, IO/IW, OSINT, attribution)</h3>
+<p>The concealment is temporal: the relevant mask emerges when I compare two samples at the right offset. The <code>(period, offset)</code> pair tells an analyst where to look. I would call it analysis geometry, not a cryptographic key.</p>
+<p>For a collection workflow, the lesson is to keep the original sequence and test relationships when the usual per-frame checks are inconclusive. A negative pairwise scan would still have limits: sampling, lag range, quantization, and nonlinear encodings can all hide a relation. I would report what the analytic tested, never that it "cleared" every possible covert channel.</p>
+<p>The general question travels beyond video. Repeated display captures, sector images, telemetry samples, and ciphertexts can all carry relationships between observations. Each medium needs its own null model; the video threshold here should not be copied over unchanged.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<h3>Artifact 1 - <code>frame_relatedness_scan()</code> (see §3)</h3>
+<p><strong>Usage:</strong> the source solver below takes thresholded video frames, samples <code>m = 20,000</code> pixels, and computes a frame-pair correlation matrix. The <a href="./artifacts/frame_relation_review.py">offline reviewer</a> takes bounded raw gray frames and scans configurable lags in blocks. At 20,000 independent fair-bit samples, <code>1/sqrt(m)</code> is about 0.0071. Other media and benign corpora need their own evaluation.</p>
+<p><strong>Usage note:</strong> the correlation screen can surface identical, complementary, or partially correlated pairs. It cannot explain why they are related. The <a href="./artifacts/test_frame_relation_review.py">synthetic checks</a> include a fixed-offset positive, benign duplicate frames that also alert, and an independent-noise near miss.</p>
+<h3>Artifact 2 - <code>cross_validate()</code> (see §3)</h3>
+<p><strong>Usage:</strong> I paired OCR with repeated popcount classes and a known format prefix. The <a href="./artifacts/solve_temporal_xor.py">challenge solver</a> contains the helper. This check can be adapted to another noisy recognizer only when that other task has a justified structural invariant.</p>
+<p><strong>Usage note:</strong> it constrains <strong>repeated</strong> symbols only. Singletons pass without this check. Here, 15 of 25 positions were constrained and 10 were not. Different glyphs can also share a count.</p>
+<h3>Artifact 3 - Media steganalysis triage order</h3>
+<p>Ordered by cost-to-discriminating-power, hardest-won lesson first:</p>
+<pre><code class="language-text">1. Container/codec sanity      - all-intra for noise-like content? bitrate vs resolution?
+                                 (cheap, and a strong prior that something is off)
+2. Marginal distribution       - histogram: how many levels? is the decision boundary empty?
+                                 (establishes bit depth; NOT evidence of a payload)
+3. DEFINE THE FALSIFIER        - before adopting any container/tool hypothesis, write down
+                                 the single observation that would kill it. Run THAT first.
+4. Relation scan               - are any two samples linearly related? (null-model
+                                 threshold; the highest-value probe on an unknown embedding)
+5. Exact structure             - hash before you average; equality survives what statistics destroy
+6. Characterize before consume - run-length/periodicity check any extracted sequence BEFORE
+                                 feeding it to a decoder. Clocks look like payloads.
+7. Cross-validate the read     - pair the noisy channel with a structural invariant, then
+                                 negative-control the invariant to learn its real coverage
+
+Anti-pattern: entropy as a payload test. ~8.0 bits/byte is equally consistent with
+compressed data and with uniform noise. Likelihood ratio 1. It narrows nothing.
+</code></pre>
+<h3>Artifact 4 - Decision tree: where does the payload live?</h3>
+<pre><code class="language-mermaid">flowchart TD
+    A[&quot;Media artifact, no obvious payload&quot;] --&gt; B{&quot;Per-sample stats anomalous?&quot;}
+    B -- yes --&gt; C[&quot;Payload is intra-sample&lt;br/&gt;LSB / bit-plane / DCT&quot;]
+    B -- no --&gt; D{&quot;Padding tail, magic, or&lt;br/&gt;container slack present?&quot;}
+    D -- yes --&gt; E[&quot;Payload is an encoded file&lt;br/&gt;extract + decompress&quot;]
+    D -- no --&gt; F{&quot;Relation scan:&lt;br/&gt;any two samples correlate&lt;br/&gt;above 1/sqrt(m)?&quot;}
+    F -- no --&gt; G[&quot;Re-examine container/metadata&lt;br/&gt;or payload is not in this artifact&quot;]
+    F -- yes --&gt; H[&quot;Payload is INTER-sample&lt;br/&gt;derive (period, offset)&quot;]
+    H --&gt; I[&quot;Segment on raw difference magnitude&lt;br/&gt;NOT on a zero/nonzero predicate&quot;]
+    I --&gt; J[&quot;Compare exact XOR masks in each run&lt;br/&gt;render glyphs for reading&quot;]
+</code></pre>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<h3>Tier 1 - Completeness checklist</h3>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>Mapping or N/A</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>MITRE ATT&amp;CK</strong></td>
+<td><strong>T1027.003</strong> - Obfuscated Files or Information: Steganography, a technique-class analogy for concealed video data. <strong>T1001.002</strong> - Data Obfuscation: Steganography, conditional on actual command-and-control use. Neither is an observed adversary action in this puzzle.</td>
+</tr>
+<tr>
+<td><strong>MITRE ATLAS</strong></td>
+<td>N/A - no ML/AI system, model, or dataset is present in the artifact or the solve.</td>
+</tr>
+<tr>
+<td><strong>OWASP Top 10</strong></td>
+<td>N/A - no web application, API, or server-side component.</td>
+</tr>
+<tr>
+<td><strong>OWASP Top 10 for LLM Applications</strong></td>
+<td>N/A - no LLM or generative component.</td>
+</tr>
+<tr>
+<td><strong>CVSS + EPSS + CISA KEV</strong></td>
+<td>N/A - no CVE, no software vulnerability. The technique abuses a general property of media containers, not a defect in a product; there is nothing to score or prioritize.</td>
+</tr>
+<tr>
+<td><strong>Cloud: CIS Benchmarks (cloud) / CSA CCM</strong></td>
+<td>N/A - no cloud control plane, workload, or storage service in scope.</td>
+</tr>
+</tbody>
+</table>
+<h3>Tier 2 - Applied where they add value</h3>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>Mapping</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>CAPEC-636</strong></td>
+<td>Hiding Malicious Data or Code within Files</td>
+<td>A possible attack-pattern analogy for a real malicious use. The puzzle's hidden string is not known to be malicious data or code.</td>
+</tr>
+<tr>
+<td><strong>D3FEND D3-FA</strong></td>
+<td>File Analysis</td>
+<td>A useful category for offline file triage. The particular frame-relation check here is custom analysis; I do not claim a matching D3FEND leaf technique.</td>
+</tr>
+<tr>
+<td><strong>CWE</strong></td>
+<td>N/A - deliberately</td>
+<td>CWE classifies weaknesses in software. Steganography is not a defect in the codec, container, or player; every component behaved to spec. Asserting a CWE here would be a fabricated mapping.</td>
+</tr>
+<tr>
+<td><strong>STRIDE</strong></td>
+<td>Information Disclosure (design-time)</td>
+<td>Applicable only in the exfil framing: a covert channel that defeats content inspection at a trust boundary. Weak fit for the artifact as given; noted for completeness, not leaned on.</td>
+</tr>
+<tr>
+<td><strong>NIST SP 800-series</strong></td>
+<td>See §11</td>
+<td>Controls mapped there rather than duplicated here.</td>
+</tr>
+<tr>
+<td><strong>CACAO / OpenC2</strong></td>
+<td>N/A - no response orchestration or playbook exchange content arose.</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<p>I would not publish a case-specific STIX/TAXII feed from this puzzle. STIX can represent observables, attack patterns, courses of action, and more. Here I have no real actor, infrastructure, campaign, or incident to describe. The carrier hash identifies this one challenge file and has no demonstrated value as an operational IOC.</p>
+<p>The relevant general technique is already defined in ATT&amp;CK T1027.003. Repackaging that entry as a local <code>attack-pattern</code> object would add little without a concrete intelligence requirement.</p>
+<p>If I encountered this pattern in a real endpoint or traffic investigation, I would share the analytic method, observed <code>(period, offset)</code>, scope, and supporting file evidence with the appropriate recipients. A file hash could still identify that specific file during the investigation. The relation test would be more reusable across regenerated carriers.</p>
+<p><strong>STIG:</strong> N/A - no host, application, or platform configuration in scope.</p>
+<p><strong>CIS Benchmarks:</strong> N/A at the benchmark level (no platform to harden). CIS Controls v8 mappings appear in §11.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<p>These are proposed controls for an environment that moves media across a trust boundary. The puzzle itself has no deployed control surface or observed exfiltration path.</p>
+<h3>11a. Standards Mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Standard</th>
+<th>Control</th>
+<th>Title</th>
+<th>Relevance</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>AC-4</td>
+<td>Information Flow Enforcement</td>
+<td>Governs enforcement of approved flows across boundaries; a steganographic channel is an unapproved flow riding an approved one.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>SC-7</td>
+<td>Boundary Protection</td>
+<td>The egress boundary where a carrier file would transit.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>SC-7(10)</td>
+<td>Boundary Protection: Prevent Exfiltration</td>
+<td>Directly on point: detection/prevention of exfiltration, explicitly including covert channels.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>SI-3</td>
+<td>Malicious Code Protection</td>
+<td>Content inspection at transfer points, and the control this technique is designed to defeat.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>SI-4</td>
+<td>System Monitoring</td>
+<td>Monitoring for anomalous transfers and unusual data flows.</td>
+</tr>
+<tr>
+<td>CIS Controls v8</td>
+<td>Control 3</td>
+<td>Data Protection</td>
+<td>Data-flow inventory and egress handling for sensitive data.</td>
+</tr>
+<tr>
+<td>CIS Controls v8</td>
+<td>Control 13</td>
+<td>Network Monitoring and Defense</td>
+<td>Traffic and content monitoring at boundaries.</td>
+</tr>
+</tbody>
+</table>
+<h3>11b. Mitigation Realization</h3>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Concrete realization</th>
+<th>Honest limitation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AC-4 / SC-7(10)</td>
+<td>Evaluate media normalization or content disarm and reconstruction at a transfer boundary. Re-encode, then re-run the pairwise check on the output before claiming this particular channel was disrupted.</td>
+<td>A transcode can preserve or recreate thresholded duplicates. No transcoding policy was tested here. It also costs compute and can damage legitimate bit-preserving transfers, including evidence and medical media.</td>
+</tr>
+<tr>
+<td>SI-3</td>
+<td>Signature-based inspection of transferred content.</td>
+<td>No stable byte signature for the frame-pair mechanism was identified in this case. A file hash could match this exact carrier, but would not generalize.</td>
+</tr>
+<tr>
+<td>SI-4</td>
+<td><strong>Egress prioritization by media bitrate.</strong> Review files whose bitrate is unusual for their size, resolution, and local encoding norms; this one is about 18.7 Mbit/s at 300x300.</td>
+<td>A proxy signal with many benign causes. No baseline, threshold, or detection rate has been measured.</td>
+</tr>
+<tr>
+<td>SI-4 / Control 13</td>
+<td>Use the <a href="./artifacts/frame_relation_review.py">offline frame-relation reviewer</a> on retrieved files selected for investigation.</td>
+<td>Requires decoding and analyst review. Synthetic tests do not establish corpus-scale accuracy or inline suitability.</td>
+</tr>
+<tr>
+<td>Control 3</td>
+<td><strong>Documented risk acceptance</strong> where bit-preserving media egress is a business requirement. The documentary artifact is the realization.</td>
+<td>Administrative only.</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p><strong>Detection maturity: offline proof of concept.</strong></p>
+<p>I wrote a bounded <a href="./artifacts/frame_relation_review.py">offline frame-relation reviewer</a> and <a href="./artifacts/test_frame_relation_review.py">synthetic checks</a>. I have not deployed or tuned it against live telemetry or a representative media collection. The <a href="./artifacts/README.md">usage notes</a> give its inputs, outputs, and limits.</p>
+<h3>Why there are no IOCs, no YARA, and no Sigma - and why that is the finding</h3>
+<p>I looked at what the file actually gives a defender: decoded frame relationships.</p>
+<p><strong>No reusable case IOC.</strong> The carrier hash identifies this synthetic file. I have no actor address, domain, infrastructure, or campaign to turn into an indicator set.</p>
+<p><strong>YARA is a weak fit for the pairwise pixel analytic.</strong> A rule could match this exact file hash or some encoded-byte feature, but that would not express the portable mechanism. This payload:
+- has no magic, header, or fixed offset;
+- has a compressed-stream entropy of 7.997 bits/byte, identical to random noise;
+- is spread across 58 MB of encoded video, where the <em>encoded</em> bytes bear no fixed relationship to the pixel values that carry the signal.</p>
+<p>I would perform "decode, threshold, compare frame pairs" in a media analyzer. I have not built or tested a general YARA rule for this relation.</p>
+<p><strong>Sigma needs different evidence.</strong> The challenge supplied no host or network logs. A real transfer might leave events that Sigma can describe, but such a rule would detect surrounding activity, not prove a glyph mask in decoded media. I have no event fields or baseline here to write a useful one.</p>
+<p>The D3FEND File Analysis mapping stays at category level. The concrete analytic belongs in offline file review.</p>
+<h3>Analytic seed (untested against production telemetry)</h3>
+<p>The original investigation also produced this broader triage sketch. The linked reviewer implements the pairwise core; metadata scoring and file collection remain proposals:</p>
+<pre><code class="language-text">ANALYTIC: inter-frame relation anomaly in media at rest
+FOR each candidate media file:
+    meta &lt;- probe(file)
+    # Prior 1: all-intra plus noise-like content may merit inspection.
+    IF meta.pict_types are all I AND meta.frame_count &gt; 100:
+        score += 1
+    # Prior 2: bitrate grossly disproportionate to resolution x duration.
+    IF meta.bitrate / (meta.width * meta.height * meta.fps) &gt; threshold_bpp:
+        score += 1
+    frames &lt;- decode_luma(file)
+    # Prior 3: a 2-level (or few-level) luma histogram in &quot;camera&quot; content
+    IF histogram_is_multimodal_with_empty_boundary(frames):
+        score += 2
+        bits &lt;- threshold(frames)
+        hits, floor &lt;- frame_relatedness_scan(bits, m=20000, sigma=6)
+        # Review: bit-identical or highly correlated frames at a fixed offset.
+        IF hits is non-empty AND offsets(hits) cluster on a single value:
+            score += 5
+            ALERT &quot;inter-frame covert channel candidate:
+                   period=P offset=O, N related pairs, max corr=C&quot;
+</code></pre>
+<p><strong>Log source / data pipeline requirements.</strong> None in the SIEM sense. This analytic requires <strong>the media files themselves</strong>, not telemetry:
+- a file-retrieval path (EDR file collection, DLP quarantine, share crawl, or egress proxy capture with body retention);
+- decode capacity such as ffmpeg. The proof of concept reads bounded raw gray frames, samples pixels, and compares lags in blocks;
+- offline placement or a quarantine queue. I did not test inline performance.</p>
+<p><strong>Fidelity expectations, false-positive surfaces, tuning.</strong>
+- Priors 1-3 alone are <strong>weak</strong>; legitimate content triggers them (screen recordings, animation with static frames, dithered/1-bit art, synthetic test patterns). Do not alert on them.
+- A repeated lag and period strengthen the lead. Legitimate loops, animation, and test patterns can have the same structure. The benign fixture demonstrates a valid alert on harmless repeated frames.
+- <code>sigma</code> multiplies the null standard deviation for independent fair bits. Real media violate that model, and the scan tests many dependent pairs. I do not infer an operational false-positive rate from six sigma.
+- Expected false-positive rate: <strong>unmeasured</strong> on a real media collection. The positive, benign repeat, and independent near miss test local logic only.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">solve process flow</a> near the top preserves my wrong turn, the lag-two pivot, and the OCR check. The diagram below maps this file-analysis method to proposed operational controls. None of those controls was deployed or tested in this challenge.</p>
+<pre><code class="language-mermaid">flowchart TB
+    subgraph THREAT[&quot;Threat Layer (ATT&amp;CK)&quot;]
+        T1[&quot;T1027.003 - Obfuscated Files or Information: Steganography&lt;br/&gt;payload in frame-pair relations, not pixels&quot;]
+        T2[&quot;T1001.002 - Data Obfuscation: Steganography&lt;br/&gt;if carrier transits as C2 / exfil&quot;]
+    end
+    subgraph PATTERN[&quot;Attack Pattern (CAPEC)&quot;]
+        C1[&quot;CAPEC-636 - Hiding Malicious Data or Code within Files&quot;]
+    end
+    subgraph STANDARD[&quot;Standard (NIST 800-53 Rev.5 / CIS v8)&quot;]
+        S1[&quot;AC-4 Information Flow Enforcement&quot;]
+        S2[&quot;SC-7(10) Prevent Exfiltration&quot;]
+        S3[&quot;SI-3 Malicious Code Protection&quot;]
+        S4[&quot;SI-4 System Monitoring&lt;br/&gt;CIS v8 Control 13&quot;]
+    end
+    subgraph MITIGATION[&quot;Mitigation Realization&quot;]
+        M1[&quot;CDR / normalizing transcode at boundary&lt;br/&gt;PROPOSED - replay output to test&lt;br/&gt;whether the frame relation survives&quot;]
+        M2[&quot;Signature content inspection&lt;br/&gt;INEFFECTIVE - no byte signature exists&quot;]
+        M3[&quot;Egress bitrate-vs-resolution anomaly&lt;br/&gt;PROXY ONLY - evadable&quot;]
+        M4[&quot;Relation-scan triage on media at rest&lt;br/&gt;offline hunt analytic&quot;]
+    end
+    subgraph DETECT[&quot;Detection Artifact (D3FEND D3-FA)&quot;]
+        D1[&quot;frame_relatedness_scan()&lt;br/&gt;fixed-offset correlation &gt; 1/sqrt(m)&lt;br/&gt;maturity: Seeds-only&quot;]
+        D2[&quot;YARA / Sigma&lt;br/&gt;can match this file or surrounding events;&lt;br/&gt;pairwise decoding needs a media analyzer&quot;]
+    end
+    T1 --&gt; C1
+    T2 --&gt; C1
+    C1 --&gt; S1
+    C1 --&gt; S2
+    C1 --&gt; S3
+    C1 --&gt; S4
+    S1 --&gt; M1
+    S2 --&gt; M1
+    S3 --&gt; M2
+    S4 --&gt; M3
+    S4 --&gt; M4
+    M1 --&gt; D2
+    M2 --&gt; D2
+    M3 --&gt; D1
+    M4 --&gt; D1
+</code></pre>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li>MITRE ATT&amp;CK. <em>Obfuscated Files or Information: Steganography</em>, Sub-technique T1027.003 (Enterprise). https://attack.mitre.org/techniques/T1027/003/</li>
+<li>MITRE ATT&amp;CK. <em>Data Obfuscation: Steganography</em>, Sub-technique T1001.002 (Enterprise). https://attack.mitre.org/techniques/T1001/002/</li>
+<li>MITRE ATT&amp;CK. <em>Data Obfuscation</em>, Technique T1001 (Enterprise). https://attack.mitre.org/techniques/T1001/</li>
+<li>MITRE CAPEC. <em>CAPEC-636: Hiding Malicious Data or Code within Files</em>. https://capec.mitre.org/data/definitions/636.html</li>
+<li>MITRE D3FEND. <em>File Analysis</em>, Technique D3-FA. https://d3fend.mitre.org/technique/d3f:FileAnalysis/</li>
+<li>NIST. <em>SP 800-53 Rev. 5: Security and Privacy Controls for Information Systems and Organizations.</em> Controls AC-4, SC-7, SC-7(10), SI-3, SI-4.</li>
+<li>CIS. <em>CIS Critical Security Controls v8.</em> Control 3 (Data Protection), Control 13 (Network Monitoring and Defense).</li>
+<li>ISO/IEC 14496-2. <em>Information technology - Coding of audio-visual objects - Part 2: Visual</em> (MPEG-4 Part 2; the artifact's codec).</li>
+<li>ISO/IEC 14496-12. <em>Information technology - Coding of audio-visual objects - Part 12: ISO base media file format</em> (the artifact's container).</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
