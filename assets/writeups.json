@@ -830,5 +830,24 @@
     "summary": "Six unusually fast P-256 signatures exposed tight bounds on their nonces. I used a lattice to recover a scalar that matched the public key, then found the payload's hash-chain wrapper. The flag-shaped plaintext stays withheld.",
     "status": "Solved-Verified",
     "url": "/cyber-ops/ctf-writeups/crypto/ecdsa-nonce-timing/"
+  },
+  {
+    "title": "Finding the Keyfob in a Crowded 433 MHz Capture",
+    "category": "RF / SIGINT",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "SDR",
+      "IQ",
+      "ISM-433",
+      "OOK",
+      "PHY",
+      "keyfob",
+      "PWM",
+      "multi-emitter"
+    ],
+    "summary": "I separated a keyfob-like packet from two other 433 MHz emitters, measured its OOK carrier and 500 microsecond chip, then corrected an ASK label the grader rejected. The accepted answer is recorded; the defensive lab uses invented IQ.",
+    "status": "Solved-Verified",
+    "url": "/cyber-ops/ctf-writeups/rf/keyfob-phy-recovery/"
   }
 ]
