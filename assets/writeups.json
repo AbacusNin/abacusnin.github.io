@@ -1185,5 +1185,27 @@
     ],
     "status": "Solved-Verified",
     "url": "/cyber-ops/ctf-writeups/forensics/ssh-auth-log-campaign/"
+  },
+  {
+    "title": "The Room Plate in the Tour Video",
+    "category": "OSINT",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "OSINT",
+      "cover-channel comms",
+      "codebook detection",
+      "pre-operational recon",
+      "OPSEC",
+      "publication control"
+    ],
+    "summary": "I followed a public waypoint codebook into the right neighborhood, then applied it one message too far. The meeting place needed a second codebook, and the room identifier was visible in a tour video.",
+    "aliases": [
+      "courier message decode",
+      "public wayspot codebook",
+      "interior signage exposure"
+    ],
+    "status": "Solved-External",
+    "url": "/cyber-ops/ctf-writeups/osint/cover-channel-courier/"
   }
 ]

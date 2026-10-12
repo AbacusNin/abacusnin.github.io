@@ -1,0 +1,3 @@
+Welcome to the demo floor.
+The door plate reads RM-27C. EXIT is painted on the nearby wall.
+Another sample reads A 2 103. The letters R M by themselves are a near miss.

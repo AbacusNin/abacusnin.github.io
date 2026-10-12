@@ -1,0 +1,9 @@
+# Interior signage review example
+
+`plate_sweep.py` is a defensive proof of concept for reviewing an organization's own approved video before release, or checking a local public-media archive. It is not a challenge solver and does not contain the challenge footage, venue, or identifier.
+
+With Python 3, `ffmpeg`, and `tesseract` installed, run `python -B plate_sweep.py --video approved-cut.mp4 --fps 1 --max-frames 300`. The tool samples at most 300 scaled frames from a local video of at most 500 MB, limits the review to ten minutes, uses Tesseract sparse-text mode, and prints candidate frame names and text to JSON. It makes no network requests and deletes its temporary frames after the run. Frame sampling can miss a short or obscured plate; OCR can misread signs. Do not interpret an empty report as clearance to publish.
+
+For pattern checks without either external program, run `python -B plate_sweep.py --ocr-text synthetic_ocr.txt`. The invented fixture should return `RM-27C` and `A 2 103`. Run `python -B -m unittest test_plate_sweep.py` for positive, benign, near-miss, expected false-positive, text-mode CLI, and invalid-rate cases.
+
+The pattern is a starting shape, not a trained classifier. It can match inventory labels or other benign text, and it will miss room numbering in a different format. A facilities reviewer must tune it against known plates, inspect candidate frames, and decide whether a plate is nonpublic under the organization's policy. Keep a release-ticket record with the media version, reviewer, frames inspected, decisions, and any recut or accepted exposure. Outputs may contain sensitive facility identifiers; store them in the approved review system. This local test does not exercise video extraction or OCR because those executables and a suitable sample video were unavailable here. It does not measure recall, precision, or production performance.

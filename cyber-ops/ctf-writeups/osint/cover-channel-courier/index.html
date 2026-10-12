@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Room Plate in the Tour Video - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="I followed a public waypoint codebook into the right neighborhood, then applied it one message too far. The meeting place needed a second codebook, and the room identifier was visible in a tour video.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/osint/cover-channel-courier/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Room Plate in the Tour Video">
+  <meta property="og:description" content="I followed a public waypoint codebook into the right neighborhood, then applied it one message too far. The meeting place needed a second codebook, and the room identifier was visible in a tour video.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/osint/cover-channel-courier/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / OSINT / <span aria-current="page">The Room Plate in the Tour Video</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Room Plate in the Tour Video</h1>
+        <p class="lead">The first message practically labeled its own codebook. I let that success carry over to the one location that had no label, and it cost me a submission.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Decode two intercepted courier messages to identify an interior meet and drop location and its identifier.</p>
+<p><strong>What I did.</strong> I classified the location references by their labels, tested a public waypoint index, rejected an outdoor answer, then followed an interior room-naming convention into published video.</p>
+<p><strong>The result.</strong> The record reports that the recovered interior room identifier was accepted outside the initial analysis window. The venue, terms, and identifier remain withheld.</p>
+<p><strong>The limit.</strong> The coded terms and room plate are redacted. The linked signage checker uses invented text and does not validate the recorded challenge result.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Read two messages; Use the waypoint index; Submit outdoor guess; Search too far; Return to room naming; Inspect tour footage">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Read two messages</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Three tagged places, one untagged meet</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Use the waypoint index</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Labeled places converge near the site</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Submit outdoor guess</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Platform rejects the exterior feature</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Search too far</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">No local wayspot or identifier hit</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Return to room naming</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Regional flora supplies a room name</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Inspect tour footage</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Room plate gives the accepted code</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>OSINT</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>OSINT, cover-channel comms, codebook detection, pre-operational recon, OPSEC, publication control</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved-External</td>
+</tr>
+<tr>
+<td>Recorded result</td>
+<td>An outdoor-location submission was rejected. A later interior room code is recorded as accepted; the code and site are withheld.</td>
+</tr>
+<tr>
+<td>Evidence boundary</td>
+<td>The final video inspection and accepted response were reported from a separate solve session. The underlying terms and room plate are withheld.</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/osint/cover-channel-courier/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>Analytical Attack Chain (Overview)</h2>
+<pre><code class="language-mermaid">flowchart LR
+    A[Two plaintext messages] --&gt; B[Three labeled places]
+    B --&gt; C[Public waypoint index]
+    C --&gt; D[Target area]
+    A --&gt; E[Untagged meet and drop]
+    E --&gt; F[Outdoor guess rejected]
+    F --&gt; G[Interior naming scheme]
+    G --&gt; H[Published tour footage]
+    H --&gt; I[Room plate]
+</code></pre>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I had two plaintext courier messages. Three place names in the first carried type labels from a location-based AR game's public waypoint vocabulary. The second message used one untagged place name, <code>&lt;CODED-TERM&gt;</code>, for a meet and package drop. It also specified a time, a false maintenance sign outside the location, and a package staged in a corner. The challenge asked for the interior place and its identifier.</p>
+<p>The scenario described an operation against a large technology company's new office. The couriers were carrying the messages without being the planners. My view was limited to the intercept and public sources; I had no building access, internal telemetry, or private facility inventory. I keep the company, city, game, coded words, and room code redacted. The mechanism is enough to explain the solve without turning a real building into a location guide.</p>
+<p>The trust boundary in the story ran from public space into an interior room. The false sign was part of the scenario's access pretext. This was an OSINT decoding problem, not an observed physical intrusion. The final accepted answer identifies a room in the challenge record; it does not establish that anyone entered it.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<h3>Solve Trace</h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Choice and result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ST.1</td>
+<td>I inventoried the nouns in both messages: three type-labeled places, one untagged meet/drop reference.</td>
+</tr>
+<tr>
+<td>ST.2</td>
+<td>I queried a crowd-sourced waypoint map inside a geographic bounding box. The labeled places converged near the target site; one wayspot received independent confirmation.</td>
+</tr>
+<tr>
+<td>ST.3</td>
+<td>I kept two hypotheses for the untagged term: an exterior geographic feature or an interior room named under a different convention.</td>
+</tr>
+<tr>
+<td>ST.3a</td>
+<td>I submitted the exterior-feature answer. The platform rejected it.</td>
+</tr>
+<tr>
+<td>ST.4</td>
+<td>I tried roughly six wayspot-search formulations for the untagged term. I found only an off-region namesake, not a local match. This route ended.</td>
+</tr>
+<tr>
+<td>ST.4a</td>
+<td>I swept about nine kinds of identifier systems, including municipal building and park assets, bike-share stations, transit codes, precincts, callboxes, and mile markers. No relevant code emerged.</td>
+</tr>
+<tr>
+<td>ST.5</td>
+<td>I returned to the interior hypothesis. Published design material described rooms named for regional flora; the coded term's geographic sense pointed to a species used as a room name.</td>
+</tr>
+<tr>
+<td>ST.6</td>
+<td>In a separate solve session, frame inspection of a corporate tour video exposed the room plate. The record reports that the redacted code was accepted.</td>
+</tr>
+</tbody>
+</table>
+<p>The order matters. I had considered the interior room early, then set it aside because its identifier did not look easy to search. The platform's rejection applied to the outdoor answer alone. It did not reject the other hypothesis. My detour through the waypoint index and identifier databases was useful negative evidence about those source classes, but it should not have displaced the message's stronger cues.</p>
+<h3>Methodology notes on the pivots</h3>
+<p>The label asymmetry was already on the page at ST.1. The three references with game-specific type words belonged to the waypoint codebook. The meet/drop term had no such label. The maintenance sign would go <em>outside</em> the place; the package would sit in its <em>corner</em>; and the plan referred to access after entering the building. Together those clues favored an enclosed room. Failure to find a local waypoint later reinforced the switch, though a search miss cannot prove that no such waypoint exists.</p>
+<p>Two scope mistakes drove the long path. Confirmation of one labeled wayspot established something about Message 1, not every noun in Message 2. I also compared the needed identifier with the company's calendar-booking name format and dismissed the room hypothesis when it did not fit. A booking string and a physical door plate are different identifiers. The latter may be visible in a photograph even when no text database indexes it.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>Most of the solve was reading, mapping, and searching. I did not use a purpose-built decoder. One command during the identifier sweep tried a public bike-share feed and met an egress block:</p>
+<pre><code class="language-bash">curl -sIL 'https://&lt;gbfs-host&gt;/gbfs/en/station_information.json' | head -5
+# HTTP/2 403
+# x-deny-reason: host_not_allowed
+</code></pre>
+<p>My first version fed the denied response to a JSON parser. The resulting <code>JSONDecodeError</code> looked like a data problem until I checked the HTTP response. That small failure is worth keeping: a parser error can be a transport error one step upstream. I did not get bike-share station IDs from this probe.</p>
+<p>The final code was found by frame inspection in the reported external solve. The <a href="artifacts/plate_sweep.py">local signage-review tool</a> below was built for the defensive use of that method, after the challenge outcome. It did not recover this case's answer. Its <a href="artifacts/synthetic_ocr.txt">test fixture</a> contains invented plates and no footage from the site.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>These messages did not hide their words. They hid what the words pointed to. A courier who knows the shared public reference can turn a harmless-looking place name into a location. I call that a cover channel here: plaintext with an external codebook, rather than encryption or steganography.</p>
+<p>The first codebook was a public waypoint index. Its labels could point to murals, parks, storefronts, and paths around a neighborhood. The labels did not need to match a venue's commercial name. A crowd-contributed picture or description could give a waypoint an unrelated visible name, while its coordinates still locate the site. Several labeled references converging in one area made the map useful. A single common name would have been ambiguous without geography and context.</p>
+<p>The second codebook was the organization's own room-naming scheme. Design coverage described an interior theme based on local plants. An outdoor geographic term in the message was also associated with a plant species; that species named a room. This switch made sense at the building boundary. A public game index can describe what is outside. Private meeting rooms call for another source. Public marketing material supplied the interior vocabulary, and a tour video supplied the plate printed on a door.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>I started by sorting the references by grammar instead of guessing venues. The type labels made three references suitable for a bounded waypoint search. Their map results converged near the office. That narrowed the staging area, but it did not settle the untagged meeting place. I extended the waypoint search anyway, found an off-region namesake, and got no in-region hit after several query forms.</p>
+<p>My first submission treated <code>&lt;CODED-TERM&gt;</code> as an exterior feature near the site. It fit the map more easily than the room, and the platform rejected it. I then swept municipal, transit, utility, and bike-share identifier systems. That no-hit result narrowed the usefulness of those databases. It did not show that a room lacked a number.</p>
+<p>The interior hypothesis fit the physical cues much better. I checked published design material for the company's regional-flora naming convention. The term could resolve through an ecological association to <code>&lt;TREE-SPECIES&gt;</code>, giving a plausible room name. The final identifier came from a different medium: the room's physical plate visible in tour footage. The record says the resulting <code>&lt;REDACTED_ROOM_CODE&gt;</code> was accepted in the challenge. I cannot derive the actual plate from the sanitized terms printed here, and I do not present the later checker as a replay of that video.</p>
+<p>The transfer is about source classes. A public map helped with exterior waypoints. Searchable asset-code tables did not help with an interior plate. Published visual media did. An absence from one source class is a reason to change the source, not a verdict on every hypothesis that needs the missing identifier.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<h3>What the exercise validated</h3>
+<p>The message supplied the best clues before I opened a browser. Its labels marked one codebook's scope; the sign, corner, and after-entry language pointed to a room. I eventually solved it by respecting that boundary. The accepted result is recorded from the later session; the decisive terms and plate remain redacted here.</p>
+<h3>What the exercise surfaced as gaps</h3>
+<p>I favored the answer I could search quickly. The exterior hypothesis was easy to map and easy to submit. Its geographic rationale, however, depended on a fact that I had already checked and found false. I should have lowered confidence before submission. The rejected answer then colored my view of the separate interior hypothesis, which had never been tested by that rejection.</p>
+<p>The identifier mistake came from treating one format as the only format a room could have. The calendar name was not the physical plate. Once I asked where a plate might actually appear, the organization's own video became a sensible source. Those were judgment errors in the route, not missing tools.</p>
+<h3>Transferable principles</h3>
+<table>
+<thead>
+<tr>
+<th>What I did</th>
+<th>Rule I would carry forward</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Submitted the easier exterior answer first.</td>
+<td>Rank hypotheses by fit to message cues before ease of lookup.</td>
+</tr>
+<tr>
+<td>Extended a confirmed waypoint codebook to an untagged noun.</td>
+<td>Make each reference earn its codebook assignment.</td>
+</tr>
+<tr>
+<td>Let one rejected submission weaken another hypothesis.</td>
+<td>Record what the submission actually tested.</td>
+</tr>
+<tr>
+<td>Treated a database miss as a failed room hypothesis.</td>
+<td>Name the searched source class and look for another medium.</td>
+</tr>
+<tr>
+<td>Compared a booking identifier to a door-plate requirement.</td>
+<td>Inventory the different identifiers attached to the same place.</td>
+</tr>
+<tr>
+<td>Kept high confidence after its premise failed.</td>
+<td>Recalculate confidence when a supporting fact changes.</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<p>This puzzle resembles a real analysis problem in one narrow respect: ordinary language can carry a location when both readers know an external reference. I would not build an employee-message detector from this case. There is no enterprise communications dataset, no known target vocabulary, and no measured false-positive rate. A broad search for plant names in email would produce noise and create privacy costs without a case-grounded alert.</p>
+<p>The concrete defensive issue is the published media. A marketing walkthrough can reveal interior signage, floor layouts, access cues, and room identifiers without anyone intending to publish a facility map. For an organization, the useful workflow is a content review before posting and a periodic review of existing material. Marketing, facilities, and security need a shared decision: which details may be public, which should be blurred or cut, and which are accepted as low risk. A plate-shaped OCR hit is a review lead, not an automatic finding.</p>
+<p>For intelligence analysis, the first codebook choice can be a behavior to note across cases. If a known actor repeatedly uses the same public waypoint index, that pattern may help find related messages. One challenge does not establish such an actor profile. The more general lesson here is to ask which source class can contain the identifier you need.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<h3>8.1 Cover-channel decode triage checklist</h3>
+<pre><code class="language-text">1. List each place reference and the exact grammatical label attached to it.
+2. Scope a labeled reference to the hinted codebook; keep untagged ones open.
+3. Read physical cues: outside sign, corner, door, path, water, after entry.
+4. Rank exterior and interior hypotheses by cue fit before searching.
+5. Search the source class suited to each identifier: maps, design text, images.
+6. Record query coverage and what a no-hit result actually excludes.
+7. After rejection, update only the hypothesis that was submitted.
+8. Separate a booking name, room name, and physical plate in the evidence.
+</code></pre>
+<h3>8.2 Frame-sweep for signage identifiers in published video</h3>
+<p>A small shell sketch captured the follow-up idea: sample frames with <code>ffmpeg</code>, pass each frame to Tesseract sparse-text mode, then search OCR text for a plate shape. It was written after the solve and did not produce the accepted answer. I kept the full pipeline because the output file and the OCR mode matter:</p>
+<pre><code class="language-bash">#!/usr/bin/env bash
+# Usage: ./plate_sweep.sh &lt;video&gt; &lt;outdir&gt; [fps]
+# Requires ffmpeg and tesseract-ocr.
+set -euo pipefail
+video=&quot;${1:?video path required}&quot;
+out=&quot;${2:?outdir required}&quot;
+fps=&quot;${3:-1}&quot;
+mkdir -p &quot;$out/frames&quot;
+ffmpeg -loglevel error -i &quot;$video&quot; -vf &quot;fps=${fps}&quot; &quot;$out/frames/f_%05d.png&quot;
+plate_re='[A-Z]{1,3}[ -]?[0-9]{1,2}[ -]?[0-9]{2,4}|RM[ -]?[A-Z0-9]+'
+printf 'frame\tcandidates\n' &gt; &quot;$out/hits.tsv&quot;
+for f in &quot;$out&quot;/frames/*.png; do
+  txt=$(tesseract --psm 11 &quot;$f&quot; - 2&gt;/dev/null | tr '\n' ' ' | tr -s ' ')
+  if hits=$(grep -oE &quot;$plate_re&quot; &lt;&lt;&lt;&quot;$txt&quot; | paste -sd, -); [ -n &quot;${hits:-}&quot; ]; then
+    printf '%s\t%s\n' &quot;$(basename &quot;$f&quot;)&quot; &quot;$hits&quot; &gt;&gt; &quot;$out/hits.tsv&quot;
+  fi
+done
+echo &quot;candidate frames: $(($(wc -l &lt; &quot;$out/hits.tsv&quot;) - 1)) -&gt; $out/hits.tsv&quot;
+</code></pre>
+<p>The shell sketch does not limit its input size or run time. The <a href="artifacts/plate_sweep.py">bounded local reviewer</a> turns the same idea into a reusable defensive example for an organization's own media. It accepts a local video of at most 500 MB, samples at most 300 frames by default, and prints candidate frame names and plate-like strings. It can also read an existing OCR text file, which lets me test the pattern without a video or an OCR installation. The <a href="artifacts/synthetic_ocr.txt">invented OCR fixture</a>, <a href="artifacts/test_plate_sweep.py">four tests</a>, and <a href="artifacts/README.md">usage guide</a> show a positive, benign text, a near miss, a storage-label false positive, and an invalid rate. The code did not run against the challenge video or a production media library; <code>ffmpeg</code> and Tesseract were unavailable for an end-to-end video check here. OCR can miss a plate between sampled frames or read it wrong. A clean output is never a publication clearance by itself.</p>
+<h3>8.3 OSINT source-class selection for facility identifiers</h3>
+<table>
+<thead>
+<tr>
+<th>Needed identifier</th>
+<th>Where I would look first</th>
+<th>Limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Exterior address or parcel</td>
+<td>Public mapping and property records.</td>
+<td>Names and points can differ.</td>
+</tr>
+<tr>
+<td>Adjacent park, path, or landmark</td>
+<td>Geographically bounded public maps.</td>
+<td>A same-named result outside the area proves little.</td>
+</tr>
+<tr>
+<td>Floor or wing theme</td>
+<td>Organization-approved press or design coverage.</td>
+<td>Theme does not guarantee a room number.</td>
+</tr>
+<tr>
+<td>Interior room name</td>
+<td>Published building coverage, if any.</td>
+<td>Text may omit private rooms.</td>
+</tr>
+<tr>
+<td>Physical door plate</td>
+<td>Images or footage the organization has released.</td>
+<td>Requires visual review; text indexes can miss it.</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<h3>Tier 1 (completeness checklist)</h3>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>Fit and boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MITRE ATT&amp;CK</td>
+<td><a href="https://attack.mitre.org/tactics/TA0043/">TA0043 Reconnaissance</a>, <a href="https://attack.mitre.org/techniques/T1591/">T1591 Gather Victim Org Information</a>, and <a href="https://attack.mitre.org/techniques/T1593/">T1593 Search Open Websites/Domains</a> describe the public-source information gathering. They do not map the couriers' physical infiltration or coded prose.</td>
+</tr>
+<tr>
+<td>MITRE ATLAS</td>
+<td>No AI or ML system was involved.</td>
+</tr>
+<tr>
+<td>OWASP Top 10 and LLM Top 10</td>
+<td>No web application or LLM failure was observed.</td>
+</tr>
+<tr>
+<td>CVSS, EPSS, CISA KEV</td>
+<td>There is no CVE or software exploit to score.</td>
+</tr>
+<tr>
+<td>Cloud CIS Benchmark / CSA CCM</td>
+<td>The record does not establish a cloud system under review.</td>
+</tr>
+</tbody>
+</table>
+<p>ATT&amp;CK's T1027, Obfuscated Files or Information, would misdescribe these human messages as on-system payload obfuscation. I leave it out. ATT&amp;CK's recon terms are useful for the public-source half of the case; I do not stretch them over an unobserved building intrusion.</p>
+<h3>Tier 2 (where they add value)</h3>
+<p><a href="https://capec.mitre.org/data/definitions/118.html">CAPEC-118</a>, Collect and Analyze Information, is a <strong>category</strong>, not a concrete attack pattern. It is broad context for information gathering, so I do not treat it as an observed technique. NIST's content-review controls do more work for the defender here. D3FEND has no direct match for deciding what a marketing video should show before publication. STRIDE and CWE would require a design or software weakness this case did not examine. CACAO and OpenC2 would require an automated response workflow that was never part of the exercise.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<p>The case provides no shareable IP, domain, hash, malware sample, or real actor attribution. The target and recovered identifier are redacted deliberately. I would not fill a STIX indicator with placeholders or imply a TAXII exchange. A peer organization could act on the general media-review lesson without receiving a supposed IOC. There is also no host configuration assessment for a STIG finding.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<p>The strongest defensive finding is the organization's own disclosure route. Its published tour made a room plate visible. Whether a particular plate should have been withheld depends on the organization's facility policy and the room's use. The control question is whether someone reviewed that exposure before release and whether existing material is periodically checked.</p>
+<h3>11a. Standards Mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Fit in a real publication workflow</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 AC-22</a></td>
+<td>Designate authorized publishers, train them, review content before posting, and review posted content at a defined interval for nonpublic information. The before/after duties are AC-22(c) and (d), not separate enhancements.</td>
+</tr>
+<tr>
+<td><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST AU-13</a></td>
+<td>Monitor defined public sources for unauthorized disclosure at a chosen frequency. Use for material already available outside the release workflow.</td>
+</tr>
+<tr>
+<td><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST AT-3</a></td>
+<td>Train roles with publishing decisions: communications, marketing, facilities, and reviewers.</td>
+</tr>
+<tr>
+<td><a href="https://csrc.nist.gov/pubs/sp/800/171/r3/final">NIST SP 800-171 Rev. 3, 03.01.22</a></td>
+<td>Publicly accessible content requirements matter when the organization has applicable CUI obligations; the scenario does not establish that scope.</td>
+</tr>
+<tr>
+<td><a href="https://www.cisecurity.org/controls/v8-1">CIS Controls v8.1, 14.5</a></td>
+<td>Train staff on ways information reaches unintended audiences, including publication.</td>
+</tr>
+</tbody>
+</table>
+<p>I do not map AC-23, Data Mining Protection, to the published video. The content concern is the release and monitoring of public material, captured more directly by AC-22 and AU-13. None of these mappings claims that the fictional target was assessed against a federal or CIS baseline.</p>
+<h3>11b. Mitigation Realization</h3>
+<p>Before a facility video goes out, I would ask a named reviewer to inspect visible badges, door plates, access devices, layout cues, and screen content. The <a href="artifacts/plate_sweep.py">signage checker</a> can give that reviewer candidate frames, but it does not make the release decision. The release ticket should carry the media version, reviewer, frame decisions, any recut or blur request, and an explicit acceptance if an identified plate can remain visible. That gives AC-22(c) a real evidence trail.</p>
+<p>For already published tours, I would schedule a library review under AC-22(d) and AU-13, triage candidate frames with facilities, and record removal, recut, or acceptance for each finding. Communications and marketing staff need a short training example showing how a harmless interior shot can disclose an identifier, supporting AT-3 and CIS 14.5. The third-party waypoint index lies outside the organization's publication control. It is a source to account for in exposure analysis, not a database the organization can make disappear.</p>
+<p>The business reason to publish a tour can be sound. The control makes the exposure visible to the people who own the risk. It does not demand a blanket ban on interior footage.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p><strong>Detection maturity: Reframed-N/A.</strong></p>
+<p>There was no defender-side log, endpoint event, packet capture, or application audit trail in the challenge. The intercepted messages are planning artifacts. I cannot derive a Sigma rule, KQL query, or SPL alert for this case without inventing a sensor and normal fields. A general alert for coded words in staff messages would be an especially weak leap from this record.</p>
+<p>The useful check is at publication time. Its input is an approved local cut or an organization's public-media library. Its output is a list of frames that may contain room-shaped identifiers, followed by human review. The <a href="artifacts/plate_sweep.py">tool</a> and <a href="artifacts/README.md">guide</a> define that workflow and its limits. The synthetic tests establish that the example pattern catches two invented plates, ignores ordinary lobby text and a spaced near miss, and still flags an inventory label as an expected false positive. They do not establish OCR recall, a production false-positive rate, or that any real organization's media policy was violated. This is a content-control proof of concept, not a SIEM detection.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">diagram near the top</a> follows the analysis, including the rejected outdoor answer. This second view shows where the defensive control sits. The disclosure existed when the video was posted; no later intruder telemetry is needed to find it.</p>
+<pre><code class="language-mermaid">flowchart TB
+    A[Public waypoint index] --&gt; B[Exterior staging references]
+    C[Published room-naming story] --&gt; D[Interior room name]
+    E[Published tour video] --&gt; F[Physical door plate]
+    F --&gt; G[Pre-release frame review]
+    F --&gt; H[Periodic library review]
+    G --&gt; I[Release decision and record]
+    H --&gt; I
+    A -. third-party source .-&gt; J[Exposure context]
+</code></pre>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://attack.mitre.org/tactics/TA0043/">MITRE ATT&amp;CK Reconnaissance tactic</a>, <a href="https://attack.mitre.org/techniques/T1591/">T1591 Gather Victim Org Information</a>, and <a href="https://attack.mitre.org/techniques/T1593/">T1593 Search Open Websites/Domains</a>.</li>
+<li><a href="https://capec.mitre.org/data/definitions/118.html">MITRE CAPEC-118, Collect and Analyze Information category</a>.</li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5 Update 1</a>, controls AC-22, AU-13, AT-3, and AC-23 for the excluded mapping.</li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/171/r3/final">NIST SP 800-171 Rev. 3</a>, requirement 03.01.22.</li>
+<li><a href="https://www.cisecurity.org/controls/v8-1">CIS Controls v8.1</a>, safeguard 14.5.</li>
+<li>Richards J. Heuer Jr., <a href="https://www.cia.gov/resources/csi/books-monographs/psychology-of-intelligence-analysis-2/"><em>Psychology of Intelligence Analysis</em></a>, Chapter 8, for competing hypotheses.</li>
+<li><a href="https://www.dni.gov/files/documents/ICD/ICD-203.pdf">ODNI ICD 203, Analytic Standards</a>, for confidence language and distinguishing evidence from judgment.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
