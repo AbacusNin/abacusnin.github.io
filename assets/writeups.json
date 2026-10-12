@@ -794,5 +794,22 @@
     ],
     "status": "Solved-Verified",
     "url": "/cyber-ops/ctf-writeups/forensics/sqmclient-registry-config/"
+  },
+  {
+    "title": "The Shuffle Gave Away the Groups",
+    "category": "Reversing / Cryptography",
+    "difficulty": "Hard",
+    "date": "2026-10",
+    "tags": [
+      "Java Random",
+      "LCG state recovery",
+      "Fisher-Yates inversion",
+      "salted-hash bypass",
+      "blitz timer",
+      "white-box"
+    ],
+    "summary": "A status call exposed most of a shuffle seed. I recovered the missing bits, predicted where each word had moved, and grouped later salted hashes without knowing the salt. The solver passed local replica tests; live acceptance was not observed.",
+    "status": "Solved-External",
+    "url": "/cyber-ops/ctf-writeups/reversing/prng-state-leak/"
   }
 ]

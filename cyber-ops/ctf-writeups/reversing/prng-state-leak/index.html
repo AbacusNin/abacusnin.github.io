@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Shuffle Gave Away the Groups - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="A status call exposed most of a shuffle seed. I recovered the missing bits, predicted where each word had moved, and grouped later salted hashes without knowing the salt. The solver passed local replica tests; live acceptance was not observed.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/reversing/prng-state-leak/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Shuffle Gave Away the Groups">
+  <meta property="og:description" content="A status call exposed most of a shuffle seed. I recovered the missing bits, predicted where each word had moved, and grouped later salted hashes without knowing the salt. The solver passed local replica tests; live acceptance was not observed.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/reversing/prng-state-leak/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Reversing / Cryptography / <span aria-current="page">The Shuffle Gave Away the Groups</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Shuffle Gave Away the Groups</h1>
+        <p class="lead">The salt looked like the wall. The board order turned out to be the way around it.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Partition ten 16-item boards into four groups of four under an 800 ms timer, with the last six boards showing salted hashes instead of words.</p>
+<p><strong>What I did.</strong> I followed the state leak through the server&#x27;s shuffle, recovered 16 missing bits from a plaintext board, and used original positions to group the hashed boards.</p>
+<p><strong>The result.</strong> My test notes record 80 consecutive successful local replica runs after two fixes. The live service was not reached from that environment, so I have no live acceptance record.</p>
+<p><strong>The limit.</strong> The local test logs and compiled replica are unavailable now. The Java source and a synthetic protocol simulation support the method; the 80-run trial has not been repeated here.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Read the server; Observe one board; Recover the state; Predict later boards; Check the boundary">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Read the server</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">A status call exposes 32 state bits</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Observe one board</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">The known word order fixes a shuffle</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Recover the state</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Only 16 bits need a search</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Predict later boards</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Map each hash to its old position</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Check the boundary</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Local passes; no live receipt</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Reversing / Cryptography</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Hard</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>Java Random, LCG state recovery, Fisher-Yates inversion, salted-hash bypass, blitz timer, white-box</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved-External</td>
+</tr>
+<tr>
+<td>Local result</td>
+<td>My notes record 80 consecutive completed runs against a compiled local replica after two solver fixes</td>
+</tr>
+<tr>
+<td>Acceptance boundary</td>
+<td>No live-target submission or acceptance was observed</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/reversing/prng-state-leak/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I had ten rounds of a Connections-style game. Each board contained sixteen items, and I had to submit four correct groups of four before an 800 ms round timer expired. The first four rounds showed words. From round five onward, the service showed twelve-character hex prefixes of SHA-256 digests computed from a normalized word, a separator, and a fresh eight-byte salt. A wrong group ended the run.</p>
+<p>The salt made a dictionary lookup unattractive. The client never saw it, and the server generated a new one for each hashed board. I had the server's Java code, its word database, the message schema, and a container recipe. That white-box view changed the question I asked: could I learn <em>where</em> each token came from without learning its word?</p>
+<p>The authorized client could register, log in, request one fragment, start the challenge, and submit proposals over TCP. The asset was the integrity of the server's grouping decision. The broken boundary was the fragment response: it returned part of the same per-user state later used to shuffle boards. My notes show local-replica success. I have no live flag acceptance receipt.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I read the server before trying to beat the timer. Three details lined up. <code>getFragment</code> advanced a 48-bit per-user state and returned its high 32 bits. <code>applySecureShuffle</code> advanced that same state once more, passed it to <code>new Random(seed)</code>, and ran Fisher-Yates. <code>Game.getAllWords()</code> sorted words inside each group, sorted the groups, then concatenated them. That last step meant each original block of four positions belonged to one group.</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>What I tried or learned</th>
+<th>Recorded result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ST.1</td>
+<td>Read the game loader, session handler, PRNG path, and protocol fields.</td>
+<td>Identified the leak, shuffle, and ordered group layout.</td>
+</tr>
+<tr>
+<td>ST.2</td>
+<td>Considered direct salt recovery, hash matching, and guessing one of 1,820 first groups.</td>
+<td>Rejected them. The salt was fresh and a wrong guess reset the run.</td>
+</tr>
+<tr>
+<td>ST.3</td>
+<td>Ported Java <code>Random</code> and its bounded <code>nextInt</code> behavior to Python.</td>
+<td>The implementation reproduced the shuffle in my local tests.</td>
+</tr>
+<tr>
+<td>ST.4</td>
+<td>Called <code>getFragment</code> after login.</td>
+<td>Received the high 32 state bits, leaving 16 unknown bits.</td>
+</tr>
+<tr>
+<td>ST.5</td>
+<td>Matched candidate states against the first plaintext board's observed permutation.</td>
+<td>One full state remained; my notes give 25 ms median over 40 runs, with a 50 ms maximum.</td>
+</tr>
+<tr>
+<td>ST.6</td>
+<td>Ran the ten-board solver against a local replica.</td>
+<td>Failed as the fifth board arrived hashed.</td>
+</tr>
+<tr>
+<td>ST.7</td>
+<td>Changed the plaintext branch from <code>step &lt;= 5</code> to <code>step &lt;= 4</code>.</td>
+<td>Reached the end in single local runs.</td>
+</tr>
+<tr>
+<td>ST.8</td>
+<td>Repeated 25 local runs.</td>
+<td>Twenty passed; five failed on hyphenated words.</td>
+</tr>
+<tr>
+<td>ST.9</td>
+<td>Normalized incoming board words for database lookup and checked sort behavior across 3,648 groups.</td>
+<td>My notes give zero sort-order mismatches and 80 subsequent passes across 30 plus 50 runs.</td>
+</tr>
+<tr>
+<td>ST.10</td>
+<td>Packaged the client and word data for execution where the live host was reachable.</td>
+<td>Live submission was deferred; I have no acceptance receipt.</td>
+</tr>
+</tbody>
+</table>
+<p>The threshold mistake was my first useful interruption. The server had already printed <code>[HASHED MODE]</code> after step four, but I had read the constant name as if step five would still be plaintext. The hyphen issue took longer: the server normalized words on submission while its board output retained their original spelling. Five failures in 25 runs were enough to expose the mismatch. A single clean run would have hidden it.</p>
+<p>The rough timing is also part of the method. The client sends four independent proposals together and then reads their responses, collapsing four sequential network waits. My recorded seed search fit well inside the local 800 ms round budget. I did not measure it against the live service.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>The <a href="artifacts/challenge_solver.py">challenge solver</a> contains the complete standard-library Python client: registration, login, fragment request, game identification, Java-compatible shuffle, 65,536-state search, and grouped submissions. It expects the game database from the challenge beside it or as its third argument. It does not carry the database or any flag. The multiplier below comes from the server's <code>GameManager</code> code.</p>
+<p>The critical state transition is short:</p>
+<pre><code class="language-python">MASK48 = (1 &lt;&lt; 48) - 1
+STEP_MULT = (0x5DEECE66D ^ 0xABCDEF123) + 0xB
+STEP_INCR = 11
+
+def lcg_step(seed):
+    return (STEP_MULT * seed + STEP_INCR) &amp; MASK48
+</code></pre>
+<p>The leak is the high 32 bits of a state I call <code>S2</code>. The first challenge board uses <code>S3 = lcg_step(S2)</code> as the seed passed to <code>Random</code>. The client tries each possible low 16-bit suffix of <code>S2</code> and stops when the predicted first-board permutation matches the observed one. On later hashed boards it uses the predicted permutation to put each displayed token in <code>original_position // 4</code>. I tested that model with a synthetic state and a ten-round in-memory protocol simulation in the <a href="artifacts/test_lab.py">local test suite</a>. Those checks do not replay the original Java server or establish the recorded 80-run rate.</p>
+<p>The <a href="artifacts/README.md">lab guide</a> describes the input data, how to run the solver in an authorized challenge environment, and what the defensive sequence test can and cannot show. The <a href="artifacts/session_sequence.py">normalized event reviewer</a> is separate from the solver; it is for exploring a production-style logging hypothesis, not for playing the challenge.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>A linear congruential generator advances a state with <code>next = (a * state + c) mod m</code>. In this server, <code>m</code> is <code>2^48</code>. Once the high 32 bits of one state were exposed, only 65,536 full states remained. The first plaintext board supplied a strong check on each candidate because I knew the original word order from the 912-game database and could compare a predicted sixteen-position shuffle with the board I actually received.</p>
+<p>Fisher-Yates swaps from the end of an array toward the front. Its choices are entirely determined by the generator's output. Java's <code>Random</code> also has specified seed mixing and bounded <code>nextInt</code> behavior, including rejection sampling for bounds that are not powers of two. I reproduced those details rather than relying on Python's unrelated shuffle. Oracle's <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Random.html">Java <code>Random</code> documentation</a> specifies the 48-bit behavior and warns against security use.</p>
+<p>Each hashed board still began as sixteen words in four contiguous groups. The server hashed the words and then shuffled those sixteen tokens. The salt concealed which hash named which word, but it did not conceal the original <em>position</em> once I could predict the shuffle. Four positions from each original block made a valid group. This is why the attack could pass the server's group check without recovering the salt or reversing SHA-256. The Java code uses two <code>containsAll</code> calls after a length check; that is set-like containment, not a general multiset-equality implementation when duplicate tokens exist. The solve did not rely on duplicate hashes.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>The state leak and the grouping rule each did a different job. The fragment call reduced a 48-bit search to sixteen unknown bits. The known first board let me distinguish candidates. Predicting later shuffles then gave each displayed hash a group index, even though I could not name the underlying word.</p>
+<p>In symbols, if <code>P[shuffled_position] = original_position</code>, the proposed bucket is <code>P[shuffled_position] // 4</code>. The server built those original positions as four consecutive groups. The code did not have to crack a digest or guess one of the 1,820 possible four-item subsets. It submitted the actual hash strings already on the board in the arrangement the server would accept.</p>
+<p>The first board is the observation that makes the state search practical. A bare high-32-bit fragment still leaves 65,536 states, and a later hashed board alone would not reveal which candidate's shuffle was right. This attack also assumes the database and its ordering match the running service, and that no unseen operation advances the user's state between the fragment and the boards. Those are real dependencies, not generic properties of salted hashes.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<p>Reading all of the server code before implementing the client saved me from spending the whole exercise on the salt. The useful chain ran through three files and two interfaces: the client-visible fragment, the stateful shuffle, and the word layout. I would have missed it if I had stopped at the first cryptographic-looking function.</p>
+<p>The local tests were worth the time. My threshold assumption failed on the first hashed board. Then the stress run found the hyphen boundary that ordinary boards did not exercise. The server's own mode message made the first failure easy to diagnose; the 25-run distribution made the second one visible. I still cannot claim live success from that. A correct model and a local streak are strong preparation, while live acceptance remains a separate observation.</p>
+<p>For an operational team, the parallel is straightforward. Inventory every client-visible state value, trace each random generator's consumers, and test protocol normalization on both the send and receive sides. Fast automated sessions may be a useful hunt lead, but fast play alone is weak evidence of abuse. The state read followed by machine-speed proposals is the tighter sequence.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<p>The practitioner exercise is a compact way to rehearse cross-language PRNG modeling: port the exact arithmetic, preserve the order of calls, compare a known output, and only then forecast later outputs. It also rehearses a useful change of viewpoint. If a defender protects item identities but validates a structural relation among items, ask whether the relation leaks through order, indexing, or timing.</p>
+<p>For a SOC, the promising observable is a same-session sequence: a state-revealing read and four or more dependent submissions inside a short window. The <a href="artifacts/session_sequence.py">event reviewer</a> and <a href="artifacts/fixtures/events.jsonl">invented event fixture</a> make that hypothesis inspectable. A benign optimized client in the fixture also triggers it. A defender would need to add source identity, endpoint context, expected client behavior, and allowlisted testing before using the result as an alert.</p>
+<p>For intelligence work, a confirmed implementation detail such as <code>java.util.Random</code> in a security path can help compare products or protocol versions, but a few timing samples do not attribute an operator or prove a generator family. I would look for an exposed value and a known output before making a state-recovery claim. No campaign, actor, or real-world IOC is established by this challenge.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The <a href="artifacts/challenge_solver.py">solver</a> is a complete example of the state and shuffle calculation. Its <code>java_shuffle_perm</code> function includes the non-power-of-two rejection branch; its <code>crack_seed</code> function compares predicted positions early to avoid fully shuffling most bad candidates. The generic idea can be lifted into another review: enumerate the unknown state suffix and supply a target-specific <code>verify(candidate)</code> function. The 16-bit search size belongs to this particular leak and must be recalculated for a different system.</p>
+<p>I also keep a short white-box triage checklist in the <a href="artifacts/README.md">lab guide</a>: list client-callable operations, mark internal state in each response, follow every PRNG use, write down data ordering before and after encryption or hashing, and inspect exactly what the validator checks. For timed protocols, measure computation and network trips separately. The proposed runtime reviewer, its <a href="artifacts/fixtures/events.jsonl">fixture</a>, and <a href="artifacts/test_lab.py">tests</a> are defensive proofs of concept built around those observations. They use invented events and contain no challenge transcript.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<h3>Tier 1 - completeness checklist</h3>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>Fit in this case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MITRE ATT&amp;CK</td>
+<td><a href="https://attack.mitre.org/techniques/T1190/">T1190</a> describes exploitation of a public-facing application. It would fit a public deployment of this service, but I have no evidence of internet exposure or a real intrusion.</td>
+</tr>
+<tr>
+<td>MITRE ATLAS</td>
+<td>No model, training data, or AI inference path was attacked.</td>
+</tr>
+<tr>
+<td>OWASP Top 10 for Web / LLM</td>
+<td>The service was a custom TCP game, not a demonstrated web or LLM application. I would not force a web category onto it.</td>
+</tr>
+<tr>
+<td>CVSS, EPSS, CISA KEV</td>
+<td>No product CVE or scored deployment is identified. These programs cannot supply a case-specific score here.</td>
+</tr>
+<tr>
+<td>Cloud benchmarks</td>
+<td>No cloud control plane or hosting configuration was in scope.</td>
+</tr>
+</tbody>
+</table>
+<h3>Tier 2 - depth where it adds value</h3>
+<p><a href="https://cwe.mitre.org/data/definitions/338.html">CWE-338</a> is the strongest weakness label for a cryptographically weak PRNG in a security-relevant shuffle; <a href="https://cwe.mitre.org/data/definitions/330.html">CWE-330</a> is the broader family. The direct state exposure fits <a href="https://cwe.mitre.org/data/definitions/200.html">CWE-200</a> better than a mere observable discrepancy: the response actually contains internal state bits. <a href="https://d3fend.mitre.org/technique/d3f:ResourceAccessPatternAnalysis/">D3-RAPA</a> is a reasonable defensive lens for reviewing the operation sequence, provided the application emits operation-level logs. I have left CAPEC-59 and ATT&amp;CK T1600 out of the causal mapping. This solver did not forge a session credential or modify server cryptography.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<p>An intelligence note could describe this as a <em>technique pattern</em>: partial PRNG state returned by an auxiliary API, a known-output check, and prediction of a downstream shuffle. That is more useful than an indicator containing the game's operation names. The names are challenge-specific, and there is no campaign infrastructure to share.</p>
+<p>If another team had an affected product, I would put the pattern into a STIX 2.1 <code>attack-pattern</code> object and attach the exact product/version evidence, observed endpoint, and confidence there. I would use a <code>course-of-action</code> object for removing state disclosure and replacing security-sensitive randomness. I have no TAXII feed or exchanged STIX bundle here. The <a href="artifacts/README.md">lab guide</a> gives the small field list a defender would need before sharing: affected build, endpoint behavior, logging coverage, and tested reproduction. Any application STIG or CIS safeguard mapping should be checked against the current baseline for the actual product; a challenge source tree alone does not establish a compliance finding.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>11a. Standards Mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Control or guidance</th>
+<th>Concrete application</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NIST SP 800-53 Rev. 5 SI-11, Error Handling</td>
+<td>Review status and diagnostic responses for internal state exposure. Here the fragment call was the direct disclosure.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5 SA-11, Developer Testing and Evaluation</td>
+<td>Add a regression test that a client cannot infer future boards from exposed values.</td>
+</tr>
+<tr>
+<td>NIST SP 800-90A Rev. 1</td>
+<td>Use a suitable DRBG for security-sensitive randomness, with correct lifecycle handling.</td>
+</tr>
+<tr>
+<td>CIS Controls v8 16.11 and 16.12</td>
+<td>Review the approved cryptographic component and add code-level checks in the security path.</td>
+</tr>
+</tbody>
+</table>
+<p>These are design and verification mappings, not a claim that the game was subject to those baselines. The 800 ms timer was a gameplay constraint, not a cryptographic control.</p>
+<h3>11b. Mitigation Realization</h3>
+<p>I would start by removing <code>getFragment</code> or making its response independent of shuffle state. I would also separate any client-visible telemetry generator from the generator used to order security-relevant items. Replacing <code>Random</code> with <code>SecureRandom</code> in that path makes forecasting harder, but I would still review the protocol: when the decision is "which supplied tokens form a group," a predictable or leaked ordering defeats a hidden word-to-hash mapping. The validator should use a design whose acceptance cannot be reconstructed from a client-visible permutation alone.</p>
+<p>A code review gate can flag <code>new Random(...)</code> where the result controls authorization, nonce selection, challenge assignment, or any other security decision. A simple text search is only a lead; data-flow review must establish the actual use. A regression test should expose the fragment to a test client, gather a known board, attempt prediction, and fail when the client can recover the next partition. Repeat with hyphenated words because the original client failed there. The <a href="artifacts/test_lab.py">synthetic test suite</a> checks only the attack model. A defender regression test still needs to be built.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<h3>Indicators</h3>
+<p>I have no campaign IOC, malicious domain, or production packet trace. The case-level pattern is a fragment read followed by multiple <code>submitProposal</code> calls at machine speed in the same session. Repeated short registrations may strengthen that lead, but legitimate test clients can look similar. Source IP and generated usernames alone would be weak selectors.</p>
+<h3>YARA - static-side artifact</h3>
+<p>A static source search for <code>new Random(seed)</code> near a shuffle is useful during review, but a YARA hit would not prove that the seed is exposed or that the shuffle gates a security decision. A YARA expression for these strings would be a triage lead, not a validated finding. Reviewers should trace <code>getFragment</code>, <code>applySecureShuffle</code>, and <code>getAllWords</code> together. A grep-style pattern can find candidate files; the data-flow argument is the finding.</p>
+<h3>Splunk SPL - runtime indicator</h3>
+<p>The following template expects normalized <code>session_id</code>, <code>source_ip</code>, <code>operation</code>, and <code>_time</code> fields. It selects submissions within five seconds <em>after</em> the first fragment read. Map fields and index names to an actual deployment before use.</p>
+<pre><code class="language-spl">index=application_logs earliest=-1h
+| eval read_epoch=if(operation=&quot;getFragment&quot;,_time,null())
+| eventstats min(read_epoch) as first_read by session_id source_ip
+| where isnotnull(first_read) AND _time&gt;first_read AND _time&lt;=first_read+5 AND operation=&quot;submitProposal&quot;
+| stats count as submissions by session_id source_ip first_read
+| where submissions&gt;=4
+</code></pre>
+<h3>Microsoft Sentinel KQL</h3>
+<p>This template assumes a normalized <code>ApplicationLogs</code> table. It keeps the read time and submission time separate, so event order is explicit. Multiple reads in one session may produce duplicate joins and need a product-specific deduplication rule.</p>
+<pre><code class="language-kql">let reads = ApplicationLogs
+| where TimeGenerated &gt; ago(1h) and Operation == &quot;getFragment&quot;
+| project SessionId, SourceIP, ReadTime=TimeGenerated;
+let submissions = ApplicationLogs
+| where TimeGenerated &gt; ago(1h) and Operation == &quot;submitProposal&quot;
+| project SessionId, SourceIP, SubmitTime=TimeGenerated;
+reads
+| join kind=inner submissions on SessionId, SourceIP
+| where SubmitTime &gt; ReadTime and SubmitTime &lt;= ReadTime + 5s
+| summarize Submissions=count() by SessionId, SourceIP, ReadTime
+| where Submissions &gt;= 4
+</code></pre>
+<h3>Log source and pipeline requirements</h3>
+<p>The useful sensor is the application operation log. It needs a stable session identifier, event time with enough precision for sub-second work, operation name, and source identifier. A reverse proxy without operation names cannot support this sequence. The <a href="artifacts/session_sequence.py">JSONL reviewer</a> accepts those four normalized fields and is bounded to a 2 MB, 20,000-line local file. Its <a href="artifacts/fixtures/events.jsonl">fixture</a> and <a href="artifacts/test_lab.py">test suite</a> are linked here so the input and expected result can be inspected together.</p>
+<h3>Detection engineering notes</h3>
+<p>The local test finds a case-like session and a deliberately benign fast client. It leaves a delayed near miss clear. That is an honest result: the sequence has some recall in a toy event stream and poor specificity without endpoint and client context. The SPL and KQL are query templates; neither was run in a SIEM or tuned against production telemetry. Ordinary Sigma selectors cannot express this complete timed sequence. A formal Sigma correlation would need the specification's ordered event and count semantics, backend support, and a mapped application log source. I would validate the query and investigate known automation before promotion.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow near the top</a> shows the dependency I wanted to keep visible: source review led to the fragment leak, the first plaintext board checked the recovered state, and that state predicted later hash positions. The last box marks the evidence boundary. My local replica run reached completion. I have no live acceptance receipt.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Random.html">Oracle Java <code>Random</code> documentation</a>, seed and generator behavior.</li>
+<li><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/security/SecureRandom.html">Oracle Java <code>SecureRandom</code> documentation</a>, security-sensitive randomness.</li>
+<li><a href="https://cwe.mitre.org/data/definitions/338.html">MITRE CWE-338</a>, <a href="https://cwe.mitre.org/data/definitions/330.html">CWE-330</a>, and <a href="https://cwe.mitre.org/data/definitions/200.html">CWE-200</a>, weakness taxonomy.</li>
+<li><a href="https://attack.mitre.org/techniques/T1190/">MITRE ATT&amp;CK T1190</a>, conditional public-facing application mapping.</li>
+<li><a href="https://d3fend.mitre.org/technique/d3f:ResourceAccessPatternAnalysis/">MITRE D3FEND D3-RAPA</a>, resource access pattern analysis.</li>
+<li><a href="https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-correlation-rules-specification.md">Sigma correlation specification</a>, ordered temporal correlation syntax.</li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/90/a/r1/final">NIST SP 800-90A Rev. 1</a> and <a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5</a>, randomness and control references.</li>
+<li><a href="https://www.cisecurity.org/controls/application-software-security">CIS Controls v8, Control 16</a>, application software security.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
