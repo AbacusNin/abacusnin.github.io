@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Finding the Keyfob in a Crowded 433 MHz Capture - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="I separated a keyfob-like packet from two other 433 MHz emitters, measured its OOK carrier and 500 microsecond chip, then corrected an ASK label the grader rejected. The accepted answer is recorded; the defensive lab uses invented IQ.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/rf/keyfob-phy-recovery/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="Finding the Keyfob in a Crowded 433 MHz Capture">
+  <meta property="og:description" content="I separated a keyfob-like packet from two other 433 MHz emitters, measured its OOK carrier and 500 microsecond chip, then corrected an ASK label the grader rejected. The accepted answer is recorded; the defensive lab uses invented IQ.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/rf/keyfob-phy-recovery/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / RF / SIGINT / <span aria-current="page">Finding the Keyfob in a Crowded 433 MHz Capture</span></p>
+      <div class="page-head">
+        <h1 class="page-title">Finding the Keyfob in a Crowded 433 MHz Capture</h1>
+        <p class="lead">Three emitters shared the band. The packet shape, more than the loudest peak, led me to the keyfob.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Identify the target emitter in a 433 MHz IQ capture and report its carrier frequency, modulation token, and shortest fundamental symbol period.</p>
+<p><strong>What I did.</strong> I checked sample geometry, surveyed the band, grouped bursts by carrier and packet shape, then measured the selected emitter&#x27;s amplitude, phase, and pulse widths.</p>
+<p><strong>The result.</strong> The challenge account records a rejected ASK submission followed by acceptance with the more specific OOK token, 433920000 Hz, and a 500 microsecond chip period.</p>
+<p><strong>The limit.</strong> The account does not include a grader receipt or a bit-level comparison of the two packets. The linked local tests use invented IQ and do not replay the challenge capture or establish a replay vulnerability.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Check the capture; Survey the band; Sort the bursts; Measure the candidate; Correct the label; Test the defense">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Check the capture</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">20 million complex samples in 10 seconds</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Survey the band</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Three carriers near -80, 0, and +40 kHz</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Sort the bursts</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Discard beacon and telemetry shapes</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Measure the candidate</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">433.92 MHz, OOK, 500 us chip</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Correct the label</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">ASK rejected; OOK recorded accepted</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Test the defense</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Synthetic IQ positive and near misses</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>RF / SIGINT signal analysis</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>SDR, IQ, ISM-433, OOK, PHY, keyfob, PWM, multi-emitter</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved-Verified</td>
+</tr>
+<tr>
+<td>Recorded result</td>
+<td>An ASK-token answer was rejected; a later OOK-token answer was recorded as accepted</td>
+</tr>
+<tr>
+<td>Evidence boundary</td>
+<td>The page does not claim a bit-level payload decode, live vehicle test, or production RF detection</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/rf/keyfob-phy-recovery/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I had a ten-second IQ recording from an SDR tuned to 433.92 MHz near a parking area. It was complex float32, little-endian, at two million samples per second: 20 million samples in all. Multiple devices spoke in the same slice of spectrum. The challenge asked for the target vehicle keyfob's center frequency in hertz, modulation label, and shortest fundamental symbol period in microseconds.</p>
+<p>The plausible threat was passive collection of a physical-access transmitter. At this layer I could hear when a carrier appeared and how it was modulated. I could not tell whether the underlying access code was fixed, rolling, or challenge-response without decoding and comparing payloads. This was a PHY identification problem. A replay or relay attack would require separate evidence.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I worked through twelve recorded steps. The file-size check came first: 20 million complex64 samples at 8 bytes each implied a 160 MB capture and ten seconds at 2 MS/s. A two-sided Welch survey with <code>nperseg=8192</code> showed three carrier regions, about -80, 0, and +40 kHz relative to the receiver. That was a map of where to look, not yet a keyfob identification.</p>
+<p>I smoothed the magnitude with a 200-sample window, thresholded the envelope, and found roughly 360 pulses longer than 250 microseconds. A per-pulse FFT and 5 kHz carrier bucket separated the emitters. Emitter A at +40 kHz looked like a repeating five-pulse beacon. Emitter C at -80 kHz had a telemetry-like PWM alphabet. I left both out of the keyfob answer. Emitter B near the tuned center produced the longer 171-symbol packet twice, the stronger structural match for a button press.</p>
+<p>The initial coarse spectrum placed the strongest peak near +0.5 kHz. I nearly let that number stand. With <code>FS/8192</code>, bins sit about 244 Hz apart; the coarse peak was only a few bins from center. I then took a 0.26-second packet segment and evaluated a zero-padded <code>2^22</code>-point FFT. The grid spacing was about 0.477 Hz and its peak landed at the tuned center, yielding a reported carrier of 433,920,000 Hz. The real observation was about 520,000 samples. Zero padding interpolated its spectrum; it did not give me four million samples of independent information or certify sub-hertz accuracy. Receiver calibration and repeat measurements would matter outside this puzzle.</p>
+<p>Magnitude and phase settled the modulation family. The ON/OFF amplitude distribution was strongly bimodal, with fewer than 0.5% of samples in the middle region by the recorded threshold. During ON intervals the reported instantaneous-frequency standard deviation was 139 Hz. That favored OOK over the FSK and multi-level ASK alternatives considered here. Pulse widths then clustered at 500 microseconds (194 pulses) and 1000 microseconds (137 pulses). The short width was the chip; a bit made from a short and long interval could last three chips.</p>
+<p>I first submitted the broader family label <code>ASK</code>. The grader rejected it. I kept the measured frequency and chip width, changed the token to <code>OOK</code>, and recorded acceptance. My notes also mention a pre-submission dry-run bug, but preserve neither its fault nor its fix. I cannot turn that into a detailed debugging story.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>The analysis used NumPy for complex samples, envelope edges, per-burst FFTs, magnitude histograms, phase differences, and width bins; SciPy's <code>welch</code> and <code>find_peaks</code> supplied the first spectrum. The core steps were <code>np.fromfile(..., dtype=np.complex64)</code>, two-sided Welch with 8192-sample segments, and pulse grouping after a 200-sample smoother. An 8192-point FFT on each pulse assigned a coarse carrier bucket. A longer selected packet supplied the later carrier estimate.</p>
+<p>My pulse-width logic considered both ON and OFF runs, removed gaps above 5 ms, and used 25-microsecond histogram bins. That is more reliable than treating a protocol bit as the shortest unit. The modulation check paired an envelope histogram with phase-derived instantaneous frequency during ON periods. Either measurement alone can be fooled by clipping, noise, or overlapping emitters.</p>
+<p>I turned those ideas into a small <a href="artifacts/iq_review.py">IQ reviewer</a> with a <a href="artifacts/make_fixture.py">fixture generator</a>, <a href="artifacts/test_lab.py">three-case test</a>, and <a href="artifacts/README.md">lab guide</a>. It accepts bounded local complex64 files with an explicit sample rate and tune frequency. It reports one repeated long-packet candidate and the clues behind that choice. The clean example uses 200 kS/s and short invented packets so it can run locally. Its thresholds are example settings, not a general keyfob classifier.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>An SDR translates nearby radio energy into complex baseband samples. The magnitude of <code>I + jQ</code> shows the envelope; the phase advances according to carrier offset from the receiver's tuned center. OOK switches the carrier between ON and OFF. FSK changes its frequency. Multi-level ASK keeps more than two useful amplitude levels. In this trace, an ON/OFF envelope plus steady ON-state phase favored the narrower OOK name. OOK is an amplitude-keying subtype, which explains why <code>ASK</code> was broad but still failed the challenge's expected token.</p>
+<p>The 500-microsecond value came from the shortest stable pulse-width cluster. In a short/long PWM scheme, a 500-microsecond chip and a 1000-microsecond interval can combine into a 1500-microsecond bit. Those timings alone do not identify a particular encoder chip, vendor, access code, or rolling-code design. PT2262 and HT12E are useful examples of encoder families, not attributions for this capture.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>The separation depended on three independent observations. First, each emitter occupied a different carrier offset. Second, its event shape differed: a five-pulse beacon, a telemetry-like alphabet, and the longer packet that appeared twice. Third, the selected packet's own amplitude, phase, and width distributions agreed on OOK with a 500-microsecond chip. I did not choose the target merely because its frequency was 433.92 MHz; several devices can share that band.</p>
+<p>The packet body's 0.26-second duration gives a rough observation-limited scale near <code>1/T</code>, about 3.8 Hz, before oscillator error and noise. The 0.477 Hz padded FFT bins are a finer sampling of the same spectrum. For the challenge, both the refined peak and the receiver tune frequency were consistent with 433,920,000 Hz. They do not establish that a field receiver knows absolute carrier frequency to the nearest hertz.</p>
+<p>The width histogram was reported as 194 pulses at 500 microseconds and 137 at 1000 microseconds. Those 331 classified intervals do not need to equal the 171-symbol packet count: ON and OFF intervals, packet boundaries, filtering, and repeated frames can change the accounting. I would preserve the pulse-to-packet association in a field investigation before claiming exact coding. I also would compare demodulated bits across the two packets before saying the code itself repeated.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<p>The useful rhythm was broad spectrum, then burst grouping, then measurement on the chosen emitter. It kept me from overfitting a carrier peak before I knew which device produced it. Rejecting A and C on packet shape mattered as much as the final OOK classification.</p>
+<p>The coarse +0.5 kHz reading was a near miss. I refined the peak with more of the actual packet, then used padding to locate the peak between FFT bins. I now keep bin spacing, real observation time, and receiver calibration separate in my notes. The <code>ASK</code> submission was another near miss, this time about vocabulary. I had evidence for OOK, so I used that specific term on the second submission.</p>
+<p>One limit stayed open. I did not decode the two packets bit for bit. The record supports a PHY tuple and a reported accepted answer. It does not show a working replay, a vehicle unlock, or a fixed-code protocol.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<p>The same workflow would help me triage a facility's authorized RF capture: find occupied carriers, group pulse trains, compare packet timing, then decide what deserves demodulation. Other bands and devices would need new thresholds and calibration. Packet repetition alone is not a replay indicator. Many rolling-code transmitters repeat a frame during one press, and a passive collector might never touch an organization-managed endpoint.</p>
+<p>For a security team, RF-side and endpoint-side visibility answer different questions. RF sensors can compare emission timing and, with a decoder, payloads. Endpoint logs may show SDR programs or attached hardware on managed machines, but they cannot see an off-site passive receiver. A suspected access incident would need access-controller records, authorized RF recordings, physical context, and the protocol owner's help. I would not order a rolling-code reset or accuse a user on a process-name hit alone.</p>
+<p>The PHY tuple can support emitter-class triage when paired with packet cadence and a known baseline. It does not identify a vendor by itself. Time-difference-of-arrival geolocation would require synchronized, geographically separated sensors and validated clock error; this single capture cannot do it.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The <a href="artifacts/README.md">lab guide</a> lists inputs, output fields, thresholds, and limits. The <a href="artifacts/iq_review.py">IQ reviewer</a> finds pulse groups, checks for one repeated long packet, then reports a carrier estimate, amplitude middle fraction, ON-state frequency variation, and observed pulse widths. The <a href="artifacts/make_fixture.py">generator</a> makes three invented captures. The <a href="artifacts/test_lab.py">test suite</a> checks a positive OOK packet, a beacon-and-telemetry capture with no target, and a multi-level ASK near miss that must not be called OOK.</p>
+<p>My field checklist is short: verify IQ format and sample rate; enumerate carrier regions; keep emitter labels attached to each event; select the target by packet structure; record actual observation time with the FFT grid; inspect amplitude and phase; quantify ON and OFF widths; separate chip duration from bit duration; and retain the submission outcome and any uncertainty. The lab covers only part of that checklist. It neither transmits nor decodes access codes.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<p>ATT&amp;CK <a href="https://attack.mitre.org/techniques/T1200/">T1200, Hardware Additions</a> concerns hardware introduced into a target system or network. A receiver listening from outside is not that event. <a href="https://attack.mitre.org/techniques/T1592/004/">T1592.004</a> concerns client host configurations, not an RF keyfob's PHY tuple. <a href="https://attack.mitre.org/techniques/T1557/">T1557</a> could become relevant to an observed relay, but I did not perform or observe one. I leave these as possible later scenarios rather than map them as findings from this capture.</p>
+<p>The CAPEC-60 analogy is narrow: <a href="https://capec.mitre.org/data/definitions/60.html">CAPEC-60</a> specifically concerns reuse of a session ID. A fixed-code RF replay would be a different credential or signal replay mechanism, and fixed-code status was not established. D3FEND <a href="https://next.d3fend.mitre.org/technique/d3f%3ANetworkTrafficAnalysis/">Network Traffic Analysis</a> addresses computer network traffic, while <a href="https://next.d3fend.mitre.org/technique/d3f%3AResourceAccessPatternAnalysis/">Resource Access Pattern Analysis</a> addresses a user's resource access. They are analogies for RF baselining and access-controller review, not exact labels for this IQ analysis. No ML, web, LLM, cloud, or CVE-scoped component was in this challenge.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<p>The carrier, OOK label, and 500-microsecond chip form a useful case fingerprint, but many legitimate emitters can share those features. I would not turn them into an actor IOC or a STIX indicator. A sharing team could attach a richer RF observation through an agreed custom extension after validating emitter identity, collection time, receiver calibration, and handling rules. This one capture gives me no basis to invent that schema or claim TAXII exchange.</p>
+<p>Wireless STIGs, ETSI EN 300 220, and FCC Part 15 speak to different deployment or radio-compliance questions. None proves whether this keyfob uses a secure access code. That question needs protocol documentation or demodulation, plus tests against the actual receiver. The challenge stopped at PHY recovery.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>11a. Standards Mapping (abbreviated)</h3>
+<table>
+<thead>
+<tr>
+<th>NIST SP 800-53 Rev. 5 control</th>
+<th>Fit and limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">SC-40</a>, Wireless Link Protection</td>
+<td>A program-level home for assessing signal-parameter attacks on defined wireless links.</td>
+</tr>
+<tr>
+<td>SC-40(3), Imitative or Manipulative Communications Deception</td>
+<td>Relevant if a system must identify and reject spoofed wireless transmissions. The PHY tuple here does not test that rejection.</td>
+</tr>
+<tr>
+<td>SI-4(14), Wireless Intrusion Detection</td>
+<td>A possible home for a deployed RF monitoring program with coverage, baselines, and response ownership. No such sensor was tested here.</td>
+</tr>
+<tr>
+<td>SC-43, Usage Restrictions; PE-19, Information Leakage</td>
+<td>Possible policy and site-planning considerations once the organization, facility, and access technology are known.</td>
+</tr>
+</tbody>
+</table>
+<p>I initially mapped SC-40(1), but that enhancement addresses electromagnetic interference. It does not directly realize replay resistance. A control mapping is a design suggestion, not evidence of compliance or a claim that this puzzle system used a fixed code.</p>
+<h3>11b. Mitigation Realization</h3>
+<p>For a real access product, I would ask the vendor how it authenticates each actuation and how the receiver rejects stale or imitative frames. Rolling codes and challenge-response are possible designs; either needs a review of resynchronization, relay exposure, recovery, and key management. OOK itself is a modulation choice, not a proof that the code is fixed. A procurement rule that rejects every OOK device would discard some secure designs and still miss insecure devices using other modulation.</p>
+<p>A site that needs RF monitoring should first document its bands, sensor positions, baseline emitters, alert ownership, and legal collection scope. A receiver or endpoint sensor cannot reliably detect every passive listener by looking for local-oscillator leakage. Shielding and transmitter power are site engineering decisions, not conclusions from this file. The <a href="artifacts/README.md">local IQ lab</a> is useful for evaluating a reviewer workflow before any deployment.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>The only observed indicators here are case-specific RF measurements: three carrier regions, a twice-seen long packet at the center, OOK-like amplitude and phase, and two width clusters. They are not malicious infrastructure IOCs. An unmeasured carrier or placeholder rule ID would make a poor shareable record or runnable rule.</p>
+<p>The source proposed hunting <code>gqrx</code>, <code>inspectrum</code>, <code>urh</code>, <code>rtl_433</code>, <code>gnuradio-companion</code>, <code>hackrf_transfer</code>, and <code>bladerf-cli</code> on non-engineering hosts. That is a low-confidence lead. A process name can be renamed, benign lab use is common, and a receiver outside the managed fleet leaves no endpoint event. A real Sigma rule needs a valid rule ID, exact telemetry mapping, tested field modifiers, and allowlists based on an owned asset inventory. I have kept the idea but have not labeled the placeholder Sigma sketch a validated detector.</p>
+<p>A Sentinel hunting query could start with <code>DeviceProcessEvents</code> and <code>FileName</code>, join an approved-host inventory, and review user, path, signer, and USB-attachment context. It would hunt for unexpected <strong>tool use on managed endpoints</strong>, not for RF interception itself. An RF-side replay analytic would require authorized sensor events with calibrated timestamps, carrier/channel, decoded frame hash, receiver outcome, and a protocol-aware repeat window. No frame hashes or receiver outcomes were available in this exercise, so I did not write a pretend replay detector.</p>
+<p>The <a href="artifacts/test_lab.py">synthetic IQ tests</a> are a modest validation of the <a href="artifacts/iq_review.py">reviewer</a>: a repeated OOK packet is selected; an ordinary beacon plus telemetry is rejected as targetless; a repeated multi-level ASK packet is withheld from the OOK class. They do not measure a false-positive rate on real RF, validate a SIEM query, or establish device attribution. Tuning would require captures from multiple real authorized devices and known negative cases, with drift, overlap, and low-SNR trials.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow above</a> carries the key distinction: I found the target by packet structure, measured its PHY, then corrected the answer token. The last box is a separate defender lab using generated signals. That lab establishes no result about the challenge capture or whether the observed fob could be replayed.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.welch.html">SciPy Welch reference</a> and <a href="https://docs.scipy.org/doc/scipy/tutorial/signal.html">SciPy spectral-analysis tutorial</a>, PSD segments and zero-padding behavior.</li>
+<li><a href="https://www.mathworks.com/help/signal/ug/amplitude-estimation-and-zero-padding.html">MathWorks amplitude estimation and zero padding</a>, distinction between interpolated bins and spectral resolving power.</li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5</a> and <a href="https://tsapps.nist.gov/publication/get_pdf.cfm?pub_id=933932">NIST SC-40(3) assessment text</a>, wireless-link and monitoring control scope.</li>
+<li><a href="https://attack.mitre.org/techniques/T1200/">MITRE ATT&amp;CK T1200</a>, <a href="https://attack.mitre.org/techniques/T1592/004/">T1592.004</a>, and <a href="https://attack.mitre.org/techniques/T1557/">T1557</a>, checked for applicability rather than assigned as observed tactics.</li>
+<li><a href="https://capec.mitre.org/data/definitions/60.html">MITRE CAPEC-60</a> and <a href="https://next.d3fend.mitre.org/technique/d3f%3ANetworkTrafficAnalysis/">D3FEND Network Traffic Analysis</a>, analogies checked for fit.</li>
+<li><a href="https://www.etsi.org/technologies/short-range-devices">ETSI short-range-device standards</a> and <a href="https://www.ecfr.gov/current/title-47/chapter-I/subchapter-A/part-15/subpart-C">47 CFR Part 15 Subpart C</a>, radio-equipment context rather than proof of access-code security.</li>
+<li>Princeton Technology PT2262 and Holtek HT12E/HT12D encoder datasheets, example PWM designs. Neither identifies the transmitter in this case.</li>
+<li>Biham et al., <em>How to Steal Cars: A Practical Attack on KeeLoq</em> (EUROCRYPT 2008), and Samy Kamkar, <em>Drive It Like You Hacked It</em> (DEF CON 23, 2015), later protocol-attack context rather than results observed in this PHY exercise.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
