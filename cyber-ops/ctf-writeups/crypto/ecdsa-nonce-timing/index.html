@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Six Fast Signatures and a Private Key - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="Six unusually fast P-256 signatures exposed tight bounds on their nonces. I used a lattice to recover a scalar that matched the public key, then found the payload&#x27;s hash-chain wrapper. The flag-shaped plaintext stays withheld.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/ecdsa-nonce-timing/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="Six Fast Signatures and a Private Key">
+  <meta property="og:description" content="Six unusually fast P-256 signatures exposed tight bounds on their nonces. I used a lattice to recover a scalar that matched the public key, then found the payload&#x27;s hash-chain wrapper. The flag-shaped plaintext stays withheld.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/ecdsa-nonce-timing/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Crypto / <span aria-current="page">Six Fast Signatures and a Private Key</span></p>
+      <div class="page-head">
+        <h1 class="page-title">Six Fast Signatures and a Private Key</h1>
+        <p class="lead">I had 1,600 signatures, but six short signing times carried the key.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Recover a P-256 signing key from signature timing, then unwrap a short encrypted payload.</p>
+<p><strong>What I did.</strong> I fitted a nonce bit-length timing model, reduced a six-signature Hidden Number Problem lattice, verified the scalar against the public key, and tried a bounded keystream matrix.</p>
+<p><strong>The result.</strong> The replay recovered a scalar whose P-256 public point exactly matches the supplied point. The matching ciphertext yields 35 printable bytes in flag format under the recorded hash-chain method.</p>
+<p><strong>The limit.</strong> The scalar and plaintext are withheld. The available record has no platform acceptance receipt and does not identify a real vulnerable product or signer.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Inspect 1,600 rows; Fit timing slope; Build HNP lattice; Check public key; Probe ciphertext; Defender test">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Inspect 1,600 rows</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Six signatures are much faster</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Fit timing slope</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">About 250 ns per nonce bit</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Build HNP lattice</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Bounds from six short nonces</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Check public key</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Recovered scalar times G equals Q</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Probe ciphertext</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Hash-chain XOR gives flag shape</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Defender test</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Controlled nonce-width benchmark</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Crypto / timing side channel</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Hard</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>ECDSA, P-256, side-channel, timing, HNP, lattice, LLL, Minerva-class</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved-Verified</td>
+</tr>
+<tr>
+<td>Verified result</td>
+<td>Six-signature lattice recovery matched the supplied public key; the 35-byte ciphertext decoded to printable, flag-shaped text</td>
+</tr>
+<tr>
+<td>Evidence limit</td>
+<td>No platform acceptance receipt or production signer was available</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/crypto/ecdsa-nonce-timing/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>The challenge gave me a CSV of 1,600 P-256 ECDSA signatures. Each row had a message digest <code>h</code>, signature values <code>r</code> and <code>s</code>, and an elapsed signing time in nanoseconds. A second file gave the public point <code>Q = (Qx, Qy)</code>. The last piece was a 35-byte encrypted payload. My job was to recover the long-term signing scalar <code>d</code> and use it to open that payload.</p>
+<p>The signer itself was not present. I had observations of its work, not an API I could call. The threat model is a service or device that lets an observer pair signatures with signing duration. If scalar multiplication runs for a number of iterations determined by the secret nonce's bit length, time reveals a bound on that nonce. Several such bounds can expose the long-term key. The immediate damage is loss of the signing identity; forged signatures become possible. In this puzzle, the same scalar also keyed a payload wrapper.</p>
+<p>I could verify the cryptographic claim offline. A recovered <code>d</code> either produces the supplied public point under P-256 or it does not. I kept that check separate from the later plaintext search. I have no acceptance screen or live signer log, so the page claims a locally verified recovery and a flag-shaped payload, not a recorded platform award.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I started with the boring file checks: three artifacts, a 1,600-row CSV, and well-formed hex in the signature columns. The timer values did not look like one smooth cloud. Most were around 195,000 to 198,000 ns. Six were much lower, from 139,661 to 163,860 ns. Those six made more sense as short nonces than as random scheduling noise once I checked their spacing against a simple timing model.</p>
+<h3>Tool / Code Timeline</h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Decision and evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ST.1</td>
+<td>Counted the trace rows and checked the public-key and payload files.</td>
+</tr>
+<tr>
+<td>ST.2</td>
+<td>Sorted signing times. The six low IDs were <code>1254</code>, <code>646</code>, <code>813</code>, <code>521</code>, <code>932</code>, and <code>1074</code>.</td>
+</tr>
+<tr>
+<td>ST.3</td>
+<td>Fitted <code>elapsed_ns = 133662 + 250 * bitlen(k)</code> to the low timings.</td>
+</tr>
+<tr>
+<td>ST.4</td>
+<td>Estimated their nonce widths as 24, 62, 62, 79, 79, and 121 bits, then allowed four extra bits in the lattice bounds.</td>
+</tr>
+<tr>
+<td>ST.5</td>
+<td>Computed <code>alpha = s^-1 r mod n</code> and <code>beta = s^-1 h mod n</code> for those rows.</td>
+</tr>
+<tr>
+<td>ST.6</td>
+<td>Reduced the centered Hidden Number Problem lattice. The short vector yielded a candidate scalar.</td>
+</tr>
+<tr>
+<td>ST.6a</td>
+<td>A hand-written elliptic-curve verifier failed on an inverse-point case with <code>ValueError: base is not invertible</code>. I moved verification to a maintained curve library.</td>
+</tr>
+<tr>
+<td>ST.7</td>
+<td>Checked <code>d * G == Q</code>. The independent replay of the local artifacts passes exactly.</td>
+</tr>
+<tr>
+<td>ST.8</td>
+<td>Tried raw-scalar XOR, AES variants, ChaCha20 zero-nonce variants, and hash-chain keystream candidates against the 35-byte payload.</td>
+</tr>
+<tr>
+<td>ST.9</td>
+<td>The <code>SHA-256(d_bytes)</code>-keyed hash-chain XOR branch produced 35 printable bytes with the expected flag shape. The plaintext stays withheld.</td>
+</tr>
+</tbody>
+</table>
+<p>I tried more than 30 key, mode, and nonce combinations. Raw scalar XOR gave only 8 printable bytes out of 35. AES-ECB and CBC did not fit a 35-byte bare ciphertext under ordinary block framing; CTR and ChaCha20 branches did not yield the expected prefix. Those failures matter because recovering <code>d</code> did not automatically tell me how the puzzle wrapped its payload. I used a finite probe matrix instead of staring at the ciphertext and guessing.</p>
+<p>I also considered brute-forcing the 24-bit nonce from ID <code>1254</code>. That would be a useful check, but it would solve only the easiest row and teach little about traces with weaker leakage. I stayed with the lattice path. My own replay used a bounded, pure-Python LLL implementation and recovered a scalar that passes the public-key check. It also identified the hash-chain branch without printing the scalar or plaintext. The <a href="artifacts/hnp_replay.py">replay script</a> lets the checks be repeated with locally held challenge files.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<h3>Timing-leak triage</h3>
+<p>The first useful calculation was the timing fit. Taking 197,662 ns as the full-width anchor gives <code>197662 - 256 * 250 = 133662</code> ns. The smallest measurement, 139,661 ns, lands at <code>(139661 - 133662) / 250 = 23.996</code> bits. The other five low rows land near 62, 62, 79, 79, and 121. That pattern is specific enough to justify trying a nonce-width model; an isolated low outlier would not be.</p>
+<p>My broad step-search script is a heuristic. It asks how many elapsed values fall near integer multiples of candidate steps; it does not by itself prove the signer leaks nonce length. The subsequent public-key recovery is the much stronger test. For defensive validation, the <a href="artifacts/latency_leak_check.py">controlled latency checker</a> takes a test-run CSV with known <code>nonce_bits</code> and <code>elapsed_ns</code>, rather than pretending a production log already knows each nonce width.</p>
+<h3>HNP lattice primitive (reusable)</h3>
+<p>From each ECDSA signature, I can compute <code>alpha</code> and <code>beta</code> without the private key. With a bound on <code>k</code>, the value <code>alpha * d + beta mod n</code> must be small after centering. Six such rows define a short-vector search. The <a href="artifacts/hnp_replay.py">local replay</a> builds the eight-row integer basis, performs LLL with bounded work, extracts candidate scalars, and accepts one only when P-256 multiplication reproduces <code>Q</code>. Its pure-Python reducer is transparent for this case; a noisier or larger HNP instance deserves a dedicated lattice library and more careful per-row bounds.</p>
+<h3>Driver: trace to private key</h3>
+<p>The replay script accepts the CSV and a text file containing <code>Qx</code> and <code>Qy</code>. It selects the six shortest times, applies the case's <code>133662</code> ns intercept, <code>250</code> ns-per-bit slope, and four-bit safety pad, then checks the recovered scalar. On the matching local files it reports all six selected IDs, bit bounds <code>[28, 66, 66, 83, 83, 125]</code>, and <code>public_key_match True</code>. It deliberately prints no scalar. Those numbers explain the solve without turning the page into a key disclosure.</p>
+<h3>Payload unwrap: keystream probe matrix</h3>
+<p>The same <a href="artifacts/hnp_replay.py">replay script</a> tries thirteen local branches: repeating raw-scalar XOR, a SHA-256 counter stream under three key encodings, AES-CTR with a zero counter, and ChaCha20 with eight- and twelve-byte zero nonces. It reports the best branch and output shape, never the plaintext. Against the 35-byte ASCII-hex ciphertext, <code>hash-chain XOR / SHA256(scalar bytes)</code> is the branch with 35 printable bytes and a closing brace. I also tried ECB/CBC variants, which I rejected before decryption because the bare ciphertext length was not a block multiple. A different envelope could contain other framing, so length alone is a clue rather than a cipher proof.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<h3>ECDSA in one paragraph</h3>
+<p>An ECDSA signer keeps a long-term scalar <code>d</code> and publishes <code>Q = d * G</code>. For each signature it uses a fresh nonce <code>k</code>, computes a point from <code>k * G</code>, and returns <code>(r, s)</code> where <code>s = k^-1(h + r*d) mod n</code>. If one complete <code>k</code> becomes known, the equation gives <code>d</code> immediately. A few partial nonce bounds can be enough too. <a href="https://csrc.nist.gov/pubs/fips/186-5/final">FIPS 186-5</a> defines the signature algorithm; the implementation still has to protect the nonce while computing it.</p>
+<h3>The Hidden Number Problem</h3>
+<p>Rearranging the signature equation gives <code>k_i = beta_i + alpha_i*d mod n</code>, with <code>alpha_i = s_i^-1*r_i mod n</code> and <code>beta_i = s_i^-1*h_i mod n</code>. I know the values on the right except for <code>d</code>. The timing model tells me that each selected <code>k_i</code> sits below a particular power of two. I encode those bounds in a lattice so a vector associated with the real <code>d</code> is unusually short. LLL finds candidates; the public point checks the answer. The bounds and scaling are implementation choices, so I do not present an arbitrary short vector as a recovered key.</p>
+<h3>Why timing leaks bit length</h3>
+<p>If scalar multiplication loops once per significant bit of <code>k</code>, a 24-bit nonce takes far fewer iterations than a 256-bit one. Here the observed times fit about 250 ns per bit. That is a Minerva-class failure mode, not proof that a particular library named in the research was used in this puzzle. The <a href="https://minerva.crocs.fi.muni.cz/">Minerva project</a> documents real implementations and noisy-bit-length lattice attacks. A deterministic nonce generator under <a href="https://www.rfc-editor.org/info/rfc6979/">RFC 6979</a> can avoid random-generator failures, but it still feeds a variable-width scalar to multiplication. Constant-time behavior must be checked in that arithmetic path too.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit/Analysis Mechanics</summary>
+<h3>The violated invariant</h3>
+<p>The signature must not reveal useful information about <code>k</code>. Here duration was a side channel into its bit length. ECDSA verification still worked normally, which is why correctness tests alone would miss the defect. The weakness was in how the signature was computed, not in the public verification equation.</p>
+<h3>The math</h3>
+<p>The six chosen rows give <code>s_i*k_i = h_i + r_i*d (mod n)</code>. After multiplying by <code>s_i^-1</code>, I get <code>k_i = alpha_i*d + beta_i (mod n)</code>. I padded each estimated bit length by four to avoid rejecting a true nonce because of a noisy timer. The bounds used for recovery were 28, 66, 66, 83, 83, and 125 bits. Their uneven strength matters: the shortest nonce gives far more information than a near-full-width one.</p>
+<p>The centered basis used a common width <code>W = 2^125</code>, diagonal terms <code>n^2</code>, a row of <code>n*alpha_i</code>, and a row of <code>n*(beta_i - W/2)</code>. The public-key equality is the final check. The exact lattice basis is in the linked code; it would be wrong to say that any set of six timing outliers solves P-256. This trace's bounds are unusually strong.</p>
+<h3>Recovery and validation (ST.6 through ST.7)</h3>
+<p>My first verification attempt failed because the hand-written point-addition code tried to invert a zero denominator when it encountered inverse points. That exception did not refute the lattice candidate. I switched to a maintained P-256 implementation and compared <code>d * G</code> with the supplied <code>Qx</code> and <code>Qy</code>. The independent replay passes. The <a href="artifacts/hnp_replay.py">script</a> now makes that equality the acceptance gate and keeps the scalar off standard output.</p>
+<h3>Why decryption was a small search (ST.8-9)</h3>
+<p>The payload had 35 bytes after decoding its hex text. I tested a short list of stream-shaped wrappers and key derivations. The successful branch was SHA-256 of the 32-byte scalar, followed by SHA-256 blocks over that key and a four-byte big-endian counter, XORed with the ciphertext. It produced 35 printable bytes in flag format. That is a local cryptographic result. Without a platform receipt, I leave platform acceptance unstated.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<h3>What the exercise validated</h3>
+<p>The timing histogram earned its place before the algebra. Those six values were low enough to be interesting, and the near-integer spacing gave me a testable cost model. The key check against <code>Q</code> settled whether the lattice had found something real. A pretty plaintext was useful later, but the public key was the stronger oracle for the private scalar.</p>
+<h3>What the exercise surfaced as gaps</h3>
+<p>The hand-written curve helper wasted time on an edge case a maintained implementation already handles. I kept the failing path in the record because it explains why the verifier changed. I also underestimated the payload wrapper work after recovering <code>d</code>. A prepared matrix of plausible key encodings and stream modes was faster than trying them serially by hunch.</p>
+<h3>Transferable principles</h3>
+<p>For a signer review, measure the implementation under controlled conditions and keep timing collection separate from signing secrets. For an investigation, validate each hypothesis against an independent artifact. In this case that was the public key. In a production incident it might be a certificate, an authenticated transaction, or the exact signer build. Do not promote a timing correlation into proof of exploitation without that second check.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<h3>Individual practitioner skill development</h3>
+<p>This case made the Hidden Number Problem concrete for me. The portable skills are choosing useful signatures, turning timing into defensible bounds, setting up a lattice, and rejecting candidate keys unless they match the public point. Those skills carry to other biased-nonce ECDSA cases. RSA partial-key work and hardware power analysis are adjacent subjects, but this page does not claim to have exercised either one.</p>
+<h3>Security operations (SOC, IR, threat hunting)</h3>
+<p>A defender should first inventory signers and their cryptographic libraries, then run a controlled side-channel test against affected versions. The <a href="artifacts/latency_leak_check.py">nonce-width latency checker</a> accepts a development-build benchmark where the nonce width is known to the tester. Its <a href="artifacts/fixtures/leaky.csv">leaky</a>, <a href="artifacts/fixtures/flat.csv">flat</a>, and <a href="artifacts/fixtures/sparse.csv">insufficient-data</a> fixtures make the expected behavior visible. The <a href="artifacts/test_lab.py">test suite</a> checks all three cases. A flat result from one run cannot certify constant-time behavior; the test plan must account for noise, hardware, compiler, and input distribution.</p>
+<p>An operational hunt can review unusually high volumes of signing requests by one client or key. That may help find an active collection campaign, but the puzzle's trace does not contain client identity or request provenance, and passive observation might produce no extra requests at all. If a key's nonce exposure is credibly established, the response is to contain the signer, replace the affected implementation, assess signature trust, rotate the key, and revoke dependent certificates as appropriate. The order and urgency depend on the service's actual trust role.</p>
+<h3>Intelligence operations</h3>
+<p>An intelligence record should identify the affected signer implementation and observation channel, not merely label every ECDSA timing difference "Minerva." The research describes a technique class; this challenge does not identify a campaign, actor, library version, or exploited host. The <a href="artifacts/technique_bundle.json">illustrative STIX bundle</a> contains an attack pattern and a mitigation relationship without inventing those missing facts. Historical signatures alone do not reveal signing times; a bias claim needs the relevant observation or another measurable nonce weakness.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<h3>Triage decision tree</h3>
+<p>I use this order: confirm that timing is tied to individual signatures; establish the normal timing spread; look for a repeatable relation to <em>known</em> nonce widths in a controlled build; estimate bounds conservatively; then attempt key recovery and public-key validation. A statistical outlier count is a lead. A public-key match is proof that the candidate scalar is correct for that key. If the timing model fails, I stop the lattice work and check other explanations before collecting more rows.</p>
+<h3>Generic HNP primitive</h3>
+<p>The <a href="artifacts/hnp_replay.py">HNP replay</a> contains the arithmetic, basis construction, bounded LLL reducer, public-point check, and payload probe. It is a transparent implementation of this six-row case. Its common <code>W</code> and case-specific timing slope should be reviewed before applying it to other curves or noisier traces. A production cryptography assessment should use a maintained lattice package and independent key checks.</p>
+<h3>Solve-pattern checklist</h3>
+<p>The <a href="artifacts/README.md">lab guide</a> gives the runnable commands and the evidence boundaries. In brief: count and validate rows, fit a falsifiable leak model, add safety margins to nonce bounds, compute <code>alpha</code> and <code>beta</code>, reduce the basis, verify the public key, then test a small payload matrix. Record rejected modes and the exact validation outcome. Keep the private scalar and plaintext out of logs and committed artifacts.</p>
+<h3>Payload-unwrap probe matrix template</h3>
+<p>The matrix in the <a href="artifacts/hnp_replay.py">replay script</a> tries thirteen stream-shaped candidates and reports the best branch without displaying plaintext. It includes raw-scalar XOR, hash-chain XOR, AES-CTR, and two ChaCha20 nonce lengths under three key encodings. I have not called that list exhaustive. A production wrapper should be identified from its specification and authenticated metadata, not inferred from printability.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<h3>Tier 1 - Standing checklist</h3>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>Fit in this case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MITRE ATT&amp;CK</td>
+<td><a href="https://attack.mitre.org/techniques/T1212/">T1212</a> could describe exploiting a real signer to obtain a credential. The puzzle has no intrusion telemetry. <a href="https://attack.mitre.org/techniques/T1552/004/">T1552.004</a> describes searching for insecurely stored private-key files, which did not happen here. T1040 and T1078 remain possible downstream behaviors, not observed steps.</td>
+</tr>
+<tr>
+<td>MITRE ATLAS</td>
+<td>No ML model or inference surface was attacked.</td>
+</tr>
+<tr>
+<td>OWASP Web and LLM Top 10</td>
+<td>No web application or LLM component was part of the supplied signer artifacts.</td>
+</tr>
+<tr>
+<td>CVSS, EPSS, CISA KEV</td>
+<td>No affected product or CVE is identified. A score or KEV status for this particular puzzle would be invented.</td>
+</tr>
+<tr>
+<td>Cloud benchmarks</td>
+<td>The issue is in a cryptographic implementation. No cloud deployment settings were provided.</td>
+</tr>
+</tbody>
+</table>
+<h3>Tier 2 - Applied where they add value</h3>
+<p><a href="https://cwe.mitre.org/data/definitions/208.html">CWE-208</a>, Observable Timing Discrepancy, is the close weakness match. CWE-385 is a broader covert timing channel concept, but I would not add it as a second proven root cause here. CAPEC-189 covers black-box reverse engineering generally; the challenge's exact cryptographic chain is described more precisely by the equations and the <a href="https://minerva.crocs.fi.muni.cz/">Minerva research</a>. A hardware security module or FIPS validation label cannot be assumed to remove nonce-width leakage. The operational countermeasure is an implementation and measurement claim about the actual signer, not a product-category label. STRIDE's information-disclosure category describes the leak; signature forgery is a potential downstream integrity effect.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<h3>STIX 2.1 sample objects</h3>
+<p>The <a href="artifacts/technique_bundle.json">technique bundle</a> contains a generic <code>attack-pattern</code>, a <code>course-of-action</code>, and a <code>mitigates</code> relationship. It does not contain an indicator with a fake hash, IP address, or version string. I checked that its identifiers are UUIDv4-shaped and its references resolve inside the bundle; a full STIX schema implementation and TAXII exchange were not run. A real sharing package would need an affected product/version, observation channel, evidence, confidence, producer identity, and handling rules. <a href="https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html">OASIS STIX 2.1</a> defines those object types.</p>
+<h3>STIGs</h3>
+<p>No specific DISA application STIG finding can be concluded from an anonymous signer trace. A system owner could review its approved cryptographic module and maintenance baseline once the product and environment are known. FIPS validation addresses a module's validated boundary and configuration; it does not, by itself, establish that this exact timing path is constant time.</p>
+<h3>CIS Controls v8</h3>
+<p>Control 16's vetted application-security components and Control 7's vulnerability remediation are useful program-level homes for the fix. They point to inventorying the signer, evaluating vendor evidence, testing the affected code path, and patching or replacing it. Encrypt-in-transit and encrypt-at-rest safeguards are too broad to explain this particular nonce leak.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>11a. Standards mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Guidance</th>
+<th>Case-specific use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NIST SP 800-53 Rev. 5 SC-13</td>
+<td>Select and operate cryptographic protection appropriate to the system; assess this signing implementation's side-channel behavior.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5 RA-5</td>
+<td>Inventory affected signer versions and track remediation.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5 SI-4</td>
+<td>Collect suitable operational audit data for abuse triage, without logging nonce values or key material.</td>
+</tr>
+<tr>
+<td>NIST SP 800-57 Part 1 Rev. 5</td>
+<td>Plan key lifecycle and compromise response if exposure is confirmed.</td>
+</tr>
+<tr>
+<td>FIPS 186-5 and RFC 6979</td>
+<td>Signature and deterministic-nonce guidance. Deterministic generation does not replace constant-time arithmetic.</td>
+</tr>
+<tr>
+<td>CIS Controls v8 16.11</td>
+<td>Prefer vetted cryptographic components; verify their fit and configuration.</td>
+</tr>
+</tbody>
+</table>
+<p>These are design mappings for a hypothetical deployment. The puzzle did not establish a compliance boundary, a vulnerable package version, or an actual key-rotation decision.</p>
+<h3>11b. Mitigation realization</h3>
+<p>The first engineering fix is a signing implementation that does not let secret nonce width change the observable execution path. Test the real compiler, library build, hardware, and signing API. The <a href="artifacts/latency_leak_check.py">controlled benchmark reviewer</a> gives a small positive and negative demonstration, while the <a href="artifacts/README.md">guide</a> spells out why its threshold is not a certification. An HSM can help only when the specific module and path resist this side channel. RFC 6979 helps prevent weak or repeated nonce generation; it leaves variable-time scalar multiplication to be fixed separately.</p>
+<p>For response planning, identify every identity that used the affected implementation, then decide whether to rotate and revoke. A generic policy file that bans guessed version ranges would be dangerous here because no product build was identified. I would derive that policy from vendor advisories and an SBOM, test it in CI, and retain the mapping from a finding to the exact deployed binary.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>Detection maturity here is <strong>controlled-lab screening</strong>. The key recovery was verified offline. The defensive benchmark was tested only with invented values; it has not been run against a signing service, SIEM, or production baseline.</p>
+<h3>Sanitized illustrative IOCs</h3>
+<p>There are no atomic IOCs in this challenge. The <code>Qx/Qy</code> point and signature rows are puzzle inputs, not a malicious infrastructure indicator. A proposed hunt might look for a client generating many distinct signing requests in a short period. That behavior has legitimate causes, and a passive observer could avoid it entirely. I would not share a placeholder library hash or <code>&lt;signing.host&gt;:443</code> as intelligence.</p>
+<h3>Sigma rule</h3>
+<p>My first Sigma sketch tried to combine a percentile threshold and a per-source count inside one rule's ordinary selection. That does not express a portable correlation. I have not published it as a working detector. A real rule needs a product log schema, a trusted baseline per key and host, a time-windowed count, and backend conversion support. The <a href="https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-correlation-rules-specification.md">Sigma correlation specification</a> is the starting point for that implementation.</p>
+<h3>YARA rule (library version fingerprint)</h3>
+<p>The proposed YARA expression relied on a placeholder version string and symbols that may be stripped. It would miss many affected builds and could match unrelated ELF files. I would use an authenticated SBOM, package metadata, and vendor-fixed version ranges for inventory. YARA can be a triage aid after validating a real binary signature against positive and negative samples; this case supplies neither.</p>
+<h3>SIEM queries</h3>
+<p>These are high-volume signing-request hunts, <strong>not</strong> detectors for private-key recovery. They require <code>client_id</code>, <code>key_id</code>, and a digest identifier from an application audit stream. The threshold of 1,000 requests in an hour is illustrative and needs a service baseline.</p>
+<pre><code class="language-spl">index=signing_audit event_type=ecdsa_sign earliest=-1h
+| bin _time span=1h
+| stats count as sign_count dc(message_digest) as distinct_digests by _time key_id client_id
+| where sign_count&gt;=1000 AND distinct_digests&gt;=1000
+</code></pre>
+<pre><code class="language-kql">SigningAudit
+| where TimeGenerated &gt; ago(1h) and EventType == &quot;ecdsa_sign&quot;
+| summarize SignCount=count(), DistinctDigests=dcount(MessageDigest)
+    by ClientId, KeyId, bin(TimeGenerated, 1h)
+| where SignCount &gt;= 1000 and DistinctDigests &gt;= 1000
+</code></pre>
+<h3>Log source and pipeline requirements</h3>
+<p>For request-volume hunting, the signer needs a stable key ID, caller ID, request time, and a safe digest identifier. Avoid putting message contents, nonce values, private-key handles, or plaintext in general-purpose logs. For the <a href="artifacts/latency_leak_check.py">controlled timing test</a>, a separate development harness must know each test nonce width and record a high-resolution elapsed time. Most production logs cannot supply that ground truth, and network TLS handshake duration includes many steps besides ECDSA signing. The <a href="artifacts/fixtures/leaky.csv">invented fixtures</a> and <a href="artifacts/fixtures/flat.csv">flat comparison</a> show what the isolated measurement looks like.</p>
+<h3>Detection engineering notes</h3>
+<p>The <a href="artifacts/test_lab.py">lab tests</a> pass a leaky fixture, a flat fixture, an insufficient-data rejection, and the STIX bundle's internal-reference check. The <a href="artifacts/fixtures/sparse.csv">sparse fixture</a> is linked so the rejection can be inspected. The synthetic 250 ns-per-bit signal is deliberately easy to see; real noise may erase it. No false-positive rate, backend query result, or product-level constant-time claim has been measured. The most reliable response to a confirmed timing leak is to remove the leak and assess affected keys. A SIEM outlier alone does not tell me whether a nonce was short or an observer recovered anything.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow above</a> keeps the two proof points in view. The six short signatures fed the lattice; a recovered scalar passed the independent public-key equality check. The payload probe came after that. The final box points to the defender test, where a real organization would measure its own signer before claiming the flaw fixed. It does not turn the challenge trace into production detection data.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://minerva.crocs.fi.muni.cz/">Minerva project and research</a>, systematic ECDSA nonce-bit-length leakage analysis and lattice recovery.</li>
+<li><a href="https://csrc.nist.gov/pubs/fips/186-5/final">FIPS 186-5</a>, Digital Signature Standard.</li>
+<li><a href="https://www.rfc-editor.org/info/rfc6979/">RFC 6979</a>, deterministic DSA and ECDSA nonce generation.</li>
+<li><a href="https://cwe.mitre.org/data/definitions/208.html">MITRE CWE-208</a>, Observable Timing Discrepancy.</li>
+<li><a href="https://attack.mitre.org/techniques/T1212/">MITRE ATT&amp;CK T1212</a> and <a href="https://attack.mitre.org/techniques/T1552/004/">T1552.004</a>, technique scope for the conditional mapping.</li>
+<li><a href="https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html">OASIS STIX 2.1</a> and <a href="https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-correlation-rules-specification.md">Sigma correlation specification</a>, defensive artifact formats.</li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5</a> and <a href="https://csrc.nist.gov/pubs/sp/800/57/pt1/r5/final">SP 800-57 Part 1 Rev. 5</a>, control and key-management guidance.</li>
+<li><a href="https://www.cisecurity.org/controls/application-software-security">CIS Controls v8 Control 16</a>, application-security components.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>

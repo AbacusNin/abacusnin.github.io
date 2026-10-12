@@ -1,0 +1,45 @@
+{
+  "type": "bundle",
+  "id": "bundle--80cb52af-d55e-4e28-8646-cf5bd804eecf",
+  "objects": [
+    {
+      "type": "attack-pattern",
+      "spec_version": "2.1",
+      "id": "attack-pattern--d0ea5039-e7b7-40fb-990f-8742dee2fc93",
+      "created": "2026-10-11T00:00:00Z",
+      "modified": "2026-10-11T00:00:00Z",
+      "name": "ECDSA nonce-width timing analysis",
+      "description": "An observer correlates signing latency with nonce bit length across ECDSA signatures, then uses bounded nonce information and the public signature values in a Hidden Number Problem recovery. This describes a technique class, not an observed campaign or affected product.",
+      "external_references": [
+        {
+          "source_name": "cwe",
+          "external_id": "CWE-208",
+          "url": "https://cwe.mitre.org/data/definitions/208.html"
+        },
+        {
+          "source_name": "minerva-research",
+          "url": "https://minerva.crocs.fi.muni.cz/"
+        }
+      ]
+    },
+    {
+      "type": "course-of-action",
+      "spec_version": "2.1",
+      "id": "course-of-action--9b815cd2-795b-48b9-a5dc-f1699bb5ddd1",
+      "created": "2026-10-11T00:00:00Z",
+      "modified": "2026-10-11T00:00:00Z",
+      "name": "Remove nonce-dependent signing timing",
+      "description": "Identify affected implementations, use a side-channel-resistant signing path, verify timing behavior with controlled nonce widths, and rotate keys if exposure is established. Deterministic nonce derivation alone does not remove variable-time scalar multiplication."
+    },
+    {
+      "type": "relationship",
+      "spec_version": "2.1",
+      "id": "relationship--ef6065f0-3c76-4014-9137-2e7bf531bce6",
+      "created": "2026-10-11T00:00:00Z",
+      "modified": "2026-10-11T00:00:00Z",
+      "relationship_type": "mitigates",
+      "source_ref": "course-of-action--9b815cd2-795b-48b9-a5dc-f1699bb5ddd1",
+      "target_ref": "attack-pattern--d0ea5039-e7b7-40fb-990f-8742dee2fc93"
+    }
+  ]
+}
