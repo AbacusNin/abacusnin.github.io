@@ -1322,5 +1322,29 @@
     ],
     "status": "Solved-Verified (local structural verification; scoreboard confirmation not captured)",
     "url": "/cyber-ops/ctf-writeups/crypto/progressive-caesar/"
+  },
+  {
+    "title": "The Message Between the Frames",
+    "category": "Forensics",
+    "difficulty": "Hard",
+    "date": "2026-10-12",
+    "tags": [
+      "steganography",
+      "video forensics",
+      "steganalysis",
+      "all-intra",
+      "frame differential",
+      "XOR accumulation",
+      "correlation scan",
+      "OCR cross-validation"
+    ],
+    "summary": "A 25-second static video looked like independent noise. Comparing frames two apart exposed a repeated glyph mask and the 25-character message it carried.",
+    "aliases": [
+      "temporal steganography",
+      "frame-pair analysis",
+      "video XOR"
+    ],
+    "status": "Solved-Verified",
+    "url": "/cyber-ops/ctf-writeups/forensics/temporal-frame-differential/"
   }
 ]
