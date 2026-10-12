@@ -480,5 +480,30 @@
     ],
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/osint/photo-h3-geolocation/"
+  },
+  {
+    "title": "The Relay That Gave Away a Secret One Byte at a Time",
+    "category": "Forensics",
+    "difficulty": "Hard",
+    "date": "2026-10-12",
+    "tags": [
+      "PCAP analysis",
+      "TLS decryption",
+      "ARP poisoning",
+      "ICMP redirect",
+      "CRIME",
+      "BREACH",
+      "gzip oracle",
+      "MITM",
+      "exfiltration"
+    ],
+    "summary": "I mistook the busiest host for the compromised one. Tracing the POST bodies back to their source changed the answer, and a pair of response lengths exposed the compression side channel.",
+    "aliases": [
+      "network forensics",
+      "compression side channel",
+      "relay"
+    ],
+    "status": "Solved-Verified",
+    "url": "/cyber-ops/ctf-writeups/forensics/arp-icmp-compression-oracle/"
   }
 ]
