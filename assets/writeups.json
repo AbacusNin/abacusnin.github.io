@@ -1230,5 +1230,28 @@
     ],
     "status": "Solved-Verified",
     "url": "/cyber-ops/ctf-writeups/crypto/ecdsa-nonce-reuse/"
+  },
+  {
+    "title": "The Codebook That Was Just Base Nine",
+    "category": "Crypto",
+    "difficulty": "Easy",
+    "date": "2026-10-12",
+    "tags": [
+      "positional notation",
+      "non-decimal radix",
+      "ASCII",
+      "atbash",
+      "classical cryptography",
+      "hypothesis discipline",
+      "frequency analysis"
+    ],
+    "summary": "I solved one fragment with Atbash, then spent too long fitting a codebook to 42 numeric tokens. A rejected answer led me back to the digits: base nine explained the whole message.",
+    "aliases": [
+      "base 9",
+      "encoding triage",
+      "numeric tokens"
+    ],
+    "status": "Solved-External",
+    "url": "/cyber-ops/ctf-writeups/crypto/radix-codebook/"
   }
 ]

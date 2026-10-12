@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Codebook That Was Just Base Nine - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="I solved one fragment with Atbash, then spent too long fitting a codebook to 42 numeric tokens. A rejected answer led me back to the digits: base nine explained the whole message.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/radix-codebook/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Codebook That Was Just Base Nine">
+  <meta property="og:description" content="I solved one fragment with Atbash, then spent too long fitting a codebook to 42 numeric tokens. A rejected answer led me back to the digits: base nine explained the whole message.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/radix-codebook/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Crypto / <span aria-current="page">The Codebook That Was Just Base Nine</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Codebook That Was Just Base Nine</h1>
+        <p class="lead">I could read 39 of 42 tokens and still had the wrong mechanism. The three I could not explain were the clue.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Recover the plaintext of two encoded fragments and explain the encoding rule without any key material.</p>
+<p><strong>What I did.</strong> I decoded the letter-only fragment with Atbash, built a partial word-shape table for the numeric one, then revisited its digit set after a rejected submission.</p>
+<p><strong>The result.</strong> The recorded correction decodes all 42 numeric tokens as base-9 ASCII with zero exceptions; the Atbash fragment also reads as English. The first submitted model was rejected.</p>
+<p><strong>The limit.</strong> The actual fragments, full plaintexts, and final platform receipt are withheld. The base-9 mechanism was found after the initial solve, and the linked examples use invented text.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Inspect both alphabets; Decode Atbash; Fit a word table; Submit and fail; Recheck the digits; Decode base nine">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Inspect both alphabets</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Letters and numeric tokens</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Decode Atbash</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Letter fragment reads clearly</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Fit a word table</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">39 of 42 tokens mapped</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Submit and fail</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Three tokens remain unexplained</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Recheck the digits</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Eight appears but nine does not</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Decode base nine</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">All 42 tokens map to ASCII</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Crypto / encoding analysis</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Easy</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>positional notation, non-decimal radix, ASCII, atbash, classical cryptography, hypothesis discipline, frequency analysis</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved-External</td>
+</tr>
+<tr>
+<td>Recorded result</td>
+<td>Atbash made Fragment B readable. A word-shape model for Fragment A produced a rejected submission; base-9 ASCII later decoded all 42 tokens.</td>
+</tr>
+<tr>
+<td>Evidence boundary</td>
+<td>The mechanism was identified after the initial solve. The actual fragments and a final acceptance receipt are not reproduced here.</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/crypto/radix-codebook/artifacts">browse the GitHub artifacts folder</a>.</p>
+<h2>Solve Process Flow</h2>
+<pre><code class="language-mermaid">flowchart LR
+  A[Inspect both character sets] --&gt; B[Atbash reads Fragment B]
+  A --&gt; C[Group 42 numeric tokens]
+  C --&gt; D[Fit 39 tokens by word shape]
+  D --&gt; E[Invent homophonic layer]
+  E --&gt; F[Submission rejected]
+  F --&gt; G[Notice 8 present and 9 absent]
+  G --&gt; H[Decode every token as base-9 ASCII]
+</code></pre>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I was given two inline text fragments and no key, file, host, or service to interrogate. Fragment A had 42 space-delimited, three-digit tokens. Fragment B was a short lowercase string with spaces. The task was to recover both plaintexts. The story attributed the messages to a group staging and brokering documents, but the evidence I could analyze was only the text. I did not observe collection, transfer, or an intrusion.</p>
+<p>The useful real-world question is whether unfamiliar text is actually encrypted. An analyst with a content sample and no key can still test its alphabet, field widths, and reversible transforms. Here one fragment was a keyless classical substitution; the other was ASCII code points written in a different base. Mistaking the second for a secret codebook consumed most of the solve. Treating the fictional prose as evidence of a real actor would add a different mistake.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>Both fragments were worked statically. I had no telemetry or target to validate against. The later verification code was written after the hand solve.</p>
+<h3>Solve Trace</h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Choice and observed outcome</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ST.1</td>
+<td>I inspected Fragment B: 47 characters, lowercase Latin letters and spaces.</td>
+</tr>
+<tr>
+<td>ST.2</td>
+<td>Atbash produced coherent English across the fragment in one pass.</td>
+</tr>
+<tr>
+<td>ST.3</td>
+<td>I split Fragment A into 42 tokens, each exactly three digits, including leading zeros.</td>
+</tr>
+<tr>
+<td>ST.4</td>
+<td>One token appeared eight times at intervals consistent with a separator. That gave seven groups of lengths 3, 5, 5, 2, 3, 8, and 10, counting 36 non-separator tokens plus six separators.</td>
+</tr>
+<tr>
+<td>ST.5</td>
+<td>I anchored on the eight- and ten-character groups and inferred a value-to-letter table. It covered 39 of 42 tokens without a conflict.</td>
+</tr>
+<tr>
+<td>ST.5a</td>
+<td>Base 8 failed because a token contained the digit <code>8</code>. I treated that as a reason to leave positional notation, which was the wrong inference.</td>
+</tr>
+<tr>
+<td>ST.5b</td>
+<td>Additive offsets <code>-3, -32, -35, -52, -53, -55, -57</code> did not produce one constant rule.</td>
+</tr>
+<tr>
+<td>ST.5c</td>
+<td>Multipliers <code>1.5</code>, <code>1.8</code>, and <code>9/5</code> gave incompatible intervals.</td>
+</tr>
+<tr>
+<td>ST.5d</td>
+<td>XOR with <code>0x50</code> turned the separator into a letter. A flag-prefix XOR crib made nonprintable output and assumed a flag that the question had not requested.</td>
+</tr>
+<tr>
+<td>ST.5f and ST.5g</td>
+<td>Mod-26 output was gibberish. ROT-N on the already-refuted octal reading only extended a failed premise.</td>
+</tr>
+<tr>
+<td>ST.5h</td>
+<td>I mentioned EBCDIC, Baudot, and six-bit text, then set them aside as unlikely. They were not actually tested.</td>
+</tr>
+<tr>
+<td>ST.6a</td>
+<td>I asserted a homophonic layer to explain the three unmapped values and submitted that model. The submission was rejected.</td>
+</tr>
+<tr>
+<td>ST.7</td>
+<td>After external correction, I checked the whole digit set: <code>0</code> through <code>8</code> appeared; <code>9</code> did not.</td>
+</tr>
+<tr>
+<td>ST.8</td>
+<td>Base-9 interpretation of all 42 tokens produced printable ASCII with zero exceptions.</td>
+</tr>
+</tbody>
+</table>
+<h3>Tool / Code Timeline</h3>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>What I used</th>
+<th>Timing</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ST.1-ST.2</td>
+<td>Character inspection and Atbash by hand</td>
+<td>Initial solve</td>
+</tr>
+<tr>
+<td>ST.3-ST.6a</td>
+<td>Manual token counts, word-shape table, and rejected hypothesis checks</td>
+<td>Initial solve</td>
+</tr>
+<tr>
+<td>ST.7-ST.8</td>
+<td><code>infer_radix()</code>, positional decode, and printable-block validation</td>
+<td>Later mechanism review</td>
+</tr>
+</tbody>
+</table>
+<h3>Methodology notes</h3>
+<p>Fragment B was mercifully short. The alphabet made a keyed search unnecessary at first, and Atbash gave a readable sentence immediately. The actual sentence is withheld. The point is that every letter transformed under one consistent involution, with spaces preserved.</p>
+<p>Fragment A gave me a dangerous kind of success. Long words constrained the substitution table, so 39 tokens acquired plausible letter values. The remaining three tokens sat in the leading group and encoded digits, outside what English word-shape reasoning could infer. Their numeric values were about 54 units below the other non-separator tokens, with a gap between clusters. I interpreted the two clusters as variants of a cipher alphabet and invented a homophonic layer to join them. The submitted explanation was rejected. The table fit many outputs but did not explain why those numeric values existed.</p>
+<p>The correction came later. I had noticed the <code>8</code> when ruling out octal, yet I had not asked what radix permits <code>8</code> and excludes <code>9</code>. Once I did, base 9 became the smallest candidate. The complete 42-token decode, not the digit observation by itself, supported it. This timing matters to me: the plaintext guess came during the solve; the generating rule was recovered afterward.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>I did not run a decoder during the initial hand solve. Later I wrote a small verifier around three operations: infer the minimum radix from observed digits, decode every fixed-width token as a positional numeral, and inspect the entire output for printable ASCII. Here is the core:</p>
+<pre><code class="language-python">def infer_radix(tokens):
+    return max(2, max(int(d) for token in tokens for d in token) + 1)
+
+def decode(tokens, radix):
+    values = []
+    for token in tokens:
+        value = int(token, radix)
+        if value &gt; 127:
+            raise ValueError(&quot;outside ASCII&quot;)
+        values.append(chr(value))
+    return &quot;&quot;.join(values)
+
+def validate_blocks(plaintext):
+    codes = sorted({ord(c) for c in plaintext})
+    return all(32 &lt;= code &lt;= 126 for code in codes), codes
+</code></pre>
+<p><code>infer_radix</code> gives a lower bound, not a proof. A higher base can happen to omit its largest digits in a finite sample. I check all tokens and compare candidate outputs. The invented text <code>24 keys stored in the archive</code> encodes as 29 three-digit base-9 tokens; <a href="artifacts/synthetic_messages.txt">the local fixture</a> holds those tokens. It has no connection to the withheld challenge text. The <a href="artifacts/radix_triage.py">runnable reviewer</a> reports candidate radices and hashes of decoded strings rather than printing message bodies. Its <a href="artifacts/test_radix_triage.py">tests</a> include a base-9 positive, an ambiguous decimal-ASCII example, and a near miss containing <code>9</code>. The <a href="artifacts/README.md">README</a> explains the input and sensor assumptions.</p>
+<p>For Fragment B, the transform was just alphabet reflection. For each lowercase letter at position <code>x</code> from <code>a=0</code>, use <code>25-x</code>; leave spaces and punctuation alone. An invented demonstration is <code>gsv wilk klrmg rh xlmurinvw</code>, which reads <code>the drop point is confirmed</code>. Applying Atbash again returns the input. The reviewer includes that function and its round-trip check, but it was not a tool used during the first solve.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<h3>Positional notation is a representation, not a cipher</h3>
+<p>A three-digit numeral in base <code>b</code> means <code>d2*b^2 + d1*b + d0</code>. For example, <code>055</code> in base 9 is decimal 50, the ASCII code for <code>2</code>. There is no secret parameter to recover; changing the base changes the written form of a value. That is why a fitting substitution table was the wrong model, even though it produced plausible words.</p>
+<p>The largest digit observed sets a minimum valid radix. Seeing <code>8</code> rules out bases 2 through 8. A missing <code>9</code> makes base 9 worth testing, but absence alone cannot rule out base 10 or a higher base. This is the correction to the more confident inference I first wanted to make. The complete decode and the token grouping carry the validation burden.</p>
+<p>Three base-9 digits span <code>0</code> through <code>9^3-1 = 728</code>; two span only <code>0</code> through <code>80</code>. Three positions can represent the full seven-bit ASCII range <code>0-127</code>, with leading zeros preserving width. That explains the field size without requiring a codebook. Other designers could choose a wider field, so width is supporting evidence rather than unique proof.</p>
+<h3>What the decode image reveals</h3>
+<p>The recorded fragment had 20 distinct numeric tokens. Under base 9, they mapped to ASCII space at 32, digits in the <code>48-57</code> range, and lowercase letters in the <code>97-122</code> range. Those code-point blocks explain the two value clusters I had mistaken for separate cipher alphabets. ASCII's gap from <code>9</code> at 57 to <code>a</code> at 97 is 40 decimal code points; the approximately 54-unit gap I saw was in the encoded token values, not the ASCII code points themselves.</p>
+<p>The image is stronger than a few recognizable words because it covers every token. Still, printable output is not a mathematical uniqueness proof. A decimal ASCII string can also decode to printable text under base 9; the linked synthetic fixture deliberately demonstrates this false positive. Word boundaries, semantic fit, and the stated challenge context matter after the structural checks.</p>
+<h3>Atbash</h3>
+<p>For a 26-letter alphabet, Atbash maps position <code>x</code> to <code>25-x</code>. Applying the same mapping twice restores <code>x</code>, so encoding and decoding are the same operation. It needs no key. The letter frequencies are permuted, not flattened, which makes it poor concealment. In Fragment B, one pass produced coherent English; I did not need to stack ROT-N or a keyed cipher on it.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit/Analysis Mechanics</summary>
+<p>My first model failed at a clear boundary: three tokens encoded digits, while my word-shape method assigned letters. No better word list could resolve a character class the method excluded. I covered that gap with a proposed homophonic substitution layer, but that layer had no independent evidence. The later base-9 rule explained all 42 positions with one positional operation and no exceptions.</p>
+<p>The corrected chain is short. Preserve each three-digit field and its leading zeros. Observe that <code>8</code> occurs and <code>9</code> does not. Test base 9, then decode every field as an ASCII integer. Check all results for range, printability, word boundaries, and coherent text. Compare plausible alternative radices. An invalid digit or widespread controls would refute a candidate; a few words alone would not establish it.</p>
+<p>The homophonic idea also deserved its own test. Such a cipher gives multiple symbols to some plaintext letters, often to alter letter frequencies. I had only 42 positions and no evidence of a frequency-flattening design. The claim served mainly to excuse three unmapped tokens. The right response was to revisit the token values. The rejected submission gave me that pressure, but the contradictory values were already visible before it.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<h3>What the exercise validated</h3>
+<p>Character-set triage paid off immediately on Fragment B. Atbash was cheap to test and gave a consistent reading. On Fragment A, starting with the longest groups was a reasonable way to constrain a substitution hypothesis. It yielded 39 of 42 token values without conflict. That partial result was real work, even though the hypothesis behind it was wrong.</p>
+<h3>What the exercise surfaced as gaps</h3>
+<p>I used the digit <code>8</code> to eliminate octal, then stopped. It also told me which nearby base to test next. The missing <code>9</code> was a clue, subject to sample-size limits. Reading a failed hypothesis only as a rejection, without asking what the same fact supports, kept me on the longer path.</p>
+<p>The offset sweep gave another near miss. The apparent differences stepped through 52, 53, 54, and 55 at irregular boundaries. I tried to fit a constant offset where base-9 carry behavior was changing the written numeral. The failed additive model was evidence about the representation, not an invitation to invent a more elaborate offset.</p>
+<p>The confidently stated homophonic layer was the costly error. My table reproduced most observed output but had no generating rule. When the three exceptions appeared, I made the explanation larger instead of checking the character classes. The challenge's own name also contained a numeral hinting at the maximum base-9 digit. I had noticed it and put it aside as a possible red herring. The title and the digit set were two separate hints that I failed to connect until afterward.</p>
+<h3>Transferable principles</h3>
+<table>
+<thead>
+<tr>
+<th>What happened here</th>
+<th>What I would do in an investigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>I inspected the alphabet before transforming Fragment B.</td>
+<td>Characterize bytes, delimiters, and lengths before choosing a decoder.</td>
+</tr>
+<tr>
+<td>Octal failed on digit <code>8</code>.</td>
+<td>Ask what a disqualifying observation positively implies.</td>
+</tr>
+<tr>
+<td>Three tokens escaped the word table.</td>
+<td>Treat unreachable data as a model problem, not noise to normalize away.</td>
+</tr>
+<tr>
+<td>A table fit 39 positions.</td>
+<td>Ask for a rule that generates every value; matching output alone cannot establish a mechanism.</td>
+</tr>
+<tr>
+<td>I invented a layer after contradiction.</td>
+<td>Separate a hypothesis from evidence, and withdraw it when its needed assumptions multiply.</td>
+</tr>
+<tr>
+<td>Base 9 emerged in later review.</td>
+<td>Record when the mechanism was identified; do not backdate the insight into the live solve.</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<p>The transferable skill is rapid representation triage. A content sample may be encoded, compressed, encrypted, or simply written in an unfamiliar notation. Character sets, magic bytes, field widths, and reversibility narrow the possibilities. Index-of-coincidence and Kasiski tests can help with later polyalphabetic cases; known-plaintext XOR and endianness checks are different but adjacent tools. Neither was needed for these two fragments.</p>
+<p>For a defender, the realistic hypothesis is narrow: inspect content at an authorized point where message bodies are available and look for fixed-width numeric text whose candidate radix yields printable output. The <a href="artifacts/radix_triage.py">local reviewer</a> demonstrates that mechanics and also gives a benign decimal-ASCII false positive. A content lead needs destination, volume, business context, and policy correlation. There were no network captures or endpoint logs in this case, so no operational detection was validated.</p>
+<p>I would not infer an actor from the choice of Atbash and base 9. Two fragments under two simple schemes establish only that those schemes appear in the challenge. They say nothing reliable about infrastructure, sophistication, or a real exfiltration path.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<h3>Encoded-content triage decision tree</h3>
+<pre><code class="language-text">1. Inventory the alphabet and field shape.
+   Numeric fixed-width tokens -&gt; test positional interpretations.
+   Letters and spaces -&gt; try simple, keyless substitutions.
+   Base64-like or binary content -&gt; validate that format before guessing intent.
+2. For numeric tokens, keep leading zeros and note the largest digit.
+   Test the smallest valid radix and plausible higher radices.
+   Decode every token; examine full output and alternatives.
+3. For letter text, try Atbash and ROT-N before keyed methods.
+   Use frequency tests only on enough material to support them.
+4. For high-entropy bytes, inspect headers and containers first.
+   Entropy alone cannot distinguish compression from encryption.
+5. Stop and reconsider whenever a rule needs exceptions or leaves a class
+   of tokens unreachable. Keep rejected candidates in the analysis record.
+</code></pre>
+<p>For later triage, rough index-of-coincidence landmarks near <code>0.066</code> for English monoalphabetic text and <code>0.038</code> for a flatter polyalphabetic distribution can suggest what to examine next. Those are reference values, not decision thresholds for a 47-character fragment. Chi-square and entropy checks may help with byte-heavy input; neither was run here.</p>
+<h3>Reusable primitives</h3>
+<p><code>infer_radix(tokens)</code> proposes the smallest base permitted by the observed digits. <code>decode(tokens, radix)</code> applies the positional rule. <code>validate_blocks</code> checks the output range. None turns a lower bound into a unique identification. The <a href="artifacts/radix_triage.py">bounded content reviewer</a> tests candidate bases, keeps decoded text out of its JSON report, and emits only review leads. Its <a href="artifacts/synthetic_messages.txt">synthetic messages</a>, <a href="artifacts/test_radix_triage.py">tests</a>, and <a href="artifacts/README.md">guide</a> make the positive, false-positive, and near-miss behavior reproducible.</p>
+<h3>The rule-vs-table test</h3>
+<p>I now ask whether a recovered mapping can be generated by a short formula. In this case every token could be explained by positional arithmetic, so maintaining a 20-entry value table hid a simpler mechanism. A truly arbitrary codebook may not compress that way, but failing to find a formula is not proof that none exists. The test is a prompt to compare models, not an automatic classifier.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<h3>Tier 1 - completeness checklist</h3>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>Fit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MITRE ATT&amp;CK</td>
+<td><a href="https://attack.mitre.org/techniques/T1027/">T1027 Obfuscated Files or Information</a> is an analogy for an adversary using encoding to conceal content. The fragments were encoded, but no real adversary behavior was observed. <a href="https://attack.mitre.org/techniques/T1140/">T1140</a> describes adversary decoding or deobfuscation during operations; my analyst decoding is not that technique. T1560 and T1567 would wrongly turn fictional text about staged files or bidding into observed archiving or exfiltration.</td>
+</tr>
+<tr>
+<td>MITRE ATLAS</td>
+<td>N/A: no model, ML pipeline, or AI system.</td>
+</tr>
+<tr>
+<td>OWASP Top 10 and LLM Top 10</td>
+<td>N/A: no web, API, browser, or LLM surface.</td>
+</tr>
+<tr>
+<td>CVSS, EPSS, CISA KEV</td>
+<td>N/A: no product vulnerability or CVE.</td>
+</tr>
+<tr>
+<td>CIS cloud benchmarks / CSA CCM</td>
+<td>N/A: no cloud environment in scope.</td>
+</tr>
+</tbody>
+</table>
+<h3>Tier 2 - applied where they add value</h3>
+<p><a href="https://d3fend.mitre.org/technique/d3f:NetworkTrafficAnalysis/">D3-NTA Network Traffic Analysis</a> is a possible defensive context only if an authorized sensor can inspect message content. The challenge supplied no network sensor. CAPEC, CWE, STRIDE, CACAO, and OpenC2 do not sharpen this representation problem: there is no software weakness, system design, or response automation to map. NIST monitoring controls are addressed in Section 11.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<p>I found no real domain, address, hash, host, port, credential, or observed actor behavior. The encoded sentences are challenge text. I would not create a threat-actor STIX object from their fictional attribution or a TAXII feed from a generic digit pattern. The reusable item is an analytic hypothesis with a clear input requirement and false positives, kept in Section 12.</p>
+<p><a href="https://www.rfc-editor.org/rfc/rfc20">RFC 20</a> supplies the ASCII code table that explains why space, digits, and lowercase letters form separate decoded clusters. It is a reference for the character values, not evidence of threat activity. No STIG configuration applies to these two snippets of text.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<p>The case offered no enterprise system to harden. I can map only the content-inspection and alert-handling idea. Controls for the fictional document store would require facts about that store that I do not have.</p>
+<h3>11a. Standards Mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Realistic use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NIST SP 800-53 Rev. 5 SI-4, System Monitoring</td>
+<td>An authorized content sensor could include this hypothesis in a monitored data flow, with privacy and retention rules set by the organization.</td>
+</tr>
+<tr>
+<td>CIS Controls v8 13.1, Centralize Security Event Alerting</td>
+<td>A review lead could be correlated with destination, timing, and volume in a central alerting process.</td>
+</tr>
+</tbody>
+</table>
+<h3>11b. Mitigation Realization</h3>
+<p>The proposed SI-4 implementation is a content review of numeric token runs. It needs actual body bytes. A connection log, NetFlow, or IPFIX record cannot supply those bytes. An email gateway, approved DLP export, application audit, or explicitly configured body-capture pipeline might. TLS also hides content from a passive network observer unless an authorized endpoint or inspection layer exposes it.</p>
+<p>CIS 13.1 matters after the lead exists. A long digit run lacking <code>9</code> is common in benign data and does not merit a stand-alone incident. I would correlate it with an unexpected destination, unusual transfer volume, or a known sensitive workflow, then preserve the original content under the applicable access policy. No such pipeline was deployed for this challenge.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p><strong>Detection maturity: local synthetic proof of concept.</strong> The <a href="artifacts/radix_triage.py">reviewer</a> and <a href="artifacts/test_radix_triage.py">tests</a> now exist. They have no production sensor, backend conversion, tuned threshold, or measured false-positive rate. This is a review aid for a very specific content shape, not an IOC or a general exfiltration detector.</p>
+<h3>Seed: non-decimal radix content detection</h3>
+<p>The challenge had a 42-token line of three-digit fields with <code>8</code> present and <code>9</code> absent. If <code>N</code> independent digits were uniformly sampled from <code>0-9</code>, the probability that a <em>preselected</em> digit <code>9</code> never appears is <code>0.9^N</code>. For 30, 60, 132, and 300 digits that works out to roughly <code>4.2e-2</code>, <code>1.8e-3</code>, <code>9.0e-7</code>, and <code>1.9e-14</code>. Real numeric data is rarely independent or uniform. Choosing which absent digit to highlight after seeing the sample also changes the inference. Those numbers illustrate one toy null model; they are not a calibrated alert false-positive rate.</p>
+<p>The reviewer accepts an authorized local UTF-8 text export up to 1 MB, 1,000 lines, and 1,000 tokens per line. It looks for lines of at least ten three-digit tokens, computes the minimum possible radix, tests candidate bases up to ten, and checks for printable ASCII. Its JSON gives line number, token count, digit set, candidate bases, character counts, and a digest of the decoded text. It deliberately omits plaintext. The <a href="artifacts/synthetic_messages.txt">invented fixture</a> produces one base-9-only lead and one decimal-ASCII line that is printable under both bases, an expected false positive. A third line containing <code>9</code> produces no printable candidate. Four tests passed those cases plus invalid-token and Atbash checks.</p>
+<p>I would tune this only with a real collection source and its benign examples. Decimal ASCII, numeric telemetry, and product identifiers can match. Zeek <code>conn.log</code> summarizes connections and does not carry a message body. An appropriate body extraction or content sensor is required. Without authorized plaintext visibility, this idea has no detection coverage. No Sigma, SPL, or KQL rule can create content fields missing from the collection pipeline.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">solve flow above</a> shows where the false codebook model entered and where the rejected submission forced a second look at the digits. The defensive path is narrower: obtain content lawfully, identify candidate numeric runs, review alternate radices and benign explanations, then correlate with the activity around the message. The local proof of concept covers the middle two steps on invented text only.</p>
+<pre><code class="language-mermaid">flowchart LR
+  A[Authorized content export] --&gt; B[Fixed-width numeric run]
+  B --&gt; C[Minimum radix and alternatives]
+  C --&gt; D[Printable-output review lead]
+  D --&gt; E[Context and benign-data check]
+  E --&gt; F[Analyst decision]
+</code></pre>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ol>
+<li><a href="https://www.rfc-editor.org/rfc/rfc20">RFC 20, ASCII format for Network Interchange</a>, including the space, digit, and lowercase character blocks.</li>
+<li><a href="https://attack.mitre.org/techniques/T1027/">MITRE ATT&amp;CK T1027, Obfuscated Files or Information</a>.</li>
+<li><a href="https://attack.mitre.org/techniques/T1140/">MITRE ATT&amp;CK T1140, Deobfuscate/Decode Files or Information</a>.</li>
+<li><a href="https://d3fend.mitre.org/technique/d3f:NetworkTrafficAnalysis/">MITRE D3FEND D3-NTA, Network Traffic Analysis</a>.</li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5</a>, SI-4 System Monitoring.</li>
+<li><a href="https://www.cisecurity.org/controls/cis-controls-navigator/v8">CIS Critical Security Controls v8</a>, Safeguard 13.1.</li>
+<li>Donald Knuth, <em>The Art of Computer Programming</em>, Vol. 2, 3rd ed., Section 4.1 on positional number systems.</li>
+<li>David Kahn, <em>The Codebreakers</em>, revised edition, 1996, for historical discussion of Atbash.</li>
+</ol>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
