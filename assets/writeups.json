@@ -585,5 +585,28 @@
     ],
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/osint/chat-indicator-validity/"
+  },
+  {
+    "title": "The Login UID Behind the Beacon",
+    "category": "Forensics",
+    "difficulty": "Medium",
+    "date": "2026-10",
+    "tags": [
+      "auditd",
+      "login-UID attribution",
+      "RAT",
+      "C2 beaconing",
+      "cron persistence",
+      "insider threat",
+      "SOCKADDR decode"
+    ],
+    "summary": "I followed a hidden executable from its download and root cron edit to repeated outbound connections, then used the installer's login UID to separate one Finance account from a convincing decoy.",
+    "aliases": [
+      "Linux audit logs",
+      "insider implant",
+      "root crontab"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/forensics/auditd-insider-implant/"
   }
 ]
