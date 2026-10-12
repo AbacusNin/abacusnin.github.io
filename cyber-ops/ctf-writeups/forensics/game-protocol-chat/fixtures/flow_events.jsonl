@@ -1,0 +1,4 @@
+{"ts":"2026-01-01T12:00:00Z","src_ip":"192.0.2.10","dst_ip":"198.51.100.20","dst_port":25565,"protocol":"tcp","action":"allow","asset_role":"build_server","approved_game_use":false,"game_handshake_verified":true}
+{"ts":"2026-01-01T12:01:00Z","src_ip":"192.0.2.11","dst_ip":"198.51.100.21","dst_port":25565,"protocol":"tcp","action":"allow","asset_role":"approved_gaming_station","approved_game_use":true,"game_handshake_verified":true}
+{"ts":"2026-01-01T12:02:00Z","src_ip":"192.0.2.12","dst_ip":"198.51.100.22","dst_port":443,"protocol":"tcp","action":"allow","asset_role":"build_server","approved_game_use":false,"game_handshake_verified":false}
+{"ts":"2026-01-01T12:03:00Z","src_ip":"192.0.2.13","dst_ip":"198.51.100.23","dst_port":25565,"protocol":"tcp","action":"allow","asset_role":"workstation","approved_game_use":false}

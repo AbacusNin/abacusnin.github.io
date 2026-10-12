@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Seven Chat Lines Inside a Game Session - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="A game-server capture looked like ordinary session traffic until I framed its application packets and rebuilt seven chat messages. Three short pieces carried the answer.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/game-protocol-chat/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="Seven Chat Lines Inside a Game Session">
+  <meta property="og:description" content="A game-server capture looked like ordinary session traffic until I framed its application packets and rebuilt seven chat messages. Three short pieces carried the answer.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/game-protocol-chat/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Forensics / <span aria-current="page">Seven Chat Lines Inside a Game Session</span></p>
+      <div class="page-head">
+        <h1 class="page-title">Seven Chat Lines Inside a Game Session</h1>
+        <p class="lead">The capture was mostly world data. The conversation I needed was seven small packets near the end.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Reconstruct an adversary-themed exchange from one raw game-server packet capture and recover its staged secret.</p>
+<p><strong>What I did.</strong> I checked the flow, reassembled TCP in both directions, decoded VarInt frames for protocol 774, matched chat packets by structure and time, and swept for other payload channels.</p>
+<p><strong>The result.</strong> Seven broadcasts reconstruct the conversation. Three messages from one sender form the answer; its exact text is withheld.</p>
+<p><strong>The limit.</strong> The local capture confirms the packet counts, chat timing, and unsigned message fields. The challenge submission receipt and a real-world actor or exfiltration event are not established by this capture.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Triage; Reassemble; Frame; Locate; Recover; Defend">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Triage</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">One TCP game session</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Reassemble</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Two strict byte streams</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Frame</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">VarInt lengths and packet IDs</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Locate</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Seven chat broadcasts</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Recover</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Three ordered answer pieces</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Defend</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Review unexpected game egress</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Network Forensics / Covert Channel Analysis</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>pcap, application-layer protocol, custom dissector, VarInt, game-protocol C2, offline-mode auth</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved</td>
+</tr>
+<tr>
+<td>Material</td>
+<td>One roughly 17 MB cleartext game-server pcap</td>
+</tr>
+<tr>
+<td>Result</td>
+<td>Seven chat broadcasts; three ordered messages yield the challenge answer</td>
+</tr>
+<tr>
+<td>Verification boundary</td>
+<td>Local packet and chat structure checked; no platform receipt or real actor attribution</td>
+</tr>
+</tbody>
+</table>
+<p>The defensive proofs of concept for applying this case to real telemetry are in <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/game-protocol-chat/artifacts">the GitHub tools and detection folder</a>, with <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/game-protocol-chat/fixtures">invented test captures and flow events</a>. They are examples for analysts and detection engineers, not the raw challenge capture.</p>
+<h2>Overview Diagram</h2>
+<p>The diagram above is my route through the case, from a TCP conversation to a handful of chat packets. Section 13 returns to the defensive side of that route.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I was given a capture from a game server and asked to reconstruct what two people exchanged. The story around it described adversaries using a familiar game protocol as cover for communication. The pcap was my only evidence: no endpoint log, server audit trail, or account record came with it. The analytical job was to read the application conversation and check whether anything else rode the same connection.</p>
+<p>In the simulation, <code>&lt;player_b&gt;</code> passes a short staged secret to <code>&lt;player_a&gt;</code>. I can establish what the captured client and server sent; I cannot use a private-game username as proof of a real person's identity. Nor can this exercise, by itself, establish a malware command channel or an external incident. Its value is the method: a protocol that looks like normal game traffic can still carry a specific message, and a network team needs the right bytes and versioned decoder to see it.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<h3>2.1 Triage</h3>
+<p>I started with the shape of the capture rather than a string search:</p>
+<pre><code class="language-sh">capinfos game.pcap
+tshark -r game.pcap -q -z conv,tcp
+tshark -r game.pcap -q -z conv,udp
+tshark -r game.pcap -q -z io,phs
+</code></pre>
+<p>There is one TCP conversation to port <code>25565</code>. The capture contains 2,278 records over about 29.05 seconds. Including frame headers and control packets, roughly 17.30 MB travels from server to client and 74.6 KB in the other direction. The actual reassembled application payload is 17,220,896 server bytes and 2,740 client bytes. I keep those measures separate: packet size and TCP acknowledgments make the smaller wire total much larger than the client payload. The server's bulk is ordinary world and registry data. The small client payload does not rule out a short secret moving in either direction.</p>
+<p>The available <code>tshark</code> pass identified Ethernet, IP, TCP, and mostly undecoded data. A few binary frames were heuristically labeled ESP; that label did not match the conversation or the later application framing. I treated the default port and strings like <code>minecraft:brand</code> as clues, then confirmed the protocol from its handshake.</p>
+<h3>2.2 Stream reassembly</h3>
+<p>Scapy had failed to import in my original analysis environment because of a <code>route6</code> lookup error, so I switched to <code>dpkt</code> for offline packet reading. The first reassembler sorted segments by TCP sequence and filled a gap with zeroes. That is a bad general rule: a gap means missing evidence, and invented zero bytes can create a false application frame. My later <a href="artifacts/game_capture_triage.py">offline capture tool</a> rejects a gap or conflicting overlap instead. On this capture it found no duplicate payload segment or gap, and it rebuilt two complete byte streams.</p>
+<p>This is the point where I stopped leaning on the port number. The parser had to account for each stream byte without manufacturing any. The <a href="fixtures/sample_game.pcap">invented pcap</a> and <a href="artifacts/test_game_lab.py">test suite</a> exercise the same rule, including a gap and a conflicting retransmission.</p>
+<h3>2.3 Identifying the protocol</h3>
+<p>The first client application frame is a handshake. Its packet ID is <code>0</code>, its protocol-version VarInt decodes to <code>774</code>, and <code>next_state=2</code> selects Login. The declared port is <code>25565</code>. Those fields fit the Java game protocol used by release 1.21.11; I used the negotiated number for packet decoding rather than assuming the default port meant a particular release. The first packets also contain normal brand and registry markers.</p>
+<h3>2.4 Custom protocol framing</h3>
+<p>For an uncompressed session, the shape is <code>Length:VarInt | PacketID:VarInt | Data</code>. The high bit of each VarInt byte says whether the value continues; seven low bits contribute to the integer. A 32-bit VarInt takes at most five bytes. I wrote a small framer and counted the resulting packets: 699 client-to-server and 17,799 server-to-client. The total consumption of both reassembled streams is a stronger check than a plausible-looking string at one offset.</p>
+<p>Packet IDs are state and version dependent. A <code>0x3F</code> in the right play-state table can mean Player Chat Message; that byte alone in an arbitrary protocol version cannot. The <a href="artifacts/game_capture_triage.py">capture tool</a> confines its partial chat decode to the known protocol-774 layout and reports that limit in its output.</p>
+<h3>2.5 Locating the data-bearing channel</h3>
+<p>The client stream mostly held position, rotation, on-ground, keep-alive, and small state updates. Only three <code>0x08</code> serverbound chat packets stood out as application messages. On the much larger server stream I searched for the two sender UUIDs, then decoded candidate Player Chat Message structures. Some UUID hits occurred inside NBT player-info data and failed the surrounding chat layout. I also checked that a candidate carried a plausible millisecond timestamp.</p>
+<p>Seven server-to-client broadcasts survived that structural check, at seven distinct stream offsets, with clientbound packet ID <code>0x3F</code>. The count includes messages from both players: three from <code>&lt;player_a&gt;</code> and four from <code>&lt;player_b&gt;</code>. All seven parsed with the signature-presence field clear. My independent pass reproduced the seven packet offsets, two-sender pattern, unsigned field, and time gaps without printing the message text.</p>
+<h3>2.6 Conversation reconstruction</h3>
+<p>The order by stream offset agreed with the embedded big-endian millisecond timestamps:</p>
+<table>
+<thead>
+<tr>
+<th>Relative time</th>
+<th>Sender</th>
+<th>Role in the exchange</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0.000 s</td>
+<td><code>&lt;player_a&gt;</code></td>
+<td>Greeting</td>
+</tr>
+<tr>
+<td>2.442 s</td>
+<td><code>&lt;player_b&gt;</code></td>
+<td>Reply</td>
+</tr>
+<tr>
+<td>6.093 s</td>
+<td><code>&lt;player_a&gt;</code></td>
+<td>Pretext question</td>
+</tr>
+<tr>
+<td>9.067 s</td>
+<td><code>&lt;player_b&gt;</code></td>
+<td>Answer piece 1</td>
+</tr>
+<tr>
+<td>11.717 s</td>
+<td><code>&lt;player_b&gt;</code></td>
+<td>Answer piece 2</td>
+</tr>
+<tr>
+<td>13.789 s</td>
+<td><code>&lt;player_b&gt;</code></td>
+<td>Answer piece 3</td>
+</tr>
+<tr>
+<td>16.209 s</td>
+<td><code>&lt;player_a&gt;</code></td>
+<td>Acknowledgment</td>
+</tr>
+</tbody>
+</table>
+<p>The three consecutive pieces from <code>&lt;player_b&gt;</code> concatenate into the challenge answer, shaped like <code>SKY-AAAA-####</code>. The final acknowledgment makes the intended completion clear in the conversation. I withhold the exact answer and player names. This ordering is supported twice, by byte offset and the chat timestamps, but neither field proves who operated the accounts.</p>
+<h3>2.7 Coverage sweep</h3>
+<p>After finding the chat, I checked the other clientbound and serverbound packet types for sign edits, book edits, command-block content, and plugin or custom-payload messages. The remaining client-to-server traffic in this capture parsed as routine movement and state telemetry. I found no second payload channel in the inspected material. That is a bounded conclusion about this one cleartext flow, not a claim that the protocol cannot carry messages elsewhere.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<h3>3.1 VarInt and frame extractor (reusable)</h3>
+<p>The <a href="artifacts/game_capture_triage.py">capture triage script</a> contains the complete reader and JSON report. This is the core of the frame walk:</p>
+<pre><code class="language-python">length, next_offset = varint(stream, offset)
+packet_id, body_offset = varint(stream, next_offset)
+body = stream[body_offset:next_offset + length]
+offset = next_offset + length
+</code></pre>
+<p>The real function bounds the capture, record count, frame length, and VarInt width. It rejects truncated frames and checks that the packet ID sits inside its declared frame. It reassembles both TCP directions strictly, which matters more than making a parser tolerant of missing bytes. The <a href="artifacts/README.md">guide</a> specifies the supported pcap shape and the cases it will refuse.</p>
+<h3>3.2 Player Chat Message decoder</h3>
+<p>For protocol 774, I read the global index, sender UUID, sender index, signature-presence field, length-prefixed UTF-8 text, and timestamp. The optional 256-byte signature area is skipped only when the presence flag says it exists. The packet continues with salt, previous-message acknowledgments, optional unsigned content, a filter field, and chat-type information. I do not claim to validate the signature, parse those trailing fields and their NBT, or decode other versions. The tool labels senders <code>sender_1</code>, <code>sender_2</code> in the default report and hides text; <code>--show-chat</code> is an explicit local option for an authorized content review. That separation lets me test the structure without dumping the challenge answer into a report.</p>
+<h3>3.3 Offline-mode UUID derivation (verifier and detector)</h3>
+<p>The reference offline-name calculation hashes the UTF-8 bytes of <code>OfflinePlayer:</code> followed by the name, then sets UUID version and variant bits. I used it as a consistency check on the client login name and UUID; the captured pair matched exactly. My earlier work also reported a match for the second player's name, but I have not independently reconstructed that second mapping here. A matching name and UUID supports offline-style identity assignment. It cannot alone prove the full server configuration, the presence or absence of a proxy, or the human behind that name.</p>
+<pre><code class="language-python">from hashlib import md5
+
+digest = bytearray(md5((&quot;OfflinePlayer:&quot; + name).encode(&quot;utf-8&quot;)).digest())
+digest[6] = (digest[6] &amp; 0x0f) | 0x30
+digest[8] = (digest[8] &amp; 0x3f) | 0x80
+</code></pre>
+<p>The MD5 here reproduces a vendor naming convention. Password storage and authentication require different mechanisms. The cleartext stream and early login packets were the direct evidence I used for the capture's readable state.</p>
+<h3>3.4 Channel sweep helper (fallback path; was prepared, run, and produced negative)</h3>
+<p>I also enumerated plugin/custom-payload channel names and checked for unexpected bodies, while reviewing signs, books, and command-block related client packets. My first implementation keyed one plugin packet ID to this version; the broader technique is to use a versioned table and check the payload's own length-prefixed channel name. The sweep did not produce another answer. I have not packaged it as a generic detector because a wrong packet ID or state could turn normal world data into a false finding.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<h3>4.1 Why a game protocol is an attractive covert carrier</h3>
+<p>A public client and server give someone a ready-made conversation channel. Game sessions also have much more legitimate data than chat: registry information, world updates, position reports, and keep-alives. In this capture, seven meaningful lines sit inside over 17 MB of server application data. An analyst who stops at the port or byte totals will miss them. Whether an organization permits gaming traffic depends on its own users and policy; a familiar port is neither approval nor evidence of attack.</p>
+<p>Chat, signs, books, command blocks, and plugin payloads offer distinct places to carry text or bytes. They are legitimate features. The investigative question is whether a particular session, endpoint, and message content fit the business context and the scenario's claimed behavior.</p>
+<h3>4.2 Protocol framing primer</h3>
+<p>The handshake chooses Status (<code>next_state=1</code>) or Login (<code>next_state=2</code>). Login can negotiate encryption and compression; Configuration exchanges registry and pack details; Play carries movement, world data, and chat. A packet number has meaning only inside its state and negotiated version. This session used cleartext, uncompressed framing, so I could read its packet lengths and IDs directly after TCP reassembly.</p>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>What I looked for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Handshake</td>
+<td>Version VarInt, server address and port, next state</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Server-list ping, not used in this session</td>
+</tr>
+<tr>
+<td>Login</td>
+<td>Login start/success and any encryption or compression negotiation</td>
+</tr>
+<tr>
+<td>Configuration</td>
+<td>Brand, registries, known packs, client information</td>
+</tr>
+<tr>
+<td>Play</td>
+<td>Movement and world traffic plus <code>0x08</code> serverbound chat and <code>0x3F</code> clientbound chat in version 774</td>
+</tr>
+</tbody>
+</table>
+<p>The <a href="fixtures/make_sample.py">synthetic fixture builder</a> constructs a small, valid classic pcap with a version-774 handshake and three invented broadcasts. Its <a href="fixtures/expected_capture.json">expected report</a> gives readers a safe way to check the framing before they examine an authorized capture.</p>
+<h3>4.3 Offline-mode UUIDs as a forensic signal</h3>
+<p>I saw no encryption transition before the readable application frames. The captured client login UUID also matched the deterministic offline-name calculation. That combination supports an offline-style session in this case. It says the in-protocol name is a weak attribution handle, since someone can choose a name that yields the corresponding offline UUID. A version-3 UUID by itself is not a server-mode detector, and a private proxy or server extension can change the picture. I would keep endpoint identity and account evidence separate from the captured chat label.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>The analysis works because the stream is readable and framed. I reassembled each TCP direction, decoded each length and ID, tracked the state transition, and used the version-774 chat layout to extract the message field. The <code>signed</code> presence field was false on all seven candidate broadcasts. That means the optional signature bytes are absent in these packets; it does not prove a sender's legal identity or validate an end-to-end trust chain. The message bytes were plain UTF-8.</p>
+<p>The three answer pieces were short enough to fit in normal chat messages. A greeting and a final acknowledgment made them read like a small conversation. My parser returned seven ordered messages and the same 2.442, 6.093, 9.067, 11.717, 13.789, and 16.209 second offsets I saw in my first pass. I joined the three <code>&lt;player_b&gt;</code> pieces in order. The exact answer is withheld; the challenge was marked Solved, but a platform submission receipt is not in this record.</p>
+<p>The capture demonstrates message recovery. It does not demonstrate that a compromised corporate host used this server, that the string was a real secret, or that an external actor exfiltrated it. Those claims would need host, identity, destination, and business-context evidence beyond a single CTF pcap.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<p>The first three commands gave me the conversation and protocol shape. The useful pivot was writing a minimal framer once the stock dissector failed. That got me from a 17 MB blob to a countable packet stream. The seven chat candidates then had to agree on structure, offsets, and timestamps; a raw UTF-8 search could have picked up incidental strings in registry or NBT data.</p>
+<p>I also learned to carry a second packet library for offline analysis. Scapy's import issue did not change the evidence, but it could have stalled the work. <code>dpkt</code> got me through the first pass. The later strict reassembler fixed the more serious concern in my initial script: zero-padding gaps would have manufactured bytes. For this particular capture the streams are complete, so the correction does not change the result.</p>
+<p>One tempting shortcut was to call every connection to port <code>25565</code> a game session, or every unsigned/offline-style chat suspicious. Both are too broad. Port, protocol handshake, asset role, approved use, and actual content answer different questions. I want a future detection to say which of those it really observed.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<h3>7.1 Practitioner skill development</h3>
+<p>This case gave me practice reading a wire format rather than waiting for a dissector. The reusable skills are TCP reassembly, bounded VarInt decoding, per-version packet tables, state transitions, and cardinality checks. A next step would be a Wireshark or Zeek protocol analyzer tested against several versions, compressed sessions, packet loss, and benign captures. The <a href="artifacts/README.md">current lab</a> is deliberately narrower.</p>
+<h3>7.2 SOC, IR, and threat hunting</h3>
+<p>I would start a hunt with policy context: which assets have a reason to open game-server connections, which destinations are expected, and which sensors can verify the application handshake. The <a href="artifacts/game_egress_triage.py">flow triage tool</a> flags allowed TCP/25565 from an asset without an approved exception and labels whether protocol verification exists. Its <a href="fixtures/flow_events.jsonl">invented events</a> include a true policy lead, approved gaming, an unrelated port, and a port-only lead. That is a queue for review, not a C2 verdict.</p>
+<p>If a case warrants content collection, I would preserve an authorized pcap and run a version-aware parser. NetFlow alone can show a connection but not the chat. I would then correlate endpoint process, owner, user activity, server reputation, and any sensitive-file access. After-hours timing and a self-hosted destination can sharpen a hypothesis; neither proves abuse. Blanket port blocks or TLS interception are policy decisions with user and protocol impact, not automatic outputs of this puzzle.</p>
+<h3>7.3 Intelligence operations</h3>
+<p>Protocol version, server address, destination history, timing, and path from a client process can be useful selectors across cases. A private-game username or offline-derived UUID is a poor identity anchor. A three-line split may be a useful behavioral description, but chat length limits and normal human conversation can produce the same shape. I would share a verified destination or message pattern only with provenance, scope, and expiration; this sanitized CTF case supplies no reusable external IP, domain, hash, or actor attribution.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<h3>8.1 Triage decision tree for unknown-protocol TCP pcaps</h3>
+<pre><code class="language-text">1. Measure capture duration, directions, bytes, and conversations.
+2. Ask whether a dissector recognizes the application protocol.
+3. Confirm a protocol hypothesis with both in-band structure and metadata.
+4. Reassemble TCP strictly; stop on a gap or conflicting overlap.
+5. Decode the negotiated version, state transitions, and frame lengths.
+6. Count application packet IDs before interpreting content.
+7. Decode candidate messages and cross-check order and timestamps.
+8. Inspect other data-bearing packet types before closing the case.
+</code></pre>
+<p>The <a href="artifacts/game_capture_triage.py">capture triage tool</a> implements the bounded, cleartext portion of that tree. It reports packet/frame counts and chat metadata by default. The <a href="fixtures/make_sample.py">fixture builder</a>, <a href="fixtures/sample_game.pcap">invented capture</a>, <a href="fixtures/expected_capture.json">expected report</a>, and <a href="artifacts/test_game_lab.py">tests</a> let another analyst reproduce the mechanics without the real conversation. The <a href="artifacts/README.md">guide</a> makes the byte, protocol, and privacy limits explicit.</p>
+<h3>8.2 Reusable parser primitives</h3>
+<p>The core reusable functions are strict TCP <code>reassemble</code>, five-byte <code>varint</code>, <code>frames</code>, handshake parsing, and the partial <code>player_chat</code> decoder in the <a href="artifacts/game_capture_triage.py">tool</a>. My offline-name UUID calculation in Section 3.3 is a separate identity-consistency check, not a dependency for extracting chat. A plugin-channel sweep remains a useful fallback after a version-specific packet table is confirmed; one packet ID cannot be assumed to apply to every release.</p>
+<p>For the operational side, the <a href="artifacts/game_egress_triage.py">flow checker</a> and <a href="fixtures/flow_events.jsonl">normalized event fixture</a> identify allowed traffic to the default port from an asset without an approved game-use exception. The <a href="fixtures/expected_flow_findings.json">expected findings</a> show a verified-handshake lead and a weaker port-only lead. It deliberately leaves approved gaming out of the result. The <a href="artifacts/sigma_unapproved_game_egress.yml">Sigma rule</a> and <a href="artifacts/detection_queries.md">SPL/KQL templates</a> carry the same narrow hypothesis into a SIEM after schema mapping.</p>
+<h3>8.3 Solve-pattern checklist</h3>
+<pre><code class="language-text">[ ] Capture hash, format, duration, and original custody recorded
+[ ] Every TCP direction reassembled without unexplained gaps
+[ ] Protocol and version confirmed from an actual handshake
+[ ] Compression/encryption state determined before payload decoding
+[ ] Frame lengths consume the streams exactly
+[ ] State/version table used for packet IDs
+[ ] Chat and other likely message carriers checked
+[ ] Sender labels separated from real-world identity claims
+[ ] Conversation ordered by bytes and checked against timestamps
+[ ] Answer derivation documented without exposing unrelated content
+</code></pre>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<h3>9.1 ATT&amp;CK</h3>
+<p><a href="https://attack.mitre.org/techniques/T1071/">ATT&amp;CK T1071</a>, Application Layer Protocol, is the useful analogy for the challenge's staged communication over a normal application protocol. Its current listed subtechniques cover web, file transfer, mail, DNS, and publish/subscribe; this game session belongs at the parent level. <a href="https://attack.mitre.org/techniques/T1001/">T1001</a>, Data Obfuscation, is a weaker scenario analogy if the ordinary chat and surrounding world traffic were chosen to hide intent. The bytes show clear text. They do not show an obfuscation transform.</p>
+<p>I also considered T1572 Protocol Tunneling and T1132.001 Standard Encoding. I leave both out of the finding. No second protocol is tunneled here, and UTF-8 is the ordinary text encoding of the game's chat field. Mapping every normal encoding to an adversary technique would erase the distinction between behavior and interpretation. The pcap is a simulated exchange, not proof of a deployed malicious C2 implant.</p>
+<h3>9.2 D3FEND</h3>
+<p><a href="https://d3fend.mitre.org/technique/d3f%3ANetworkTrafficAnalysis/">D3-NTA, Network Traffic Analysis</a>, fits the capture review and proposed protocol-aware detection. <a href="https://d3fend.mitre.org/technique/d3f%3ANetworkTrafficFiltering/">D3-NTF, Network Traffic Filtering</a>, and <a href="https://d3fend.mitre.org/technique/d3f%3AOutboundTrafficFiltering/">D3-OTF, Outbound Traffic Filtering</a>, fit a policy-based egress control when the organization has decided which assets may game. These are defensive options, not controls observed in the pcap. I do not use <code>D3-PA</code> for protocol analysis: that identifier names Process Analysis in D3FEND.</p>
+<h3>9.3 CAPEC</h3>
+<p>I checked <a href="https://capec.mitre.org/data/definitions/272.html">CAPEC-272, Protocol Manipulation</a>, and CAPEC-292 Host Discovery against the capture. Neither describes the observed act precisely. The chat uses a legitimate feature without a demonstrated protocol bug or manipulation, and the capture shows no host-discovery step. I keep them here as reviewed, rejected mappings rather than filling the table with a loose match.</p>
+<h3>9.4 Frameworks intentionally omitted</h3>
+<p>OWASP Top 10 and ASVS would matter for a web application or a game-server security review, but this record is a network reconstruction. STRIDE could help design a new service; it does not add an observed technique to this solved pcap. OpenC2 could carry a future approved response action, but I did not create an orchestration command from a CTF flow. Those distinctions keep the framework section useful rather than decorative.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<h3>10.1 STIX SDOs</h3>
+<p>I considered a STIX attack-pattern, indicator, and course-of-action package. The only candidate indicator from this capture was traffic on the default game port. That would match many benign sessions, and this case has no verified external destination, malware family, campaign, or time-bounded atomic IOC for a STIX/TAXII feed. I therefore keep the observable and triage logic in the <a href="artifacts/game_egress_triage.py">detector</a>, <a href="artifacts/sigma_unapproved_game_egress.yml">Sigma candidate</a>, and <a href="artifacts/detection_queries.md">query templates</a>. A shareable intelligence package would need scoped destination evidence and a validated STIX pattern.</p>
+<p>The content here is also not proof of a C2 command. The challenge labels it adversary communication, while the packet evidence shows a staged chat exchange. That distinction matters when describing it to another team.</p>
+<h3>10.2 STIG references</h3>
+<p>I would look at the applicable firewall, router, application-layer gateway, and host operating-system guidance for a deployed environment. Egress rule ownership, documented exceptions, logs, and review are relevant themes. A pcap does not identify the organization's device product, STIG release, rule base, or assessment boundary, so I cannot make a finding or cite a vendor-specific requirement from this case alone.</p>
+<h3>10.3 CIS Benchmarks and Controls v8</h3>
+<p>No Minecraft-specific CIS Benchmark is implicated. <a href="https://www.cisecurity.org/controls/cis-controls-navigator/v8">CIS Controls v8</a> supplies the useful control language: Control 8 for audit logs; 12.4 for an architecture diagram that shows the egress boundary; 13.1 for centralized security event alerting; 13.6, <em>Collect Network Traffic Flow Logs</em>; and 13.10 for application-layer filtering where a suitable device can identify this protocol. Collection lets me review the flow; protocol-aware filtering is a separate control design.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>11a. Standards mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>Candidate control</th>
+<th>What I would implement or verify</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5</a></td>
+<td>SC-7 Boundary Protection</td>
+<td>Restrict unnecessary egress at a defined boundary.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>AC-4 Information Flow Enforcement</td>
+<td>Express which asset populations and destinations may use the application protocol.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>SI-4 System Monitoring</td>
+<td>Review unexpected game-protocol egress and preserve high-fidelity network evidence.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>AU-6 Audit Review, Analysis, and Reporting</td>
+<td>Give an analyst enough flow and asset context to review an alert.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>CA-7 Continuous Monitoring</td>
+<td>Revisit exceptions and detector performance as ports and protocol versions change.</td>
+</tr>
+<tr>
+<td><a href="https://www.cisecurity.org/controls/cis-controls-navigator/v8">CIS Controls v8</a></td>
+<td>8, 12.4, 13.1, 13.6, 13.10</td>
+<td>Document the egress boundary, centralize alerts, retain flow visibility, and use app-layer filtering where appropriate.</td>
+</tr>
+<tr>
+<td>CMMC Level 2, if applicable</td>
+<td>SC.L2-3.13.1</td>
+<td>Assess boundary protection only for a scoped CUI environment; this puzzle establishes no CMMC status.</td>
+</tr>
+</tbody>
+</table>
+<p>These are implementation prompts. I have not assessed a real boundary, firewall, or compliance program.</p>
+<h3>11b. Mitigation realization</h3>
+<p>For a network where game traffic has no business purpose, I would document the source populations and destinations, make an egress decision at the firewall, log each allowed exception, and test the rule with an approved game client and an unrelated service on the same port. Port-only filtering is easy to evade and may block legitimate use. A protocol-aware gateway or sensor can improve identification, but it still cannot decide intent from a handshake alone.</p>
+<p>For monitoring, the <a href="artifacts/sigma_unapproved_game_egress.yml">experimental Sigma rule</a> flags an allowed TCP/25565 flow when asset policy says game use is unapproved. The <a href="artifacts/detection_queries.md">SPL/KQL templates</a> state their normalized fields instead of pretending a specific endpoint table contains byte totals or session duration. The <a href="artifacts/game_egress_triage.py">offline checker</a> is the runnable policy-lead equivalent. The <a href="artifacts/README.md">guide</a> describes source fields, tuning, and what the files have actually tested. A short Zeek signature that guesses at a handshake from a few bytes would be too brittle for this versioned, variable-length format, so I would use a tested protocol parser before relying on a Zeek alert. None of these flow examples claims to detect the three chat pieces from a firewall log.</p>
+<p>An SOC playbook for a lead would enrich the asset owner and approved-use list, confirm protocol with a handshake if available, review destination history and process lineage, and request a preserved pcap only when the case warrants content inspection. If the parsed conversation shows a real unauthorized transfer, incident response can scope it and apply containment. OpenC2-style orchestration would require an approved action and target; there is no automatic block in this lab.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<h3>12.1 IOCs (sanitized; illustrative)</h3>
+<table>
+<thead>
+<tr>
+<th>Candidate signal</th>
+<th>Evidence level</th>
+<th>Use and limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TCP/25565 from an unapproved asset</td>
+<td>Flow-log lead</td>
+<td>Another service can use the port; approved gaming may be missing from inventory.</td>
+</tr>
+<tr>
+<td>Valid versioned handshake on that flow</td>
+<td>Protocol confirmation</td>
+<td>Confirms application shape, not malicious purpose.</td>
+</tr>
+<tr>
+<td>Readable play-state chat and unsigned field</td>
+<td>Pcap observation</td>
+<td>Enables conversation reconstruction; unsigned status does not prove impersonation.</td>
+</tr>
+<tr>
+<td>Client login name matching offline-style UUID derivation</td>
+<td>Identity-consistency clue</td>
+<td>Supports a weakly bound in-protocol identity, not an external actor attribution.</td>
+</tr>
+<tr>
+<td>Three short adjacent chat lines</td>
+<td>Case-specific behavior</td>
+<td>Needs human context and message review; not a general IOC.</td>
+</tr>
+</tbody>
+</table>
+<p>The private IPs in this pcap and the invented fixture addresses are not external indicators. The case provides no file hash, domain, or destination suitable for a feed.</p>
+<h3>12.2 YARA (file-side artifact)</h3>
+<p>I considered a YARA rule for brand and pack strings in stored pcaps. Those strings identify normal game traffic, not this staged conversation; a shortened handshake hex pattern is also too easy to match outside the correct packet boundary. I did not publish that as a malicious-content rule. The <a href="artifacts/game_capture_triage.py">bounded parser</a> is the more useful file-side triage proof of concept because it checks TCP continuity and VarInt framing before interpreting chat.</p>
+<h3>12.3 Sigma</h3>
+<p>The <a href="artifacts/sigma_unapproved_game_egress.yml">experimental firewall Sigma rule</a> has one modest claim: an allowed flow to the game-server default port from an asset without an approved use exception deserves review. It requires enriched <code>approved_game_use</code> plus normalized <code>dst_port</code>, <code>protocol</code>, and <code>action</code>. pySigma parsed it locally. No backend conversion, production log trial, or measured false-positive rate was performed. The rule's low level reflects its port-based uncertainty; the packet parser is a separate tool for protocol and content verification.</p>
+<h3>12.4 SIEM queries</h3>
+<p>The <a href="artifacts/detection_queries.md">KQL and SPL templates</a> express the same review lead against explicitly described normalized flow schemas. They do not use a process file size as a byte-transfer estimate or subtract two different connection event times and call that one session's duration. A destination and source pair can have many connections. I have not run these templates in Sentinel or Splunk; they need field mapping, syntax checks in the target backend, and tuning on benign traffic.</p>
+<h3>12.5 Log source and data pipeline requirements</h3>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Needed source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Is this port allowed for the asset?</td>
+<td>Firewall or endpoint flow, asset role, owned exception list</td>
+</tr>
+<tr>
+<td>Is it actually the game protocol?</td>
+<td>Handshake-capable sensor or preserved cleartext pcap</td>
+</tr>
+<tr>
+<td>Is content visible?</td>
+<td>Full packet capture plus matching version/state decoder and content-review authority</td>
+</tr>
+<tr>
+<td>Is a username tied to a person?</td>
+<td>Independent account, endpoint, or server identity records</td>
+</tr>
+<tr>
+<td>Was data really lost?</td>
+<td>Content, destination, business sensitivity, and incident context</td>
+</tr>
+</tbody>
+</table>
+<p>Flow records alone cannot reconstruct the chat. Conversely, a captured chat cannot prove business authorization. Time synchronization, retention, sensor placement, and protocol-version maintenance matter as much as the initial rule.</p>
+<h3>12.6 Detection engineering notes</h3>
+<p>The <a href="artifacts/test_game_lab.py">six local test groups</a> cover a synthetic handshake/chat capture, opt-in text extraction, malformed VarInt and pcap, TCP gap/conflict, an unapproved flow, an approved gaming flow, a different port, and invalid policy input. The <a href="fixtures/make_sample.py">fixture generator</a>, <a href="fixtures/sample_game.pcap">sample pcap</a>, <a href="fixtures/flow_events.jsonl">sample flows</a>, <a href="fixtures/expected_capture.json">expected capture report</a>, and <a href="fixtures/expected_flow_findings.json">expected findings</a> are all invented and linked. The capture parser also reproduced the real case's core structure in content-hidden mode: 2,278 records, 699 client frames, 17,799 server frames, three <code>0x08</code> client packets, and seven <code>0x3F</code> chat broadcasts. That is a local parsing check, not a production detector evaluation.</p>
+<p>I would tune the flow lead against known gaming populations, authorized tests, destination changes, and other applications on the port. I would measure both false positives and missed sessions before raising severity. Compression, encryption, other versions, other ports, and non-chat message carriers remain outside the packaged parser's coverage. Those are explicit gaps for any real deployment.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow diagram above</a> shows my investigation checkpoints. For a real network, I would lay the defensive chain beside it: asset and egress policy, flow collection, protocol handshake validation, captured-content review when justified, and a documented response decision. The diagram's last step is a review lead, not a claim that a game connection is malicious. That keeps the original defense-in-depth idea while respecting what this one capture can prove.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://www.minecraft.net/en-us/article/minecraft-java-edition-1-21-11">Minecraft Java Edition 1.21.11 release</a> and the <a href="https://minecraft.wiki/w/Java_Edition_protocol/Packets">Java Edition protocol packet reference</a> for version-specific fields and packet IDs. The negotiated protocol number is observed in the capture.</li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc9562.html">RFC 9562, UUIDs</a>, version and variant bit structure for name-based UUIDv3. The <code>OfflinePlayer:</code> input string is a game convention.</li>
+<li><a href="https://attack.mitre.org/techniques/T1071/">MITRE ATT&amp;CK T1071</a> and <a href="https://attack.mitre.org/techniques/T1001/">T1001</a>, bounded technique analogies.</li>
+<li><a href="https://d3fend.mitre.org/technique/d3f%3ANetworkTrafficAnalysis/">MITRE D3FEND Network Traffic Analysis</a>, <a href="https://d3fend.mitre.org/technique/d3f%3ANetworkTrafficFiltering/">Network Traffic Filtering</a>, and <a href="https://d3fend.mitre.org/technique/d3f%3AOutboundTrafficFiltering/">Outbound Traffic Filtering</a>.</li>
+<li><a href="https://capec.mitre.org/data/definitions/272.html">MITRE CAPEC-272</a>, considered and rejected for this observed behavior.</li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5</a> and <a href="https://csrc.nist.gov/pubs/sp/800/92/final">NIST SP 800-92</a>, control and log-management references.</li>
+<li><a href="https://www.cisecurity.org/controls/cis-controls-navigator/v8">CIS Controls v8 navigator</a>, including Safeguards 13.6 and 13.10.</li>
+<li><a href="https://sigmahq.io/sigma-specification/specification/sigma-rules-specification.html">Sigma rule specification</a> and <a href="https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html">OASIS STIX 2.1</a>, detection format and exchange reference.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>

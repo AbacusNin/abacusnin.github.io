@@ -1,0 +1,6 @@
+{
+  "findings": [
+    {"ts": "2026-01-01T12:00:00+00:00", "src_ip": "192.0.2.10", "dst_ip": "198.51.100.20", "dst_port": 25565, "asset_role": "build_server", "handshake": "verified", "disposition": "review_egress_policy_and_protocol"},
+    {"ts": "2026-01-01T12:03:00+00:00", "src_ip": "192.0.2.13", "dst_ip": "198.51.100.23", "dst_port": 25565, "asset_role": "workstation", "handshake": "unverified", "disposition": "review_egress_policy_and_protocol"}
+  ]
+}

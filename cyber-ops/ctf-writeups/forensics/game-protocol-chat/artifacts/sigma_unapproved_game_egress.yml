@@ -1,0 +1,23 @@
+title: Game Default Port Egress from Unapproved Asset
+id: 8c2af01b-0e64-4ec7-a5c4-cad5cc7d7f42
+status: experimental
+description: Triage allowed TCP flows to a game-server default port from assets without an approved use exception.
+logsource:
+  category: firewall
+detection:
+  selection:
+    dst_port: 25565
+    protocol: tcp
+    action: allow
+    approved_game_use: false
+  condition: selection
+fields:
+  - src_ip
+  - dst_ip
+  - dst_port
+  - asset_role
+  - game_handshake_verified
+falsepositives:
+  - Authorized tests or gaming activity missing from the asset inventory.
+  - Another application using the same port.
+level: low
