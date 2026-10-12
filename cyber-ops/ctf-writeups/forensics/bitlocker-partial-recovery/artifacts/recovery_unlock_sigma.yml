@@ -1,0 +1,28 @@
+title: BitLocker Recovery Password Unlock Command
+id: 2ffec258-76ab-4ef8-b578-4a513c6be949
+status: experimental
+description: Detects command-line use of a recovery password to unlock a BitLocker volume. Suppress or redact command-line secrets in downstream cases.
+logsource:
+  product: windows
+  category: process_creation
+detection:
+  manage_bde:
+    Image|endswith: '\manage-bde.exe'
+    CommandLine|contains|all:
+      - '-unlock'
+      - '-RecoveryPassword'
+  powershell:
+    Image|endswith:
+      - '\powershell.exe'
+      - '\pwsh.exe'
+    CommandLine|contains|all:
+      - 'Unlock-BitLocker'
+      - '-RecoveryPassword'
+  condition: manage_bde or powershell
+fields:
+  - Image
+  - User
+  - ParentImage
+falsepositives:
+  - Authorized helpdesk or incident response recovery
+level: medium

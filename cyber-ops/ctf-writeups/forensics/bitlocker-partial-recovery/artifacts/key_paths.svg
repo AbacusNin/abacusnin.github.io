@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 500" role="img" aria-labelledby="title desc">
+  <title id="title">BitLocker recovery path and defensive observables</title>
+  <desc id="desc">A partial printed recovery password leads to 909 plausible final groups, then to the recovery protector. A separate user password leads to its own protector. Both can unlock the Volume Master Key, which leads through the Full Volume Encryption Key to encrypted sectors. Escrow-read and unlock-command events provide defensive observables.</desc>
+  <rect width="840" height="500" rx="14" fill="#10141d"/>
+  <g font-family="Arial, sans-serif" fill="#e6e9f0" text-anchor="middle" font-size="15">
+    <rect x="24" y="48" width="180" height="62" rx="8" fill="#23293a" stroke="#ff4d9d"/><text x="114" y="77">Partial printed key</text><text x="114" y="97" font-size="12">seven groups + 57????</text>
+    <rect x="244" y="48" width="180" height="62" rx="8" fill="#23293a" stroke="#ff4d9d"/><text x="334" y="77">Structure check</text><text x="334" y="97" font-size="12">909 final groups</text>
+    <rect x="464" y="48" width="180" height="62" rx="8" fill="#23293a" stroke="#ff4d9d"/><text x="554" y="77">Recovery protector</text><text x="554" y="97" font-size="12">authenticated check</text>
+    <rect x="24" y="210" width="180" height="62" rx="8" fill="#23293a" stroke="#35e0d0"/><text x="114" y="247">Strong user password</text>
+    <rect x="244" y="210" width="180" height="62" rx="8" fill="#23293a" stroke="#35e0d0"/><text x="334" y="247">User protector</text>
+    <rect x="464" y="210" width="180" height="62" rx="8" fill="#23293a" stroke="#35e0d0"/><text x="554" y="247">Volume Master Key</text>
+    <rect x="680" y="210" width="136" height="62" rx="8" fill="#23293a" stroke="#35e0d0"/><text x="748" y="238">FVEK</text><text x="748" y="258" font-size="12">sector key</text>
+    <rect x="680" y="352" width="136" height="62" rx="8" fill="#23293a" stroke="#35e0d0"/><text x="748" y="390">Encrypted sectors</text>
+    <rect x="90" y="352" width="250" height="62" rx="8" fill="#23293a" stroke="#e6b45a"/><text x="215" y="379">Escrow read audit</text><text x="215" y="400" font-size="12">directory visibility required</text>
+    <rect x="380" y="352" width="250" height="62" rx="8" fill="#23293a" stroke="#e6b45a"/><text x="505" y="379">Unlock command telemetry</text><text x="505" y="400" font-size="12">redact recovery secret</text>
+  </g>
+  <g stroke="#8f9ab0" stroke-width="2" fill="none" marker-end="url(#arrow)">
+    <path d="M204 79H244"/><path d="M424 79H464"/><path d="M554 110V210"/>
+    <path d="M204 241H244"/><path d="M424 241H464"/><path d="M644 241H680"/><path d="M748 272V352"/>
+    <path d="M340 383H380"/><path d="M505 352V290H554V272"/>
+  </g>
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#8f9ab0"/></marker></defs>
+</svg>
