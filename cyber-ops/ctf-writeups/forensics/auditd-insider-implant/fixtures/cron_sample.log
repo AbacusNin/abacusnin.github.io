@@ -1,0 +1,3 @@
+Nov 14 23:13:20 app CRON[501]: (root) CMD (/tmp/.cache/.upd)
+Nov 15 00:13:20 app CRON[502]: (root) CMD (/tmp/.cache/.upd)
+Nov 15 00:14:00 app CRON[503]: (root) CMD (/usr/local/bin/backup)

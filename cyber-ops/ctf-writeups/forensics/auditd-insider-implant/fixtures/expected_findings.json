@@ -1,0 +1,14 @@
+{
+  "findings": [
+    {
+      "auid": "1001",
+      "beacon_count": 2,
+      "delivery_ip": "198.51.100.77",
+      "path": "/tmp/.cache/.upd",
+      "result": "correlated_persistence_and_egress",
+      "root_cron_runs": 2,
+      "session": "7"
+    }
+  ],
+  "unattributed_execve_events": 1
+}

@@ -1,0 +1,17 @@
+# Insider-implant log triage: offline proof of concept
+
+The [triage script](auditd_rat_triage.py) reads one host's Linux audit log and cron log. It joins `SYSCALL`, `EXECVE`, and `SOCKADDR` records by their exact audit timestamp and serial, then looks for a successful download into a hidden `/tmp` path, `chmod`, a root crontab edit and success record under the same login UID/session. It also requires two root cron runs of that exact path and two successful IPv4 connections from it to the delivery IP. The output is JSON with a correlated candidate and a count of `EXECVE` records lacking their `SYSCALL` partner. It never resolves an employee name or contacts the endpoint.
+
+```sh
+python -B artifacts/auditd_rat_triage.py fixtures/auditd_sample.log fixtures/cron_sample.log
+cd artifacts
+python -B -m unittest -v test_auditd_rat_triage.py
+```
+
+Run the first command from the article directory. The [invented audit events](../fixtures/auditd_sample.log), [invented cron lines](../fixtures/cron_sample.log), and [expected JSON](../fixtures/expected_findings.json) show one complete chain, a second account's unrelated download, and an orphaned `EXECVE`. Five local test groups cover that positive, the benign decoy, missing cron/auth/endpoint evidence, an unsuccessful process, wrong socket family, and command-selection examples. Python's standard library runs the triage script. The optional Sigma-selection test uses PyYAML; no Sigma backend conversion was performed.
+
+The [Sigma rule](sigma_hidden_tmp_download.yml) covers one earlier behavior: a process-creation event for `curl` or `wget` writing a dot-prefixed file under `/tmp`. It expects normalized `Image` and `CommandLine` fields. A pipeline starting from raw audit records must first join records by event ID, take `Image` from `SYSCALL.exe`, and build `CommandLine` from the paired `EXECVE` arguments. A raw `EXECVE` event alone has no trustworthy `auid`. The rule does not assert root cron persistence, an insider, C2, or exfiltration. Legitimate maintenance downloads can match. The [triage checklist](detection_triage_checklist.md) covers the full investigation and the privilege gap.
+
+This parser accepts at most 5 MB, 50,000 lines, and 5,000 events per file. It handles the audit record forms in the synthetic fixture, literal IPv4 delivery URLs, AF_INET sockets, and a simple root CRON `CMD` format. It assumes one host and one boot's audit stream, complete relevant records, successful `SYSCALL` fields, and a trustworthy login UID. It counts matching cron lines without proving their time order relative to the audit events. It does not parse every audit format, follow rotated logs, resolve DNS, reconstruct traffic contents, or decide whether data left the host. An endpoint match and repeated connections support an egress hypothesis; neither proves an application protocol or exfiltrated payload. A production adapter would need a defined log schema, source-host/boot identity, time alignment, privilege-provenance checks, backend rule conversion, and measured false-positive rates.
+
+This public lab uses invented logs, account labels, and RFC 5737 IPs. It contains no challenge identity or answer. The [audit login UID documentation](https://man7.org/linux/man-pages/man8/auditctl.8.html) explains `auid` and the optional immutable-loginuid setting; the [Sigma rule specification](https://sigmahq.io/sigma-specification/specification/sigma-rules-specification.html) describes the rule format.

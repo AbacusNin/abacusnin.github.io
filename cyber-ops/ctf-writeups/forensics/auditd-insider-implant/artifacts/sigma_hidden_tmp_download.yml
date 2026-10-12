@@ -1,0 +1,26 @@
+title: Network Utility Writes a Hidden Temporary File
+id: 80587b54-0153-4903-b419-8e39ba85867e
+status: experimental
+description: Flags curl or wget writing a dot-prefixed file beneath /tmp.
+references:
+  - https://attack.mitre.org/techniques/T1105/
+logsource:
+  category: process_creation
+  product: linux
+detection:
+  selection_tool:
+    Image|endswith:
+      - /curl
+      - /wget
+  selection_output:
+    CommandLine|re: '(?:^|\s)(?:-o\s+|-O\s+|--output(?:=|\s+))/tmp/\.[^\s]+'
+  condition: selection_tool and selection_output
+fields:
+  - Image
+  - CommandLine
+  - User
+falsepositives:
+  - Approved installers or maintenance scripts staging temporary files.
+level: medium
+tags:
+  - attack.t1105
