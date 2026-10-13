@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 540" role="img" aria-labelledby="title desc">
+  <title id="title">RTTY audio analysis and defensive review</title>
+  <desc id="desc">The recorded challenge path moves from a WAV through two-tone and timing measurements, RTTY framing, ITA2 mode comparison, and a reported readable message. A separate optional authorized transfer review feeds file-content triage; no exfiltration is observed in the challenge.</desc>
+  <defs>
+    <style>
+      .bg{fill:#0b1423}.panel{fill:#132238;stroke:#5c7895;stroke-width:2}.proof{fill:#12333d;stroke:#32d1ca;stroke-width:2}.limit{fill:#3b292c;stroke:#edaa73;stroke-width:2}.txt{fill:#f4f8fc;font:600 20px Arial,sans-serif}.sub{fill:#bed0e0;font:16px Arial,sans-serif}.label{fill:#9ab3c9;font:700 18px Arial,sans-serif}.line{stroke:#77a6c2;stroke-width:3;fill:none;marker-end:url(#arrow)}.dash{stroke:#caa179;stroke-width:3;stroke-dasharray:8 7;fill:none;marker-end:url(#arrow)}
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#77a6c2"/></marker>
+  </defs>
+  <rect class="bg" width="1100" height="540"/>
+  <text class="label" x="42" y="43">REPORTED CHALLENGE PATH</text>
+  <rect class="panel" x="35" y="75" width="195" height="110" rx="14"/><text class="txt" x="55" y="116">WAV recording</text><text class="sub" x="55" y="146">23.65 s, mono PCM</text>
+  <path class="line" d="M230 130 H252"/>
+  <rect class="panel" x="255" y="75" width="195" height="110" rx="14"/><text class="txt" x="275" y="115">Two tones</text><text class="sub" x="275" y="145">1420 / 1580 Hz</text>
+  <path class="line" d="M450 130 H472"/>
+  <rect class="panel" x="475" y="75" width="195" height="110" rx="14"/><text class="txt" x="495" y="115">Timing + frame</text><text class="sub" x="495" y="145">~22 ms, 5 data bits</text>
+  <path class="line" d="M670 130 H692"/>
+  <rect class="panel" x="695" y="75" width="365" height="110" rx="14"/><text class="txt" x="715" y="115">Compare ITA2 readings</text><text class="sub" x="715" y="145">Shift-aware / forced letters</text>
+  <path class="line" d="M875 185 V217"/>
+  <rect class="proof" x="695" y="220" width="365" height="105" rx="14"/><text class="txt" x="715" y="260">Readable text reported</text><text class="sub" x="715" y="290">WAV and plaintext unavailable for replay</text>
+  <text class="label" x="42" y="381">OPTIONAL DEFENSIVE DESIGN</text>
+  <rect class="panel" x="35" y="405" width="290" height="100" rx="14"/><text class="txt" x="55" y="445">Authorized transfer sample</text><text class="sub" x="55" y="475">Context and provenance required</text>
+  <path class="dash" d="M325 455 H360"/>
+  <rect class="panel" x="365" y="405" width="270" height="100" rx="14"/><text class="txt" x="385" y="445">Bounded spectral triage</text><text class="sub" x="385" y="475">Candidate, not an IOC</text>
+  <path class="dash" d="M635 455 H670"/>
+  <rect class="limit" x="675" y="405" width="385" height="100" rx="14"/><text class="txt" x="695" y="445">Analyst disposition</text><text class="sub" x="695" y="475">No observed exfiltration in this case</text>
+</svg>

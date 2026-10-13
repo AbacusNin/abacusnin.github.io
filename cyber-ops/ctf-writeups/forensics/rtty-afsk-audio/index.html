@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Telegram in Two Tones - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="A short WAV sounded like a simple signal, but its alternating tones led me through FSK timing, RTTY framing, and two readings of ITA2 shift codes.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/rtty-afsk-audio/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Telegram in Two Tones">
+  <meta property="og:description" content="A short WAV sounded like a simple signal, but its alternating tones led me through FSK timing, RTTY framing, and two readings of ITA2 shift codes.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/rtty-afsk-audio/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Forensics / <span aria-current="page">The Telegram in Two Tones</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Telegram in Two Tones</h1>
+        <p class="lead">The useful clue was in the sound itself. Two alternating tones let me move from a generic steganography search to a framed teleprinter message. The remaining puzzle was how to read its shift state.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Recover the message concealed in a fictional operative&#x27;s audio telegram.</p>
+<p><strong>What I did.</strong> I checked the WAV, tested audio steganography ideas, measured tone and timing, demodulated the signal, and compared ITA2 decoding modes.</p>
+<p><strong>The result.</strong> The case record reports a readable plaintext from a forced-letter decode and marks the challenge solved. The plaintext and submission receipt are absent.</p>
+<p><strong>The limit.</strong> The challenge WAV, complete decoded message, and acceptance receipt were not supplied for independent replay. Linked tools were tested on synthetic audio and bitstreams.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Inspect WAV; Measure tones; Recover bits; Decode ITA2; Record result">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Inspect WAV</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Test a simple LSB reading</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Measure tones</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">1420 and 1580 Hz</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Recover bits</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">22 ms and RTTY frames</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Decode ITA2</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Compare shift and letters</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Record result</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Readable message reported</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Forensics / Signal Analysis</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>RTTY, AFSK, ITA2, Baudot, FSK, audio steganography, signal demodulation, covert communications</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved, as recorded; independent replay unavailable</td>
+</tr>
+<tr>
+<td>Challenge evidence</td>
+<td>A reported 23.65-second, 48 kHz, 16-bit mono PCM WAV with tones near 1420 and 1580 Hz. The WAV and plaintext are not included here.</td>
+</tr>
+<tr>
+<td>Reusable proofs</td>
+<td>The linked analysis scripts and fixtures are newly built, synthetic demonstrations.</td>
+</tr>
+</tbody>
+</table>
+<p>The production-oriented proofs of concept are in the <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/rtty-afsk-audio/artifacts">GitHub artifacts folder</a>. They do not replay the challenge recording.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I was given a fictional signals-intelligence story about an amateur-radio enthusiast and a WAV file called <code>telegram.wav</code>. The goal was to recover the message carried by that recording. The case notes report a 23.65-second, 48 kHz, 16-bit mono PCM file. I can describe the solve from those notes, but the file and the recovered plaintext were not retained with this record.</p>
+<p>That distinction matters for the operational sections below. A message in an audio file is the observed challenge mechanism. The fictional backstory does not establish an actual extremist network, a radio transmission, or exfiltration. I use the scenario to design possible content-review tools, with those ideas labeled as extrapolation.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<h3>Initial Triage</h3>
+<p>I started with <code>file telegram.wav</code> and Python's <code>wave</code> module. The recorded result was one mono PCM channel at 48 kHz, 1,135,200 frames, or 23.65 seconds. The title and radio context suggested a teleprinter mode, but neither those hints nor the file length could identify one by themselves.</p>
+<h3>Hypothesis 1: LSB Audio Steganography</h3>
+<p>My first pass pulled the least significant bit from 16-bit samples and tried seven- and eight-bit text reconstruction. It produced no readable message. That ruled out my simple LSB interpretation; it did not prove that every form of audio steganography was absent.</p>
+<h3>Hypothesis 2: Spectrogram / SSTV</h3>
+<p>I next looked at the signal over time. The case records two alternating, stable tones rather than an SSTV-like frequency sweep. That made a two-state modulation more promising than an image decoder.</p>
+<h3>Pivot: FSK Signal Identification</h3>
+<p>The reported tone centers were about <strong>1420 Hz and 1580 Hz</strong>. Their midpoint is 1500 Hz and their separation is <strong>160 Hz</strong>. I treated that as a binary FSK candidate. It is close to the common 170 Hz shift used in one amateur RTTY arrangement, but the numbers in this case do not equal 170 Hz. Without the WAV, I cannot recompute frequency uncertainty or distinguish generator settings from estimator error.</p>
+<h3>Baud Rate Identification</h3>
+<p>The recorded runs were approximately 22, 44, 66, 88, 110, and 132 milliseconds. About 22 ms per bit implies 45.45 symbols per second, a useful RTTY clue. It supports a framing hypothesis when combined with the two tones; that alone does not prove the protocol.</p>
+<h3>Demodulation</h3>
+<p>I bandpassed roughly 1300-1700 Hz, formed an analytic signal with the Hilbert transform, unwrapped its phase, and estimated instantaneous frequency. A median filter reduced short disturbances, and a 1500 Hz threshold separated candidate mark and space runs. This is one workable route for a clean two-tone recording. Short-time spectral energy is another; neither gives an exact symbol decision at every sample, especially near transitions or low-amplitude intervals.</p>
+<h3>RTTY Framing and ITA2 Decode</h3>
+<p>I tested a start bit, five data bits sent least-significant-bit first, and a mark stop interval. A standard ITA2 decoder tracks LTRS and FIGS shifts. The case notes report that mode-aware output became punctuation and digits after a FIGS code, while treating printable values as letters yielded a readable message. I would keep both outputs, the per-character mode trace, and the WAV before deciding whether that FIGS code was intentional, a framing error, or a damaged symbol. The missing recording prevents that check here.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>These are the solve-time code sketches from the case record. They document the approach; I cannot rerun them without the WAV. The framing loop rounds tone runs to bit counts and skips startup samples, so a different file could require timing recovery and error handling. The linked bounded triage and ITA2 tools below are separately tested with synthetic inputs.</p>
+<h3>Full RTTY Demodulation and Decode Script</h3>
+<pre><code class="language-python">import wave
+import numpy as np
+from scipy.signal import hilbert, butter, filtfilt, medfilt
+
+# --- Configuration ---
+WAV_PATH = &quot;telegram.wav&quot;
+BAUD = 45.45          # Standard amateur RTTY
+MARK_FREQ = 1580      # Hz  -  logical 1
+SPACE_FREQ = 1420     # Hz  -  logical 0
+CENTER_FREQ = 1500    # Hz  -  decision threshold
+
+# ITA2 / Murray Code  -  letters table (index = 5-bit value, LSB-first)
+ITA2_LETTERS = [
+    None, 'E', '\n', 'A', ' ', 'S', 'I', 'U',
+    '\r', 'D', 'R',  'J', 'N', 'F', 'C', 'K',
+    'T',  'Z', 'L',  'W', 'H', 'Y', 'P', 'Q',
+    'O',  'B', 'G',  None,'M', 'X', 'V', None   # 31=LTRS, 27=FIGS handled separately
+]
+
+# ITA2  -  figures table
+ITA2_FIGURES = [
+    None, '3', '\n', '-',  ' ', &quot;'&quot;, '8', '7',
+    '\r', '+', '4',  None, ',', None,':',  '(',
+    '5',  '&quot;', ')',  '2',  '#', '6', '0', '1',
+    '9',  '?', '&amp;',  None, '.', '/', None, None
+]
+
+def load_wav(path):
+    w = wave.open(path)
+    rate = w.getframerate()
+    frames = w.readframes(w.getnframes())
+    samples = np.frombuffer(frames, dtype=np.int16).astype(np.float32)
+    w.close()
+    return samples, rate
+
+def demodulate_fsk(samples, rate, lo=1300, hi=1700, threshold=CENTER_FREQ):
+    &quot;&quot;&quot;Bandpass filter + Hilbert instantaneous frequency extraction.&quot;&quot;&quot;
+    b, a = butter(4, [lo / (rate / 2), hi / (rate / 2)], btype='band')
+    filtered = filtfilt(b, a, samples)
+    analytic = hilbert(filtered)
+    inst_phase = np.unwrap(np.angle(analytic))
+    inst_freq = np.diff(inst_phase) / (2.0 * np.pi) * rate
+    inst_freq_smooth = medfilt(inst_freq, kernel_size=101)
+    return (inst_freq_smooth &gt; threshold).astype(int)
+
+def build_bitstream(bits_cont, baud, rate):
+    &quot;&quot;&quot;Convert continuous bit signal to symbol-rate bitstream.&quot;&quot;&quot;
+    BIT_S = rate / baud  # samples per bit
+    transitions = np.where(np.diff(bits_cont) != 0)[0]
+    run_starts = np.concatenate([[0], transitions + 1])
+    run_ends   = np.concatenate([transitions + 1, [len(bits_cont)]])
+    run_vals   = bits_cont[run_starts]
+    bits = []
+    for val, dur in zip(run_vals, run_ends - run_starts):
+        bits.extend([int(val)] * max(1, round(dur / BIT_S)))
+    return bits[2:]  # drop startup transient
+
+def decode_ita2_letters_only(bits):
+    &quot;&quot;&quot;
+    Decode ITA2 bitstream using letters table exclusively.
+    Ignores LTRS/FIGS shift state  -  appropriate when payload is known
+    to be entirely in letters-table values.
+    &quot;&quot;&quot;
+    text = ''
+    i = 0
+    n = len(bits)
+    while i &lt; n - 7:
+        if bits[i] == 0:                            # start bit (space)
+            d = bits[i + 1:i + 6]                  # 5 data bits, LSB-first
+            stop = bits[i + 6] if i + 6 &lt; n else 1
+            if stop == 1 and len(d) == 5:           # valid stop bit (mark)
+                val = d[0] | (d[1] &lt;&lt; 1) | (d[2] &lt;&lt; 2) | (d[3] &lt;&lt; 3) | (d[4] &lt;&lt; 4)
+                if val not in (27, 31):             # skip shift codes
+                    c = ITA2_LETTERS[val]
+                    if c and c not in ('\r', '\x00'):
+                        text += c
+            i += 7
+            while i &lt; n and bits[i] == 1:           # resync to next start bit
+                i += 1
+        else:
+            i += 1
+    return text
+
+def decode_ita2_full(bits):
+    &quot;&quot;&quot;
+    Decode ITA2 bitstream with full LTRS/FIGS shift tracking.
+    Returns decoded text respecting mode state.
+    &quot;&quot;&quot;
+    text = ''
+    mode = 'L'
+    i = 0
+    n = len(bits)
+    while i &lt; n - 7:
+        if bits[i] == 0:
+            d = bits[i + 1:i + 6]
+            stop = bits[i + 6] if i + 6 &lt; n else 1
+            if stop == 1 and len(d) == 5:
+                val = d[0] | (d[1] &lt;&lt; 1) | (d[2] &lt;&lt; 2) | (d[3] &lt;&lt; 3) | (d[4] &lt;&lt; 4)
+                if val == 31:
+                    mode = 'L'
+                elif val == 27:
+                    mode = 'F'
+                else:
+                    c = ITA2_LETTERS[val] if mode == 'L' else ITA2_FIGURES[val]
+                    if c and c not in ('\r', '\x00', '\n'):
+                        text += c
+            i += 7
+            while i &lt; n and bits[i] == 1:
+                i += 1
+        else:
+            i += 1
+    return text
+
+# --- Main ---
+samples, rate = load_wav(WAV_PATH)
+bits_cont = demodulate_fsk(samples, rate)
+bits = build_bitstream(bits_cont, BAUD, rate)
+
+print(&quot;=== Letters-table decode ===&quot;)
+print(decode_ita2_letters_only(bits))
+
+print(&quot;\n=== Full mode-aware decode ===&quot;)
+print(decode_ita2_full(bits))
+</code></pre>
+<h3>Diagnostic: Per-Character Verbose Dump</h3>
+<pre><code class="language-python">def dump_characters(bits):
+    &quot;&quot;&quot;Print each decoded ITA2 character with its binary value and mode state.&quot;&quot;&quot;
+    mode = 'L'
+    i = 0
+    n = len(bits)
+    print(f&quot;{'IDX':&gt;6}  {'VAL':&gt;4}  {'BIN':&gt;7}  {'MODE'}  {'L_CHAR':^8}  {'F_CHAR':^8}&quot;)
+    print(&quot;-&quot; * 52)
+    while i &lt; n - 7:
+        if bits[i] == 0:
+            d = bits[i + 1:i + 6]
+            stop = bits[i + 6] if i + 6 &lt; n else 1
+            if stop == 1 and len(d) == 5:
+                val = d[0] | (d[1] &lt;&lt; 1) | (d[2] &lt;&lt; 2) | (d[3] &lt;&lt; 3) | (d[4] &lt;&lt; 4)
+                cl = ITA2_LETTERS[val] or ''
+                cf = ITA2_FIGURES[val] or ''
+                if val == 31: cl = '&lt;LTRS&gt;'
+                if val == 27: cl = '&lt;FIGS&gt;'
+                print(f&quot;{i:&gt;6}  {val:&gt;4}  {val:&gt;07b}  {mode}     {repr(cl):^8}  {repr(cf):^8}&quot;)
+                if val == 31: mode = 'L'
+                elif val == 27: mode = 'F'
+            i += 7
+            while i &lt; n and bits[i] == 1:
+                i += 1
+        else:
+            i += 1
+</code></pre>
+<hr />
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<h3>Binary Frequency Shift Keying (2-FSK)</h3>
+<p>Binary FSK carries 0 and 1 with different tones. In this recording, the lower tone was reported near 1420 Hz and the higher one near 1580 Hz. I mapped lower to space/start and higher to mark/stop as a decoding hypothesis. The difference is 160 Hz. <a href="https://www.itu.int/dms_pub/itu-r/opb/rep/R-REP-M.2200-2010-PDF-E.pdf">ITU-R M.2200</a> describes a common 45.45-baud amateur RTTY arrangement with a 170 Hz shift; the mismatch deserves to be recorded, not silently rounded away.</p>
+<h3>International Telegraph Alphabet No. 2 (ITA2)</h3>
+<p>ITA2 uses five-bit character values, LTRS and FIGS shift states, and start/stop framing. Five data bits alone cannot carry letters, numbers, and punctuation in one table, so the state persists until another shift code arrives. This explains why one bad shift decision can make an otherwise aligned message look wrong. In the case record, forced letters are a diagnostic alternate reading, not proof that the sender meant to ignore FIGS.</p>
+<h3>Hilbert Transform for Instantaneous Frequency</h3>
+<p>For a filtered real-valued waveform, I can form an analytic signal, unwrap its phase, and differentiate phase to estimate instantaneous frequency. SciPy's <a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.hilbert.html">Hilbert documentation</a> shows this relationship. Estimates are most useful in stable tone interiors. Noise, amplitude nulls, filtering transients, and symbol transitions can disturb them, so I checked run lengths and framing rather than treating every sample as exact.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit/Analysis Mechanics</summary>
+<h3>Step 1: Signal Isolation</h3>
+<p>I used a fourth-order bandpass around 1300-1700 Hz to focus on the reported tone pair. Those limits are case-specific and would need remeasurement for another file.</p>
+<h3>Step 2: Instantaneous Frequency Extraction</h3>
+<p>Unwrapped analytic phase gave a frequency estimate; a 101-sample median filter at 48 kHz smooths about two milliseconds. This is shorter than the reported 22 ms symbol interval. It does not by itself repair a weak signal or prove the carrier frequencies.</p>
+<h3>Step 3: Symbol Recovery</h3>
+<p>I thresholded at 1500 Hz, grouped runs, and rounded their lengths against roughly 1056 samples per bit. Rounding made the clean run pattern usable, but it can compound clock drift or split/merge symbols around noise. A production decoder would estimate timing jointly with framing.</p>
+<h3>Step 4: RTTY Frame Extraction</h3>
+<p>I looked for a space start, five least-significant-bit-first data symbols, and a mark stop. The sketch resynchronizes after malformed frames. Without the original bitstream I cannot report a frame-error rate or prove the chosen alignment was unique.</p>
+<h3>Step 5: The Shift-Mode Trap</h3>
+<p>The mode-aware reading in the notes became mostly figures after one FIGS symbol; forced letters looked like prose. That was the solve pivot. I would also inspect the symbol before and after the shift, alternate start alignment, and both candidate tables. The record does not retain the plaintext or enough raw bits to determine why the two interpretations diverged.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<h3>What the exercise validated</h3>
+<p>The useful move was to characterize the waveform before committing to a hiding method. Two tones and repeated 22 ms runs led me to an RTTY/ITA2 hypothesis. The second useful move was comparing mode-aware and forced-letter output while preserving the shift-code trace. Those are transferable analysis habits; they are not evidence that this challenge involved a real covert operation.</p>
+<h3>What the exercise surfaced as gaps or inefficiencies</h3>
+<p>I tried simple LSB recovery first and spent time considering SSTV. A quick spectrum or spectrogram earlier would have narrowed the search. More important, the case record did not preserve the WAV, plaintext, alignment trace, or submission receipt. That prevents a later analyst from checking the frequency estimate and FIGS interpretation.</p>
+<h3>Transferable principles</h3>
+<ol>
+<li>Measure tone centers, separation, run lengths, and framing separately. Protocol identity comes from their agreement, not one magic number.</li>
+<li>Keep stateful decoding visible. A shifted table can make legible bits look like nonsense.</li>
+<li>Retain the raw artifact and the rejected interpretations. A readable decode should be tested against the original signal.</li>
+</ol>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<h3>Individual Practitioner Skill Development</h3>
+<p>I would practice this on known audio fixtures with deliberately altered shift, baud, noise, and clock drift. GNU Radio or another SDR workflow could extend that learning to RF captures, but this challenge only supplied a WAV in the written record. Packet radio, DTMF, and modem tones are adjacent skills, not outcomes I demonstrated here.</p>
+<h3>Security Operations (SOC, IR, Threat Hunting)</h3>
+<p>In an environment that permits audio uploads, a defender could ask whether outbound files contain repeated data-like tones. The <a href="./artifacts/audio_fsk_triage.py">spectral triage tool</a> provides a bounded local candidate score. It needs transfer context, an authorized content sample, false-positive testing, and analyst review before it could support a hunt or alert. File extension, duration, and a pair of tones are not malicious indicators by themselves.</p>
+<h3>Intelligence Operations (SIGINT, IO/IW)</h3>
+<p>ITA2 framing and FSK can help classify an authorized interception, but a decoded audio file does not establish where it was transmitted, who sent it, or whether a call sign identified anyone. The fictional salutation is message content, not attribution. The format also does not authenticate a sender; any real attribution would require separate collection and corroboration.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The linked <a href="./artifacts/README.md">artifact README</a> gives inputs, tests, and limits. The <a href="./artifacts/audio_fsk_triage.py">audio FSK triage script</a> reads bounded mono PCM WAV files and checks for alternating energy near configured tones. The <a href="./artifacts/ita2_decode.py">ITA2 decoder</a> compares modes on already recovered bits. The <a href="./artifacts/test_audio_tools.py">synthetic tests</a> cover a two-tone signal, single-tone and noise negatives, WAV parsing, and a shift-mode example. They do not decode the missing challenge WAV end to end.</p>
+<h3>FSK Signal Triage Checklist</h3>
+<pre><code>1. Generate spectrogram (specgram, matplotlib or scipy)
+   - Flat noise -&gt; many possible causes; investigate separately
+   - Discrete tone pairs -&gt; FSK candidate
+   - Continuous frequency sweep -&gt; possible SSTV, chirp, or FM; inspect timing
+   - Pulsed single tone -&gt; Morse code
+
+2. Measure tone frequencies (FFT, first 1s of signal)
+   - Record f_mark (higher) and f_space (lower)
+   - Calculate shift = f_mark - f_space
+   - Common shifts: 170 Hz (RTTY), 425 Hz (RTTY wide), 1000 Hz (Bell 202)
+
+3. Measure symbol duration (run-length analysis)
+   - Identify smallest run duration = 1 bit period
+   - Calculate baud = 1000 / bit_period_ms
+   - Common rates: 45.45 (RTTY), 50 (RTTY EU), 300/1200 (Bell 103/202 modem)
+
+4. Match (shift, baud) to protocol table:
+   | Shift  | Baud  | Protocol        |
+   |--------|-------|-----------------|
+   | 170 Hz | 45.45 | Amateur RTTY    |
+   | 170 Hz | 50    | Commercial RTTY |
+   | 1000 Hz | 1200  | Bell 202 / AFSK |
+   | 200 Hz | 300   | HF modem        |
+
+5. Demodulate with Hilbert instantaneous frequency
+6. Extract bitstream at symbol rate
+7. Identify framing (start/stop bits, sync words)
+8. Identify character encoding (ITA2, ASCII, EBCDIC, custom)
+9. Handle mode/shift state explicitly
+</code></pre>
+<h3>Reusable FSK Demodulator Module</h3>
+<p>This solve-time module is an untested sketch retained for reproducibility. It assumes a clean signal, stable symbol timing, a valid bandpass, and already-chosen tone parameters. The linked triage script is narrower but has synthetic tests.</p>
+<pre><code class="language-python"># fsk_demod.py  -  drop-in FSK demodulation primitive
+# Usage: bits = fsk_demod(samples, rate, baud=45.45, mark=1580, space=1420)
+
+import numpy as np
+from scipy.signal import hilbert, butter, filtfilt, medfilt
+
+def fsk_demod(samples, rate, baud=45.45, mark=1580, space=1420, filter_margin=200, median_kernel=101):
+    &quot;&quot;&quot;
+    Demodulate a 2-FSK audio signal using Hilbert instantaneous frequency.
+
+    Parameters
+    ----------
+    samples : np.ndarray (float32)  Raw audio samples
+    rate    : int                   Sample rate in Hz
+    baud    : float                 Symbol rate
+    mark    : int                   Mark frequency (logical 1) in Hz
+    space   : int                   Space frequency (logical 0) in Hz
+    filter_margin : int             Bandpass filter half-width beyond signal edges
+    median_kernel : int             Smoothing kernel length (odd integer, in samples)
+
+    Returns
+    -------
+    bits : list[int]                Recovered bitstream at symbol rate
+    &quot;&quot;&quot;
+    lo = min(mark, space) - filter_margin
+    hi = max(mark, space) + filter_margin
+    threshold = (mark + space) / 2.0
+
+    # Bandpass filter
+    b, a = butter(4, [lo / (rate / 2), hi / (rate / 2)], btype='band')
+    filtered = filtfilt(b, a, samples)
+
+    # Instantaneous frequency via Hilbert transform
+    analytic = hilbert(filtered)
+    inst_phase = np.unwrap(np.angle(analytic))
+    inst_freq = np.diff(inst_phase) / (2.0 * np.pi) * rate
+    inst_freq_smooth = medfilt(inst_freq, kernel_size=median_kernel)
+    bits_cont = (inst_freq_smooth &gt; threshold).astype(int)
+
+    # Run-length to symbol-rate bitstream
+    BIT_S = rate / baud
+    transitions = np.where(np.diff(bits_cont) != 0)[0]
+    run_starts = np.concatenate([[0], transitions + 1])
+    run_ends   = np.concatenate([transitions + 1, [len(bits_cont)]])
+    run_vals   = bits_cont[run_starts]
+
+    bits = []
+    for val, dur in zip(run_vals, run_ends - run_starts):
+        bits.extend([int(val)] * max(1, round(dur / BIT_S)))
+
+    return bits
+</code></pre>
+<h3>RTTY ITA2 Decoder Module</h3>
+<p>The solve-time decoder sketch assumes reliable framed bits. For a small tested comparison of shift tracking and forced letters, use the linked <a href="./artifacts/ita2_decode.py">ITA2 decoder</a>.</p>
+<pre><code class="language-python"># ita2_decode.py  -  ITA2/Baudot decode with configurable mode handling
+
+ITA2_LETTERS = [
+    None,'E','\n','A',' ','S','I','U','\r','D','R','J','N','F','C','K',
+    'T','Z','L','W','H','Y','P','Q','O','B','G',None,'M','X','V',None
+]
+ITA2_FIGURES = [
+    None,'3','\n','-',' ',&quot;'&quot;,'8','7','\r','+','4',None,',',None,':','(',
+    '5','&quot;',')','2','#','6','0','1','9','?','&amp;',None,'.','/',None,None
+]
+LTRS = 31
+FIGS = 27
+
+def decode_rtty(bits, mode='track', start_mode='L'):
+    &quot;&quot;&quot;
+    Decode an ITA2 bitstream from a standard RTTY framed signal.
+
+    Parameters
+    ----------
+    bits       : list[int]   Symbol-rate bitstream (output of fsk_demod)
+    mode       : str         'track'   - respect LTRS/FIGS shifts (standard)
+                             'letters' - force letters table throughout
+                             'figures' - force figures table throughout
+    start_mode : str         Initial mode if mode='track' ('L' or 'F')
+
+    Returns
+    -------
+    text : str               Decoded plaintext
+    &quot;&quot;&quot;
+    text = ''
+    current_mode = start_mode
+    i = 0
+    n = len(bits)
+    while i &lt; n - 7:
+        if bits[i] == 0:                                   # start bit
+            d = bits[i + 1:i + 6]
+            stop = bits[i + 6] if i + 6 &lt; n else 1
+            if stop == 1 and len(d) == 5:
+                val = d[0]|(d[1]&lt;&lt;1)|(d[2]&lt;&lt;2)|(d[3]&lt;&lt;3)|(d[4]&lt;&lt;4)
+                if mode == 'track':
+                    if val == LTRS:
+                        current_mode = 'L'
+                    elif val == FIGS:
+                        current_mode = 'F'
+                    else:
+                        table = ITA2_LETTERS if current_mode == 'L' else ITA2_FIGURES
+                        c = table[val]
+                        if c and c not in ('\r', '\x00'): text += c
+                elif mode == 'letters':
+                    if val not in (LTRS, FIGS):
+                        c = ITA2_LETTERS[val]
+                        if c and c not in ('\r', '\x00'): text += c
+                elif mode == 'figures':
+                    if val not in (LTRS, FIGS):
+                        c = ITA2_FIGURES[val]
+                        if c and c not in ('\r', '\x00'): text += c
+            i += 7
+            while i &lt; n and bits[i] == 1:
+                i += 1
+        else:
+            i += 1
+    return text
+</code></pre>
+<hr />
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<p>I use the frameworks here to separate what the WAV exercise demonstrates from what a defender might investigate in a real transfer. The challenge shows signal encoding and message recovery. It does not show an adversary, a C2 link, or data leaving a protected network.</p>
+<h3>MITRE ATT&amp;CK</h3>
+<table>
+<thead>
+<tr>
+<th>Mapping considered</th>
+<th>My disposition</th>
+<th>Evidence needed in a real case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://attack.mitre.org/techniques/T1001/">T1001, Data Obfuscation</a></td>
+<td>Conditional analogy. AFSK can carry content in an unexpected form, but encoding alone is not proof of adversarial obfuscation.</td>
+<td>Actor-controlled communication and concealment purpose</td>
+</tr>
+<tr>
+<td>T1001.001, Junk Data</td>
+<td>Not supported. ITA2 shift codes are protocol symbols, not automatically junk inserted to hide traffic.</td>
+<td>Deliberate padding or irrelevant bytes for concealment</td>
+</tr>
+<tr>
+<td><a href="https://attack.mitre.org/techniques/T1048/">T1048, Exfiltration Over Alternative Protocol</a> and T1048.003</td>
+<td>Not observed. There is only a local WAV in the exercise.</td>
+<td>Evidence of an outbound transfer using a non-C2 protocol and sensitive content</td>
+</tr>
+<tr>
+<td>T1027, Obfuscated Files or Information</td>
+<td>Conditional analogy if an actor used the audio encoding to conceal information.</td>
+<td>File purpose and adversary behavior</td>
+</tr>
+<tr>
+<td>T1205, Traffic Signaling</td>
+<td>Not supported by message-bearing audio alone.</td>
+<td>A signaling pattern used to trigger or control behavior</td>
+</tr>
+</tbody>
+</table>
+<h3>MITRE D3FEND</h3>
+<p>The practical defensive analogue is <a href="https://next.d3fend.mitre.org/technique/d3f%3AFileContentAnalysis/">D3-FCOA, File Content Analysis</a>: inspect an allowed audio file's content rather than relying on its extension. Network traffic analysis could identify where a file moved, but it cannot tell whether a WAV contains 2-FSK unless a sensor extracts or inspects content. My initial <code>D3-FCA</code> label belongs to File Creation Analysis, so I do not use it for this content check. I did not run a D3FEND control in a production environment.</p>
+<h3>CAPEC</h3>
+<p>I do not map CAPEC-137 Parameter Injection to this case; no parameter was injected. <a href="https://capec.mitre.org/data/definitions/636.html">CAPEC-636</a> concerns hiding malicious data or code in file features and metadata. An audible two-tone message is not that pattern as recorded. These were useful mapping checks because they exposed where a generic "hidden in a file" label would overstate the evidence.</p>
+<p>No OWASP web attack or STRIDE design model is supported by this standalone audio challenge.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<h3>STIX 2.1 Sample Objects</h3>
+<p>My initial notes proposed STIX 2.1 attack-pattern, indicator, and course-of-action objects with redacted UUIDs and a redacted hash. Those are sketches, not exchangeable intelligence. I have no real hash to publish, no validated malicious activity, and no observed infrastructure. An indicator for a WAV file would also confuse a common file type with an IOC.</p>
+<p>The <a href="./artifacts/stix_behavior_example.json">illustrative STIX behavior bundle</a> contains only a scenario-derived attack-pattern description and a course of action for authorized content review. It is explicitly marked as training context, contains no indicator or actor attribution, and was checked for JSON syntax and basic STIX 2.1 fields. I did not validate it with a full STIX schema or exchange it through TAXII. <a href="https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.pdf">OASIS STIX 2.1</a> defines the object model.</p>
+<p>My initial notes also mentioned STIG and CIS. I found no direct host STIG finding in the WAV. CIS Control 13's monitoring theme can inform an audio-egress review if that environment has such a path; it does not mandate a universal spectral detector. An actual assessment would need the applicable product baseline and evidence of configuration.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>11a. Standards Mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Control reference</th>
+<th>Bounded application</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NIST SP 800-53 SI-3</td>
+<td>Malicious-code protection applies only if the audio is part of a malware problem. No malicious code was found here.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 SI-4</td>
+<td>A possible monitoring design for authorized audio transfers, if content is available for inspection.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 SC-7</td>
+<td>Boundary policy could route or restrict certain transfers, subject to business requirements.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 AU-12</td>
+<td>Record transfer metadata for later review; it does not create spectral evidence by itself.</td>
+</tr>
+<tr>
+<td>CIS Controls 13.3 / 13.8</td>
+<td>Network detection and prevention may support the transfer-context side of this design. Neither safeguard is a WAV decoder.</td>
+</tr>
+</tbody>
+</table>
+<p>These are design touchpoints, not a control implementation or compliance result.</p>
+<h3>11b. Mitigation Realization</h3>
+<p>For a team that already inspects outbound files, I would build two stages. First, collect the file through an authorized DLP or gateway workflow with size limits and consent. Then run bounded audio analysis for a persistent dual-tone pattern. The <a href="./artifacts/audio_fsk_triage.py">local triage script</a> implements the second stage on mono PCM WAV files and reports a candidate with diagnostic scores. It does not decide whether the file is malicious or whether data was exfiltrated.</p>
+<p>My first-two-seconds FFT sketch is preserved below as the initial idea. A single whole-window spectrum can be dominated by one segment or miss time ordering. The linked script uses multiple short windows and asks whether both tones actually alternate. Its thresholds were tested on synthetic fixtures only.</p>
+<pre><code class="language-python"># Illustrative first-pass idea, not a production DLP hook.
+def flag_fsk_audio(wav_bytes, mark_freq=1580, space_freq=1420):
+    import io, wave, numpy as np
+    with wave.open(io.BytesIO(wav_bytes)) as wav:
+        rate = wav.getframerate()
+        samples = np.frombuffer(wav.readframes(wav.getnframes()), dtype=&quot;&lt;i2&quot;)
+    window = samples[:rate * 2]
+    spectrum = abs(np.fft.rfft(window))
+    frequencies = np.fft.rfftfreq(len(window), 1 / rate)
+    def energy(center):
+        return spectrum[abs(frequencies - center) &lt;= 30].sum()
+    return energy(mark_freq), energy(space_freq)  # inspect time variation separately
+</code></pre>
+<p>My Palo Alto policy sketch was conceptual, not deployable PAN-OS syntax. I would translate it into an actual environment's egress and DLP policy, then validate allowed business audio, false positives, and the availability of decrypted content. My Splunk search is similarly an audio-transfer <em>intake</em> query, not an FSK detector. Its fields (<code>mime_type</code>, <code>bytes_out</code>, <code>uri_path</code>, and host) require a defined proxy schema and enrichment; encrypted traffic may expose none of the file bytes. A representative starting query is:</p>
+<pre><code class="language-spl">index=proxy_logs mime_type=&quot;audio/*&quot;
+| stats count sum(bytes_out) as bytes_out by src_ip dest_host mime_type
+| where bytes_out &gt; 50000
+</code></pre>
+<p>That query only lists audio transfers. An analyst would need an approved content sample and the spectral result before making a covert-channel finding.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<h3>IOCs (Sanitized/Illustrative)</h3>
+<p>There is no real IOC in the supplied record. The case measurements are a mono PCM WAV, 48 kHz, 23.65 seconds, reported tones near 1420 and 1580 Hz, and about 45.45 symbols per second. The <code>REDACTED_HASH</code> value in the case notes is a placeholder. Its 10-120 second duration range and 8-48 kHz rate range are broad candidate filters, not indicators of malicious activity. A normal <code>.wav</code> extension or RIFF header is even broader.</p>
+<h3>YARA Rule</h3>
+<p>My initial notes offered a YARA rule matching a RIFF/WAVE header, a narrow PCM <code>fmt</code> sequence, and a file-size range. That can only select some WAV files for later review; YARA does not perform spectral analysis. I would name and deploy such a rule as a file-type intake filter, not <code>AFSK_RTTY_WAV_Covert_Channel</code>. A simplified conceptual form is:</p>
+<pre><code class="language-yara">rule WAV_PCM_Intake_Only
+{
+    meta:
+        description = &quot;Broad WAV/PCM triage; no FSK or threat determination&quot;
+    strings:
+        $wave = { 52 49 46 46 ?? ?? ?? ?? 57 41 56 45 }
+        $fmt_pcm_mono = { 66 6D 74 20 10 00 00 00 01 00 01 00 }
+    condition:
+        $wave at 0 and $fmt_pcm_mono and filesize &gt; 10KB and filesize &lt; 10MB
+}
+</code></pre>
+<p>The <code>fmt</code> sequence assumes one common chunk layout and misses valid alternatives. I did not run a YARA engine or measure coverage. The meaningful content check is the linked <a href="./artifacts/audio_fsk_triage.py">spectral triage script</a>, followed by framing and interpretation review.</p>
+<h3>Sigma Rule</h3>
+<p>My initial Sigma sketch selected outbound <code>.wav</code> POSTs using proxy fields and excluded an example host. That is a plausible <em>transfer</em> queue, but it cannot detect FSK or establish exfiltration. Field names, HTTP method visibility, multipart uploads, cloud sync clients, and allowed audio workflows vary by environment. I would define a normalized gateway event before shipping a rule:</p>
+<pre><code class="language-text">event_type: outbound_file_transfer
+source_user, source_host, destination_host, method, file_name,
+mime_type, file_size, extracted_content_available, transfer_time
+</code></pre>
+<p>Selection would be an outbound audio file with content available for inspection, followed by the spectral result and human review. I did not publish a placeholder-ID Sigma as a deployable rule or claim pySigma/backend validation. False positives include media production, calls, accessibility recordings, and routine collaboration.</p>
+<p>The practical detection chain is <strong>transfer context -&gt; bounded file triage -&gt; waveform review -&gt; timing and ITA2 decode -&gt; analyst disposition</strong>. A dual-tone score is a lead, not proof of hostile intent. The <a href="./artifacts/test_audio_tools.py">tests</a> cover a synthetic alternating signal, single tone, seeded noise, a PCM reader, and a shift-mode example. They do not establish performance on the missing challenge file or a production file set.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">short flow</a> at the top shows the solve sequence. This <a href="./artifacts/rtty-analysis-flow.svg">standalone SVG</a> shows where the defensive review would attach without inventing a transmission or exfiltration stage.</p>
+<p><img src="./artifacts/rtty-analysis-flow.svg" alt="A WAV is triaged, two tones and approximate timing are measured, RTTY framing is tried, and shift-aware and forced-letter ITA2 readings are compared. An optional authorized audio-transfer review can feed the same spectral triage, but the challenge has no observed exfiltration." style="display:block;max-width:100%;height:auto"></p>
+<p>The earlier kill-chain idea would have implied exfiltration. The SVG instead ends the challenge path at the reported message and places authorized transfer review on a separate, conditional track.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ol>
+<li><a href="https://www.itu.int/dms_pub/itu-r/opb/rep/R-REP-M.2200-2010-PDF-E.pdf">ITU-R Report M.2200</a> describes a 45.45-baud, 170 Hz amateur RTTY arrangement. The separately cited <a href="https://www.itu.int/rec/R-REC-M.476-5-199510-I/en">M.476-5</a> is titled for maritime direct-printing telegraph equipment.</li>
+<li>ITA2 / International Telegraph Alphabet No. 2. The five-bit LTRS/FIGS tables and start/stop framing are the decoding model used here.</li>
+<li><a href="https://attack.mitre.org/techniques/T1001/">MITRE ATT&amp;CK T1001</a>, a conditional adversary-behavior analogy.</li>
+<li><a href="https://attack.mitre.org/techniques/T1048/">MITRE ATT&amp;CK T1048</a>, withheld as a case finding because no exfiltration was observed.</li>
+<li><a href="https://next.d3fend.mitre.org/technique/d3f%3AFileContentAnalysis/">MITRE D3FEND File Content Analysis</a>, the bounded defensive analogue.</li>
+<li><a href="https://capec.mitre.org/data/definitions/636.html">MITRE CAPEC-636</a>, reviewed and not mapped directly to the audible tone content.</li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final">NIST SP 800-53 Rev. 5</a>, control catalog used only as a design reference.</li>
+<li>Marple, <em>Digital Spectral Analysis</em> (1987), cited in the case for frequency-estimation background; no claim from a specific chapter is needed here.</li>
+<li><a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.hilbert.html">SciPy <code>hilbert</code> documentation</a>, analytic signal and instantaneous-frequency example.</li>
+<li><a href="https://www.cisecurity.org/controls/v8">CIS Controls v8</a>, monitoring and defense context.</li>
+<li><a href="https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.pdf">OASIS STIX 2.1</a>, structure for the linked illustrative bundle.</li>
+</ol>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>

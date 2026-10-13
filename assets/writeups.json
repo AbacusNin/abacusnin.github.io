@@ -1413,5 +1413,28 @@
     ],
     "status": "Solved",
     "url": "/cyber-ops/ctf-writeups/crypto/pbes2-rsa-key-recovery/"
+  },
+  {
+    "title": "The Telegram in Two Tones",
+    "category": "Forensics",
+    "difficulty": "Medium",
+    "date": "2026-10-12",
+    "tags": [
+      "RTTY",
+      "AFSK",
+      "ITA2",
+      "Baudot",
+      "FSK",
+      "audio steganography",
+      "signal demodulation",
+      "covert communications"
+    ],
+    "summary": "A short WAV sounded like a simple signal, but its alternating tones led me through FSK timing, RTTY framing, and two readings of ITA2 shift codes.",
+    "aliases": [
+      "RTTY/AFSK Audio Steganography - Covert Message Recovery",
+      "telegram.wav"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/forensics/rtty-afsk-audio/"
   }
 ]

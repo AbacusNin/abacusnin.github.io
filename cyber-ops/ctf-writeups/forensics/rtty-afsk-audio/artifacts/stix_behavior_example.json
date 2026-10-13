@@ -1,0 +1,24 @@
+{
+  "type": "bundle",
+  "id": "bundle--e05c6cb5-0f2e-48a7-984a-d7961f0146ea",
+  "objects": [
+    {
+      "type": "attack-pattern",
+      "spec_version": "2.1",
+      "id": "attack-pattern--b0c32c9f-93c1-4b47-9a96-d8075fb7ef89",
+      "created": "2026-10-12T00:00:00.000Z",
+      "modified": "2026-10-12T00:00:00.000Z",
+      "name": "Data-like tones inside an audio file (training scenario)",
+      "description": "Illustrative analytic behavior only. The CTF record reports alternating FSK-like tones in a WAV; no real adversary, malicious intent, outbound transfer, or infrastructure was observed."
+    },
+    {
+      "type": "course-of-action",
+      "spec_version": "2.1",
+      "id": "course-of-action--0e356dc0-030d-4db8-8ac1-a309601786fa",
+      "created": "2026-10-12T00:00:00.000Z",
+      "modified": "2026-10-12T00:00:00.000Z",
+      "name": "Authorized bounded audio-content review",
+      "description": "If transfer context warrants review, retain authorized samples with provenance and size limits, check for persistent alternating tones, then require analyst validation and business-context review. This is a design example, not a deployed control."
+    }
+  ]
+}
