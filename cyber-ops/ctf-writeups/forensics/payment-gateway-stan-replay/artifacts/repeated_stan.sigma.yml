@@ -1,0 +1,31 @@
+title: ISO 8583 Authorization Request
+name: iso8583_authorization_request
+id: aa8508a5-ab68-4729-97c4-900910bdf7a7
+status: experimental
+description: Select parsed authorization requests for scoped STAN review.
+logsource:
+    product: payment_gateway
+    service: iso8583_parsed
+detection:
+    selection:
+        mti: '0100'
+    condition: selection
+---
+title: Repeated ISO 8583 Authorization STAN Within Terminal and Processing Day
+id: f561566e-c356-4041-903e-d8b9d4de5796
+status: experimental
+description: Review repeated authorization requests with the same terminal, day, and STAN; retries may be legitimate.
+correlation:
+    type: event_count
+    rules:
+        - iso8583_authorization_request
+    group-by:
+        - terminal_id
+        - processing_date
+        - stan
+    timespan: 1d
+    condition:
+        gte: 2
+falsepositives:
+    - Terminal or gateway retries that reuse the original transaction number
+level: medium

@@ -1,0 +1,5 @@
+index=payment_gateway sourcetype=iso8583_parsed mti=0100
+| stats count AS request_count dc(session_id) AS session_count earliest(_time) AS first_seen latest(_time) AS last_seen values(session_id) AS sessions BY terminal_id processing_date stan
+| where request_count > 1
+| eval review_type=if(session_count>1,"cross-session repeated STAN","same-session retry or duplicate")
+| table first_seen last_seen terminal_id processing_date stan request_count session_count sessions review_type
