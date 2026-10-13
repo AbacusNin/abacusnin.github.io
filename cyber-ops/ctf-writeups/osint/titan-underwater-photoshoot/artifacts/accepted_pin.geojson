@@ -1,0 +1,14 @@
+{
+  "type": "Feature",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [98.323308, 7.513015]
+  },
+  "properties": {
+    "name": "Barracuda Rock CTF answer point",
+    "event": "Titan underwater product photoshoot",
+    "observed_on": "2026-08-13",
+    "provenance": "Case-recorded interactive pin read; original pin URL unavailable",
+    "uncertainty": "Map pin; physical dive position unverified"
+  }
+}
