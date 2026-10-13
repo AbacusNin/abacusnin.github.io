@@ -1,0 +1,780 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Watch That Pointed to a Dive Site - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="A superlative in a coordinate challenge led me to a Guinness record, a named dive site, and finally a map pin that supplied the accepted six-decimal answer.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/osint/titan-underwater-photoshoot/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Watch That Pointed to a Dive Site">
+  <meta property="og:description" content="A superlative in a coordinate challenge led me to a Guinness record, a named dive site, and finally a map pin that supplied the accepted six-decimal answer.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/osint/titan-underwater-photoshoot/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / OSINT / <span aria-current="page">The Watch That Pointed to a Dive Site</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Watch That Pointed to a Dive Site</h1>
+        <p class="lead">I expected to spend this one comparing maps. The event name settled in a single search; finding the exact pin took the rest of the work.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Find the six-decimal coordinates of the location where the deepest underwater product photoshoot happened.</p>
+<p><strong>What I did.</strong> I searched the exact superlative, checked the issuing record, ruled out same-name sites, and read the relevant dive-site map pin.</p>
+<p><strong>The result.</strong> The case record reports first-attempt acceptance of the six-decimal coordinate answer on August 13, 2026. I withhold the answer itself.</p>
+<p><strong>The limit.</strong> The submission receipt and original pin URL are unavailable for independent verification. The accepted point represents a map pin; its distance from the physical dive position is unknown.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Read the prompt; Search the phrase; Verify the site; Sweep published coordinates; Read the pin; Submit the flag">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Read the prompt</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">venue and six-decimal answer</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Search the phrase</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Guinness names Titan Watches</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Verify the site</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Barracuda Rock near Racha Noi</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Sweep published coordinates</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">no usable decimals</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Read the pin</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">Six-decimal pin (withheld)</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Submit the flag</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">first-attempt acceptance recorded</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Geo-OSINT (scriptCTF 2026)</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>OSINT, GEOINT, event-pivot, source-evaluation, geolocation, scriptCTF-2026</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved-External</td>
+</tr>
+<tr>
+<td>Recorded result</td>
+<td>Six-decimal coordinate answer (withheld), first-attempt acceptance reported for August 13, 2026. The event listing ended August 10.</td>
+</tr>
+<tr>
+<td>Evidence boundary</td>
+<td>The Guinness event record is independently visible. The pin read and platform acceptance are case-recorded; the pin URL and submission receipt are not available.</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive and analyst proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/osint/titan-underwater-photoshoot/artifacts">browse the GitHub artifacts folder</a>.</p>
+<p>This was a public-information CTF exercise. The geographic point below is a challenge answer and an approximate dive-site marker, not a verified position of the dive team.</p>
+<h2>1. Exercise Context and Tasking</h2>
+<p>The prompt called the challenge <em>Titan</em> and asked for the latitude and longitude, to six decimal places, of the place where the deepest underwater product photoshoot happened. Its example wrapper was <code>scriptCTF{13.373737_-13.373737}</code>. I had the prompt and no attached image or map.</p>
+<p>The title tempted me toward the <em>Titan</em> submersible. The phrase "deepest underwater product photoshoot" was more specific. It sounded like a record title, so I treated the event as the first thing to identify. Coordinates were the requested output.</p>
+<p><strong>Exact requested answer.</strong> Latitude and longitude in decimal degrees, six places each, assembled as <code>scriptCTF{lat_lon}</code>.</p>
+<p><strong>Required precision.</strong> Six latitude decimals describe about 0.11 m of nominal resolution; longitude resolution is slightly smaller at this latitude. A dive site in open water cannot be located to that physical accuracy from a record title. The demand for six places told me to find the challenge author's point marker, as discussed in Section 5.4.</p>
+<p>The CTF platform needed a formatted answer. I used an intelligence-requirement frame to keep the research organized, but the task did not involve a real-world operational decision.</p>
+<p>I searched underlying public facts about the record and dive site rather than published challenge solutions. The case notes date the accepted submission to August 13, 2026. The <a href="https://ctftime.org/event/3052">event listing</a> ends on August 10, so I do not present this as an in-competition score.</p>
+<p><strong>Information cutoff.</strong> The case's source-access dates are August 13, 2026. I checked the cited record and dive-site pages again while preparing this account; current page content can differ from the solve-time view.</p>
+<p>The only CTF question was the coordinate request. The extra structure below records how I arrived there and where the answer's certainty ends.</p>
+<details class="fold section-fold">
+<summary>2. Intelligence Requirements and Analytical Framing</summary>
+<p>I wrote one requirement for myself: identify the photoshoot site and obtain the six-decimal point the challenge expected. I broke it into four checks so I would not jump from a matching name to a guessed flag.</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Essential Element of Information</th>
+<th>Indicator</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>EEI-01</td>
+<td>Identify the real-world event matching the superlative phrase</td>
+<td>Verbatim record-category title match + "Titan" brand hint</td>
+<td>Resolved - decisive</td>
+</tr>
+<tr>
+<td>EEI-02</td>
+<td>Resolve the named venue to a mappable point</td>
+<td>Existence of a named dive-site pin</td>
+<td>Resolved - decisive</td>
+</tr>
+<tr>
+<td>EEI-03</td>
+<td>Extract the exact 6-decimal values</td>
+<td>Interactive map pin read</td>
+<td>Resolved via documented manual terminal action</td>
+</tr>
+<tr>
+<td>EEI-04</td>
+<td>Determine flag assembly rules</td>
+<td>Hemisphere signs, separator, decimal padding</td>
+<td>Resolved from challenge text + venue hemisphere</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Assumptions.</strong> I treated the coordinates as WGS84 decimal degrees and expected a public map pin to hold the exact decimals. The negative longitude in the example flag was a placeholder, not a hint about the venue's hemisphere.</p>
+<p>At the start, I knew none of the event identity, venue, or coordinates.</p>
+<p>I did not force D3A or F3EAD onto a one-answer CTF. They would have added a targeting frame with no decision to support. The four checks above were enough.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Collection Strategy, Tools, and Actions Taken</summary>
+<p><strong>Phase 1 - Event identification.</strong> I searched <code>deepest underwater product photoshoot</code> verbatim. The <a href="https://www.guinnessworldrecords.com/world-records/783220-deepest-underwater-product-photoshoot">Guinness World Records entry</a> named Titan Watches, a 52.1 m shoot on March 29, 2026, at Barracuda Rock by Racha Noi Island, Phuket. Several trade articles repeated the campaign. One query disposed of my initial submersible association; the wording matched a record category and the brand matched <em>Titan</em>.</p>
+<p><strong>Phase 2 - Record check.</strong> I opened the issuing authority's page instead of relying on the press retellings. It confirmed the venue, date, and depth. It gave no coordinates, so I shifted from identifying the event to locating the point.</p>
+<p><strong>Phase 3 - Published-coordinate sweep.</strong> I ran seven more searches and fetched the <a href="https://www.scubago.com/en/explore/divesite/barracuda-rock-242681">SSI/Scubago Barracuda Rock entry</a>. I checked dive databases, operators, general search, map indexes, and Thai-language terms. The bounded search did not turn up an indexed six-decimal point for the relevant pin. The Scubago page gave me a named dive site among Racha Noi sites, but its visible text did not supply the needed decimals. I did not treat the absence as proof that no published coordinate exists anywhere.</p>
+<p>The dead ends mattered. "Barra Cuda Beach Club" in Patong polluted name searches. Raja Ampat, Indonesia, has another Barracuda Rock, and "Raja" is close enough to "Racha" to invite a bad match. A <a href="https://www.guinnessworldrecords.com/world-records/679971-deepest-underwater-model-photoshoot">Guinness <em>model</em> photoshoot record</a> pointed to Florida in 2024; the challenge asked about a <em>product</em>. Those checks pushed me toward a manual pin read, as explained in Section 5.3.</p>
+<p><strong>Phase 4 - Manual pin read.</strong> I selected the Barracuda Rock pin beside Ko Racha Noi and recorded its latitude and longitude to six decimals. I dropped hemisphere letters and degree marks for the flag. Section 10 gives the manual procedure. The case records first-attempt acceptance, although I do not have the pin URL or platform receipt to replay that step independently.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Source and Evidence Management</summary>
+<p>I kept stable identifiers for sources (<code>SRC-###</code>), evidence (<code>E-###</code>), observations (<code>OBS-###</code>), queries (<code>QRY-###</code>), actions (<code>ACT-###</code>), gaps (<code>GAP-###</code>), and judgments (<code>KJ-##</code>). The matrix below is the compact source register needed to follow this solve.</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Type</th>
+<th>Origin</th>
+<th>Accessed</th>
+<th>Supports</th>
+<th>Independence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SRC-001</td>
+<td>Record registry (issuing authority)</td>
+<td>Guinness World Records, record 783220</td>
+<td>2026-08-13</td>
+<td>E-001..E-004</td>
+<td>Original / authoritative</td>
+</tr>
+<tr>
+<td>SRC-002..004</td>
+<td>Trade press (MediaBrief, afaqs, Indian Television)</td>
+<td>Titan PR + GWR</td>
+<td>2026-08-13</td>
+<td>Consistency only</td>
+<td><strong>Derivative - single PR origin, counted once</strong></td>
+</tr>
+<tr>
+<td>SRC-005</td>
+<td>Dive-industry database entry</td>
+<td>SSI/Scubago, "Barracuda Rock" id 242681</td>
+<td>2026-08-13</td>
+<td>E-005</td>
+<td>Independent of PR chain</td>
+</tr>
+<tr>
+<td>SRC-006</td>
+<td>Record registry (rejected path)</td>
+<td>GWR record 679971 (model photoshoot)</td>
+<td>2026-08-13</td>
+<td>HYP-C rejection</td>
+<td>Original</td>
+</tr>
+<tr>
+<td>SRC-007</td>
+<td>Dive-site guide (decoy documentation)</td>
+<td>Bird's Head Seascape, Raja Ampat</td>
+<td>2026-08-13</td>
+<td>HYP-D rejection</td>
+<td>Original (irrelevant site)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key evidence.</strong> E-001 is the Guinness venue string, "Barracuda Rock, Racha Noi Island, Phuket, Thailand." E-002 is the March 29, 2026 date; E-003 is the 52.1 m depth. My case notes also mention a five-diver team and roughly 20 minutes, details I did not reverify from the record page. E-004 identifies the Titan 500M Professional Diver's watch. E-005 is the named Scubago dive-site entry. E-006 records the narrower search result: my bounded queries found no indexed six-decimal value for the relevant pin.</p>
+<p>I kept source URLs and access dates. I did not save a pin permalink or screenshot during the solve. That is a real gap in reproducing the coordinate extraction, even though the result was reported accepted.</p>
+<p>The trade-press wave appears to share the same brand release and record announcement. I counted it once for corroboration. Repetition across mastheads did not make it independent evidence.</p>
+<p>I omitted names of people quoted in press coverage because they did not help identify the event or the point. The source chain that matters to the answer stays visible.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Analytical Concept Explanation</summary>
+<p><strong>5.1 Superlative-record pivots.</strong> The wording sounded like a record category. I searched the full phrase first and reached the issuing record in one step. Search rank did not authenticate the answer; the Guinness page did. A similarly phrased challenge can still have more than one candidate, so I checked the holder, date, and venue before moving on.</p>
+<p><strong>5.2 Source independence vs. press waves.</strong> Several articles repeated the same brand and record story. I treated that wave as one line of reporting. The SSI dive-site entry had a different purpose and supported the existence of a same-named site in the Racha Noi area; I cannot establish from the visible page when its listing was created or how the point was sourced. I did not count it as independent proof of the exact six decimals.</p>
+<p><strong>5.3 Negative-space inference.</strong> My bounded sweep found the name but no indexed six-decimal value I could use. That result made an interactive map pin a sensible next source. It did not prove that every operator, map index, or language lacked coordinates. The query log in Section 10 shows the scope of the negative result.</p>
+<p><strong>5.4 Coordinate-precision semantics.</strong> Six decimals can describe a point to roughly 0.11 m north-south, but a map pin is not a surveyed dive-team position. The requested precision told me I needed a stored coordinate value, not a hand-drawn estimate of where the boat sat. Once I found the site, I looked for its pin.</p>
+<p><strong>5.5 Entity disambiguation under name collision.</strong> "Barracuda Rock" brought up a Patong beach club and a Raja Ampat dive site. I kept the Guinness venue string beside every candidate: Racha Noi Island, Phuket, Thailand. The Indonesia result was a name match and a location mismatch, however tempting the "Raja"/"Racha" similarity looked.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Analysis Mechanics</summary>
+<p><strong>Step 1.</strong> The challenge wanted coordinates but described an event. I put the full photoshoot phrase into search before trying to place "Titan" on a map.</p>
+<p><strong>Step 2.</strong> QRY-001 returned SRC-001, the Guinness record, along with a press wave. Guinness named Titan Watches and Barracuda Rock. That supported HYP-A and let me drop the submersible idea, HYP-B. The adjacent <em>model</em> record failed the category check for HYP-C.</p>
+<p><strong>Step 3.</strong> I fetched SRC-001 and wrote down E-001 through E-004: the venue, date, depth, and watch. The exact venue string became the key for the next searches. It also stopped me from treating a press paraphrase as the primary record.</p>
+<p><strong>Step 4.</strong> QRY-002 through QRY-008 and the SRC-005 fetch located a named dive-site entry but no usable indexed decimals in the sources checked. I recorded that as E-006, a bounded negative. OBS-4 was my inference that an interactive pin might contain the precise value, so I went to the map.</p>
+<p><strong>Step 5.</strong> ACT-9 was the manual pin read, to six decimals. I assembled the answer under EEI-04. The case records first-attempt acceptance on August 13. That supports the flag string, while the missing receipt and pin permalink limit independent checking.</p>
+<p><strong>Shortest path through the evidence:</strong> challenge phrase -&gt; SRC-001 (E-001) -&gt; pin read (ACT-9) -&gt; the six-decimal answer (withheld).</p>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Alternative Hypotheses and Decision Forks</summary>
+<table>
+<thead>
+<tr>
+<th>Hypothesis</th>
+<th>Initial rationale</th>
+<th>Contradicting / diagnostic evidence</th>
+<th>Disposition</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>HYP-A - "Titan" = Titan Watches (Tata)</td>
+<td>Superlative + brandable marketing event</td>
+<td>GWR attribution names the brand</td>
+<td><strong>Survives - confirmed</strong></td>
+</tr>
+<tr>
+<td>HYP-B - "Titan" = Titanic wreck / OceanGate Titan</td>
+<td>Strongest cultural prior for "Titan" + extreme depth</td>
+<td>No product-photoshoot record there; GWR resolves elsewhere</td>
+<td>Rejected at Step 2</td>
+</tr>
+<tr>
+<td>HYP-C - Venue = Haining record site (Pompano Beach, FL)</td>
+<td>Adjacent GWR record surfaced by the same query</td>
+<td>Category is <em>model</em> photoshoot - answer-ontology mismatch</td>
+<td>Rejected - ontology discipline</td>
+</tr>
+<tr>
+<td>HYP-D - Target pin = Raja Ampat "Barracuda Rock"</td>
+<td>Exact name match in a dive-site guide</td>
+<td>Wrong country and hemisphere vs. E-001</td>
+<td>Rejected - retained as decoy warning</td>
+</tr>
+<tr>
+<td>HYP-E - Author's pin platform = Google Maps (vs. SSI map object)</td>
+<td>Only interactive sources exist; default solver tooling</td>
+<td>First-submission acceptance made disambiguation moot</td>
+<td>Survives, unresolved and immaterial</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Decision forks.</strong></p>
+<p><strong>FORK-1.</strong> I could have followed the first association that "Titan" gave me. The record phrase had more discriminating detail, so I searched it and reached the right event in one query.</p>
+<p><strong>FORK-2.</strong> I spent seven queries looking for published decimals before reading the pin. A shorter sweep would probably have served the CTF better. The failed searches still show exactly why I changed sources.</p>
+<p><strong>FORK-3.</strong> I kept challenge-solution searches out of the collection path. The record and dive-site sources answered the question without them. The dated acceptance falls after the listed event window, so I describe it as a recorded platform result, not competition scoring.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Key Judgments and Productized Intelligence</summary>
+<p><strong>KJ-01:</strong>
+The event referenced by the challenge is the Titan Watches (Tata Group) Guinness World Record for deepest underwater product photoshoot: 52.1 m at Barracuda Rock, Racha Noi Island, Phuket, Thailand, on 29 March 2026.</p>
+<p>Confidence: High.
+Basis: Record-issuing authority (SRC-001), with a consistent - though derivative - press wave and independent confirmation that the venue exists as a named dive site (SRC-005).
+Alternative: None surviving.
+Gap: None material.</p>
+<p><strong>KJ-02:</strong>
+The flag coordinates correspond to the named dive-site pin for that venue.</p>
+<p>Confidence: High in the recorded accepted flag; lower in independently reproducing the exact pin extraction.
+Basis: ACT-9 pin read and case-reported platform acceptance. My bounded search made the pin a reasonable next source, but it did not independently supply those decimals.
+Alternative: An alternate pin platform holding a different value - rendered moot by acceptance.
+Gap: Whether the pin matches the dive team's physical position on 2026-03-29 (academic; see Section 12).</p>
+<p>The event summary in Sections 1-9 answers the CTF question and keeps the source and coordinate limits visible. It is a training artifact, not an official intelligence product.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. GEOINT / IMINT Product</summary>
+<p>The geography mattered when I checked the candidate site and assembled the coordinates. I did not analyze an image, so I have no annotated or comparison imagery to present. The exact point below is the accepted CTF answer as recorded, with pin-level uncertainty.</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Area of interest</td>
+<td>Ko Racha Noi vicinity, Phuket province, Thailand</td>
+</tr>
+<tr>
+<td>Final coordinates (accepted)</td>
+<td>Withheld; within about 1 km of 7.51 N, 98.32 E</td>
+</tr>
+<tr>
+<td>CRS</td>
+<td>WGS84 (EPSG:4326), decimal degrees</td>
+</tr>
+<tr>
+<td>Stated precision</td>
+<td>Six decimals, about 0.11 m north-south in numerical resolution; physical accuracy is unknown</td>
+</tr>
+<tr>
+<td>Positional uncertainty</td>
+<td>Pin-level; relationship to the dive team's physical anchor point is unverified (GAP-03)</td>
+</tr>
+<tr>
+<td>Analyst sanity bound (inferred, low precision)</td>
+<td>7.39-7.52 N, 98.25-98.35 E</td>
+</tr>
+<tr>
+<td>Calibration note</td>
+<td>The accepted point sits ~0.007 degrees (~775 m) inside the bound's northern edge - the bound held but nearly clipped the true point; treat memory-derived bounds as <strong>fail-open</strong> filters</td>
+</tr>
+</tbody>
+</table>
+<p>I kept a <a href="./artifacts/dive-site-approx.geojson">machine-readable GeoJSON marker</a> for the dive site, in longitude/latitude order and rounded to two decimals, so it does not carry the answer. It carries the same provenance warning. The data below is the marker, not a surveyed dive location.</p>
+<pre><code class="language-json">{
+ &quot;type&quot;: &quot;Feature&quot;,
+ &quot;geometry&quot;: { &quot;type&quot;: &quot;Point&quot;, &quot;coordinates&quot;: [98.32, 7.51] },
+ &quot;properties&quot;: {
+ &quot;name&quot;: &quot;Barracuda Rock dive site (approximate)&quot;,
+ &quot;source&quot;: &quot;case-recorded interactive pin read, 2026-08-13&quot;,
+ &quot;uncertainty&quot;: &quot;pin-level; physical dive position unknown&quot;
+ }
+}
+</code></pre>
+<p>I did not need a static map to tell this story. If I add one later, I will use a licensed tile source with attribution and keep the point's uncertainty visible.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Reproducible Queries, Scripts, and Technical Artifacts</summary>
+<p>I kept the queries in execution order. The Thai-language query is preserved because that route was part of the bounded search, even though it did not produce the six-decimal point.</p>
+<pre><code class="language-text">QRY-001 deepest underwater product photoshoot
+FETCH-1 https://www.guinnessworldrecords.com/world-records/783220-Deepest-underwater-product-photoshoot
+QRY-002 Barracuda Rock Racha Noi dive site coordinates
+FETCH-2 https://www.scubago.com/en/explore/divesite/barracuda-rock-242681
+QRY-003 &quot;Barracuda Rock&quot; Racha Noi GPS coordinates latitude longitude
+QRY-004 &quot;Barracuda Rock&quot; Phuket mapcarta
+QRY-005 dive.site &quot;Barracuda Rock&quot; Racha Noi Thailand
+QRY-006 Barracuda Rock Racha Noi google maps location
+QRY-007 Barracuda Rock Racha Noi 7.4 98 coordinates dive spot
+QRY-008 หินบาราคูด้า ราชาน้อย พิกัด ดำน้ำ # Thai: &quot;Barracuda Rock Racha Noi coordinates diving&quot;
+</code></pre>
+<p>QRY-003 through QRY-008 and FETCH-2 did not yield a usable indexed coordinate. E-006 describes that bounded search result; it cannot rule out every public source.</p>
+<p><strong>ACT-9 - manual map action.</strong></p>
+<ol>
+<li>Search <strong>"Barracuda Rock"</strong> in an interactive map and select the dive-site pin beside <strong>Ko Racha Noi, Phuket</strong>. Reject the Patong beach club and other countries using the record's venue string (Section 5.5).</li>
+<li>Read the selected pin's coordinates. If the map offers both displayed coordinates and a place URL containing latitude/longitude parameters, compare them. Save the direct pin link; I did not capture it in this case.</li>
+<li>Assemble <code>scriptCTF{&lt;lat&gt;_&lt;lon&gt;}</code> with N/E as positive values, an underscore, and exactly six decimal places. Leave out degree signs and hemisphere letters.</li>
+</ol>
+<p>My first sanity check below caught formatting and obvious geographic mistakes. Its bound was an estimate and nearly excluded the accepted point. I kept the short version to show my solve-time thinking. The linked <a href="./artifacts/check_coordinate.py">coordinate checker</a> uses explicit input errors instead of <code>assert</code>, leaves out-of-bound candidates available for review, and has <a href="./artifacts/test_coordinate.py">tests</a>.</p>
+<pre><code class="language-python"># Solve-time sketch. The linked checker has input validation and CLI arguments.
+
+BOUND = {&quot;lat&quot;: (7.39, 7.52), &quot;lon&quot;: (98.25, 98.35)} # analyst-inferred, low precision
+
+def check(lat: float, lon: float) -&gt; None:
+ assert -90 &lt;= lat &lt;= 90 and -180 &lt;= lon &lt;= 180, &quot;not a plausible coordinate&quot;
+ in_bound = (BOUND[&quot;lat&quot;][0] &lt;= lat &lt;= BOUND[&quot;lat&quot;][1]
+ and BOUND[&quot;lon&quot;][0] &lt;= lon &lt;= BOUND[&quot;lon&quot;][1])
+ print(f&quot;candidate : {lat:.6f}, {lon:.6f}&quot;)
+ print(f&quot;within bound : {in_bound} (fail-open: re-verify bound before rejecting)&quot;)
+ print(f&quot;flag candidate : scriptCTF{{{lat:.6f}_{lon:.6f}}}&quot;) # :.6f enforces zero-padding
+
+if __name__ == &quot;__main__&quot;:
+ check(7.500000, 98.300000)  # example values; the answer is withheld
+</code></pre>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Analytic Standards and Methodology Mapping</summary>
+<table>
+<thead>
+<tr>
+<th>Method / Standard</th>
+<th>Application</th>
+<th>Artifact proving application</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Analytic standards, informed by ICD 203 (quality-control lens)</td>
+<td>Observation/interpretation separation; confidence expressed without invented probabilities</td>
+<td>Section 6, Section 12</td>
+</tr>
+<tr>
+<td>Sourcing standards, informed by ICD 206</td>
+<td>Source register with access dates, origin, and independence classification; derivative press counted once</td>
+<td>Section 4</td>
+</tr>
+<tr>
+<td>Hypothesis management, adapted from ACH</td>
+<td>Explicit register with diagnostic evidence; decoys retained after resolution</td>
+<td>Section 7</td>
+</tr>
+<tr>
+<td>Collection management (discriminating-indicator prioritization)</td>
+<td>Phrase-first strategy; bounded sweep with a pre-committed pivot condition; language-expansion query</td>
+<td>Section 3, Section 10</td>
+</tr>
+<tr>
+<td>Negative-result tracking</td>
+<td>E-006 records the bounded unsuccessful coordinate search that drove FORK-2</td>
+<td>Section 3 Phase 3, Section 6 Step 4</td>
+</tr>
+</tbody>
+</table>
+<p>I borrowed useful habits from ICD 203 and ICD 206: distinguish observation from judgment, keep source origins visible, and state the gaps. The hypothesis table is an ACH-inspired aid. This CTF note is not an official intelligence product or a compliance claim. The table points to where I used each habit.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Source Evaluation, Confidence, and Intelligence Gaps</summary>
+<p><strong>Source quality.</strong> SRC-001 is the record issuer and directly supports the event, date, depth, and venue. SRC-005 lists a same-named dive site in the Phuket/Racha Noi context; its visible text does not supply the answer's decimals. SRC-002 through SRC-004 repeat the brand story and count as one press origin. SRC-006 and SRC-007 were useful for rejecting plausible wrong matches.</p>
+<p><strong>Information credibility.</strong> The event and venue are strongly supported by the record issuer. The coordinate value rests on the recorded pin read and reported platform acceptance; I do not have a captured pin URL or receipt. My bounded search found no other usable decimals.</p>
+<p><strong>Analytic confidence.</strong> KJ-01 is high because the issuer names the event and place. KJ-02 is high for the recorded CTF answer and lower for independently replaying the pin extraction. Those are judgments about specific evidence, not numerical probabilities.</p>
+<p><strong>Intelligence gaps.</strong></p>
+<table>
+<thead>
+<tr>
+<th>Gap</th>
+<th>Status</th>
+<th>Could it overturn the principal judgment?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GAP-01 - exact pin decimals</td>
+<td>Closed in the case record by ACT-9 and reported acceptance; external replay unavailable</td>
+<td>A different verified pin could change the answer, so retain the missing permalink as a reproducibility gap</td>
+</tr>
+<tr>
+<td>GAP-02 - challenge author's pin platform</td>
+<td>Unresolved; acceptance made it unnecessary for the CTF</td>
+<td>No known impact on the reported accepted flag</td>
+</tr>
+<tr>
+<td>GAP-03 - pin vs. physical dive position</td>
+<td>Open</td>
+<td>No impact on flag formatting; matters if the point is reused as a real-world location claim</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Lessons Learned and Practitioner Development</summary>
+<h3>What the exercise validated</h3>
+<p>The exact phrase got me to the event in one search. The unsuccessful coordinate sweep was useful because I recorded its scope and changed sources when it stopped paying off. I had a rejection ladder ready but never needed it; the case records acceptance on the first try. I used a manual pin read to obtain the requested decimals instead of pretending a rough geographic estimate was precise enough.</p>
+<h3>What produced friction</h3>
+<p>I expected a named dive site to have an indexed coordinate. The pages I checked did not yield the six decimals. The Patong beach club kept appearing in name searches, and my remembered latitude bound nearly cut off the point: it sat about 0.007 degrees below the upper edge.</p>
+<h3>What would change next time</h3>
+<p>Next time I would cap the published-coordinate sweep at three or four well-chosen queries, then inspect the pin. I would save the pin's direct URL or permitted capture at the moment I read it. A bound from memory stays a warning, never a reason to discard a candidate.</p>
+<h3>Transferable principles</h3>
+<table>
+<thead>
+<tr>
+<th>Exercise Behavior</th>
+<th>Professional Analytic Principle</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Preserve exact search queries, including negatives</td>
+<td>Maintain reproducible collection records</td>
+</tr>
+<tr>
+<td>Count a simultaneous press wave as one origin</td>
+<td>Circular-reporting control</td>
+</tr>
+<tr>
+<td>Record a structured negative as a finding (E-006)</td>
+<td>Disciplined absence-of-evidence reasoning</td>
+</tr>
+<tr>
+<td>Document the GUI terminal action step-by-step</td>
+<td>Auditability of manual tradecraft</td>
+</tr>
+<tr>
+<td>Discriminate name collisions with geographic bounds</td>
+<td>Entity-resolution discipline</td>
+</tr>
+<tr>
+<td>Retain rejected hypotheses after validation</td>
+<td>Hindsight-bias reduction</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>14. Reusable Analyst Assets</summary>
+<p><strong>Asset 1 - Coordinate-flag pre-submission checklist (generalized).</strong> Determine hemisphere signs from the actual site. Check the wrapper and underscore. Pad each coordinate to six places without inventing more source precision. Leave out degree marks and hemisphere letters. Record the datum assumption. The <a href="./artifacts/check_coordinate.py">coordinate checker</a> handles the syntax; the analyst still has to identify the correct point.</p>
+<p><strong>Asset 2 - Rejection delta ladder template.</strong> Before a submission, I would decide what a rejection would mean: recheck the exact pin value and rounding, compare a second pin platform, then revisit the selected feature and the event category. The case did not use this ladder after the first answer. A rejection should trigger a specific evidence check, not random coordinate changes.</p>
+<p><strong>Asset 3 - Superlative-pivot collection pattern.</strong> Search the record-like phrase verbatim. Verify the result at its issuing registry, note the exact venue string, and treat articles sourced from one press release as one origin. Then resolve the place separately. I turned that sequence into a <a href="./artifacts/source_review_template.md">source review template</a>.</p>
+<p><strong>Asset 4 - coordinate checker.</strong> The short solve-time check appears in Section 10. The linked <a href="./artifacts/check_coordinate.py">reusable checker</a>, <a href="./artifacts/test_coordinate.py">test suite</a>, and <a href="./artifacts/README.md">usage guide</a> make its fail-open bound behavior explicit. They do not validate a map or submit to a CTF platform.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>15. Cross-Challenge Capability Mapping</summary>
+<p>I kept an event-level row so this solve can be compared with other OSINT work:</p>
+<table>
+<thead>
+<tr>
+<th>Challenge</th>
+<th>IR</th>
+<th>Primary discipline</th>
+<th>Techniques</th>
+<th>Tools</th>
+<th>Product</th>
+<th>Confidence</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Titan</td>
+<td>Event-referenced venue -&gt; six-decimal coordinates</td>
+<td>OSINT (GEOINT supporting)</td>
+<td>Record-category search; bounded negative; name-collision checks; Thai-language query; source-origin review</td>
+<td>Web search/fetch, record registry, dive DBs, interactive map</td>
+<td>OSINT event summary</td>
+<td>High for event; recorded acceptance for flag</td>
+<td>Solved, first submission reported</td>
+</tr>
+</tbody>
+</table>
+<p>This small comparison records technique practice across Titan and the separate <em>Where on Earth?</em> challenge. Its counts describe the two exercises, not a broader portfolio total.</p>
+<table>
+<thead>
+<tr>
+<th>Technique</th>
+<th>Where on Earth?</th>
+<th>Titan</th>
+<th>Times Practiced</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Visual geolocation (imagery-driven)</td>
+<td>X</td>
+<td></td>
+<td>1</td>
+</tr>
+<tr>
+<td>Event-pivot record-registry search</td>
+<td></td>
+<td>X</td>
+<td>1</td>
+</tr>
+<tr>
+<td>Negative-space provenance inference</td>
+<td></td>
+<td>X</td>
+<td>1</td>
+</tr>
+<tr>
+<td>Entity disambiguation / name collision</td>
+<td></td>
+<td>X</td>
+<td>1</td>
+</tr>
+<tr>
+<td>Multilingual collection</td>
+<td></td>
+<td>X</td>
+<td>1</td>
+</tr>
+<tr>
+<td>Answer-ontology and flag-format discipline</td>
+<td>X</td>
+<td>X</td>
+<td>2</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>16. Visual Intelligence Artifact</summary>
+<p>The <a href="#analysis-flow">analysis flow</a> near the top shows the path I took from phrase search to pin read. I kept the fuller Mermaid source below because it preserves the rejected routes and evidence IDs. A map with one pin would hide more of the work than it explained.</p>
+<pre><code class="language-mermaid">flowchart TD
+ A[&quot;Challenge phrase:&lt;br/&gt;'deepest underwater product photoshoot'&quot;] --&gt; B[&quot;QRY-001 verbatim phrase search&quot;]
+ B --&gt; C[&quot;SRC-001 GWR record 783220&lt;br/&gt;Titan Watches, 52.1 m, 29 Mar 2026&quot;]
+ C --&gt; D[&quot;E-001 venue string:&lt;br/&gt;Barracuda Rock, Racha Noi Island, Phuket, TH&quot;]
+ D --&gt; E[&quot;QRY-002..008 + SRC-005 fetch&lt;br/&gt;published-coordinate sweep&quot;]
+ E --&gt;|&quot;bounded negative (E-006)&quot;| F[&quot;Inference: a map pin may hold&lt;br/&gt;the needed decimals&quot;]
+ F --&gt; G[&quot;ACT-9 manual pin read&lt;br/&gt;six decimals, withheld&quot;]
+ G --&gt; H[&quot;First submission reported accepted&lt;br/&gt;2026-08-13, after event window&quot;]
+ B -.-&gt;|&quot;rejected: HYP-B&quot;| X1[&quot;Titanic / OceanGate reading&quot;]
+ B -.-&gt;|&quot;rejected: HYP-C&quot;| X2[&quot;GWR model-photoshoot record&quot;]
+ E -.-&gt;|&quot;decoy excluded: HYP-D&quot;| X3[&quot;Raja Ampat 'Barracuda Rock'&quot;]
+</code></pre>
+<p><strong>Artifact metadata.</strong> SRC-001 through SRC-007 appear in Section 4 with August 13 access dates. No imagery underlies the diagram. The final point assumes WGS84 and has pin-level uncertainty, as explained in Section 9 and the linked <a href="./artifacts/dive-site-approx.geojson">GeoJSON</a>.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>17. After-Action Review</summary>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Time to first viable hypothesis</td>
+<td>Minutes - one query (QRY-001)</td>
+</tr>
+<tr>
+<td>Time to correct judgment</td>
+<td>Same session: venue immediate; coordinates after an eight-action sweep plus one manual step</td>
+</tr>
+<tr>
+<td>Highest-value source</td>
+<td>SRC-001 (GWR record page - issuing authority)</td>
+</tr>
+<tr>
+<td>Lowest-value collection path</td>
+<td>General-web decimal-string searches (QRY-003, QRY-007) - pure SEO noise</td>
+</tr>
+<tr>
+<td>Major pivot</td>
+<td>Published-source sweep -&gt; interactive-pin extraction, licensed by E-006</td>
+</tr>
+<tr>
+<td>Assumption causing the most friction</td>
+<td>"A named dive site will have published decimals"; secondarily, a memory-derived bound that nearly clipped the true point</td>
+</tr>
+<tr>
+<td>Tool deficiency</td>
+<td>Text retrieval did not expose map-pin coordinates, so I used a manual pin read; the direct pin link was not preserved</td>
+</tr>
+<tr>
+<td>Knowledge deficiency</td>
+<td>None material; local Thai naming for the site remained unverified (did not affect outcome)</td>
+</tr>
+<tr>
+<td>Confidence at submission</td>
+<td>High on venue; the numeric string carried no independent pre-validation - by design, its first test <em>was</em> submission</td>
+</tr>
+<tr>
+<td>Submission correct?</td>
+<td>First-attempt acceptance recorded for August 13; independent receipt unavailable and event listing ended August 10</td>
+</tr>
+<tr>
+<td>Evidence that would have improved pre-submission confidence</td>
+<td>Any indexed pin mirror (OSM node, Mapcarta page) or an operator-published GPS log</td>
+</tr>
+<tr>
+<td>Training follow-up</td>
+<td>Map the coverage boundaries of pin-mirror sources (OSM/Mapcarta/legacy GPS lists) for marine POIs; practice extracting coordinates from embedded map objects for GAP-02-type contingencies</td>
+</tr>
+</tbody>
+</table>
+<p>I kept the near-clipped bound in the record. It shows why a remembered geographic range should prompt a second look, never veto a candidate.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>18. Release Review</summary>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Challenge publication timing</td>
+<td>The <a href="https://ctftime.org/event/3052">event listing</a> ended August 10, 2026. This article is published afterward; no organizer-specific writeup restriction was verified.</td>
+</tr>
+<tr>
+<td>Flag and challenge identifiers</td>
+<td>The case-recorded flag appears here because it is the answer being explained. Its reported acceptance occurred after the listed event window.</td>
+</tr>
+<tr>
+<td>Real-world unnecessary PII</td>
+<td>None - individuals quoted in press coverage omitted from the body</td>
+</tr>
+<tr>
+<td>API keys / tokens / account identifiers</td>
+<td>None present</td>
+</tr>
+<tr>
+<td>Workstation paths / usernames</td>
+<td>None present</td>
+</tr>
+<tr>
+<td>EXIF leakage</td>
+<td>N/A - no images published</td>
+</tr>
+<tr>
+<td>Copyrighted imagery</td>
+<td>None used; future map insets to use OSM tiles with attribution</td>
+</tr>
+<tr>
+<td>Map licensing / attribution</td>
+<td>Noted in Section 9 and Section 16</td>
+</tr>
+<tr>
+<td>Source URLs defeating anonymization</td>
+<td>Not applicable - the challenge is named per CTF convention and sources are public news/registry pages</td>
+</tr>
+<tr>
+<td>Government affiliation / operational implication</td>
+<td>This is a CTF exercise and makes no operational or official-intelligence claim</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>19. References</summary>
+<h3>Methodology / Doctrine References</h3>
+<ul>
+<li><a href="https://www.odni.gov/files/documents/ICD/ICD-203.pdf">ODNI ICD 203, Analytic Standards</a> - a quality-control lens for separating observations, assumptions, and judgments; this CTF note does not claim compliance.</li>
+<li><a href="https://www.odni.gov/files/documents/ICD/ICD-206.pdf">ODNI ICD 206, Sourcing Requirements</a> - informed the source-origin and independence fields. The directive's formal requirements do not apply to this personal page.</li>
+<li>Heuer, R. J., <em>Psychology of Intelligence Analysis</em> - the hypothesis table borrows the idea of testing alternatives in a compact CTF form.</li>
+</ul>
+<h3>Analytical Sources</h3>
+<p>Primary preferred over aggregators throughout; the press wave is listed as derivative.</p>
+<ul>
+<li><a href="https://www.guinnessworldrecords.com/world-records/783220-deepest-underwater-product-photoshoot">Guinness World Records record 783220, <em>Deepest underwater product photoshoot</em></a>, the issuing event record.</li>
+<li><a href="https://www.guinnessworldrecords.com/world-records/679971-deepest-underwater-model-photoshoot">Guinness World Records record 679971, <em>Deepest underwater model photoshoot</em></a>, the rejected category match.</li>
+<li><a href="https://www.scubago.com/en/explore/divesite/barracuda-rock-242681">SSI/Scubago, Barracuda Rock site 242681</a>, a dive-site listing in the Phuket/Racha Noi context; its visible text does not establish the exact flag point.</li>
+<li>MediaBrief, afaqs, and Indian Television trade coverage of the Titan Zero Hour campaign, treated as derivative coverage of one announcement.</li>
+<li><a href="https://birdsheadseascape.com/map-location/barracuda-rock/">Bird's Head Seascape, Barracuda Rock</a>, the rejected Raja Ampat name match.</li>
+<li><a href="https://ctftime.org/event/3052">CTFtime scriptCTF 2026 event listing</a>, for the August 8-10 event window and writeup-prize context.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>

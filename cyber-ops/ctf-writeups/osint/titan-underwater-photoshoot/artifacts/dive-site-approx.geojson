@@ -1,0 +1,14 @@
+{
+  "type": "Feature",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [98.32, 7.51]
+  },
+  "properties": {
+    "name": "Barracuda Rock dive site (approximate)",
+    "event": "Titan underwater product photoshoot",
+    "observed_on": "2026-08-13",
+    "provenance": "Rounded from a case-recorded interactive pin read; original pin URL unavailable",
+    "uncertainty": "Two decimal places, about 1 km; the six-decimal CTF answer is withheld. Physical dive position unverified"
+  }
+}

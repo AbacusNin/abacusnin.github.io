@@ -551,5 +551,27 @@
     ],
     "status": "Solved-Verified",
     "url": "/cyber-ops/ctf-writeups/forensics/payment-gateway-stan-replay/"
+  },
+  {
+    "title": "The Watch That Pointed to a Dive Site",
+    "category": "OSINT",
+    "difficulty": "Medium",
+    "date": "2026-10-12",
+    "tags": [
+      "OSINT",
+      "GEOINT",
+      "event-pivot",
+      "source-evaluation",
+      "geolocation",
+      "scriptCTF-2026"
+    ],
+    "summary": "A superlative in a coordinate challenge led me to a Guinness record, a named dive site, and finally a map pin that supplied the accepted six-decimal answer.",
+    "aliases": [
+      "Titan",
+      "deepest underwater product photoshoot",
+      "Barracuda Rock"
+    ],
+    "status": "Solved-External",
+    "url": "/cyber-ops/ctf-writeups/osint/titan-underwater-photoshoot/"
   }
 ]
