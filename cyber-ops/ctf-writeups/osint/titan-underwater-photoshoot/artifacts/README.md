@@ -2,6 +2,8 @@
 
 The GeoJSON records the case's accepted CTF point. It is a map-pin coordinate, with no claim about where the dive team or boat physically stood. The original pin URL and platform submission receipt were not available for an independent replay.
 
+`analysis-flow.svg` is the static diagram displayed in Section 16. It shows the record-to-pin path, rejected name and category matches, and the missing-receipt boundary without requiring a Mermaid renderer.
+
 `check_coordinate.py` is a local, standard-library candidate check. It accepts latitude and longitude as decimal strings, enforces valid ranges and no more than six fractional digits, pads to six places, and assembles the challenge wrapper. Optional bounds are analyst estimates. A miss prints a warning and still returns the candidate. It never queries a map or submits a flag.
 
 ```sh
