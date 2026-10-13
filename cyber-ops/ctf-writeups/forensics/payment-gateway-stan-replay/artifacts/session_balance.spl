@@ -1,0 +1,5 @@
+index=payment_gateway sourcetype=iso8583_parsed mti IN ("0100","0110","0400","0410")
+| stats count(eval(mti="0100")) AS auth_requests count(eval(mti="0110")) AS auth_responses count(eval(mti="0400")) AS reversal_requests count(eval(mti="0410")) AS reversal_responses earliest(_time) AS first_seen latest(_time) AS last_seen BY terminal_id processing_date session_id
+| eval unmatched_auth=auth_requests-auth_responses
+| where unmatched_auth>0 AND reversal_requests>0
+| table first_seen last_seen terminal_id processing_date session_id auth_requests auth_responses reversal_requests reversal_responses unmatched_auth

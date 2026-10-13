@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Transaction Number That Came Back Twice - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="An 89-packet payment-gateway capture looked opaque until an EBCDIC decode exposed ISO 8583 messages, a repeated STAN, and a reversal sequence that needed closer review.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/payment-gateway-stan-replay/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Transaction Number That Came Back Twice">
+  <meta property="og:description" content="An 89-packet payment-gateway capture looked opaque until an EBCDIC decode exposed ISO 8583 messages, a repeated STAN, and a reversal sequence that needed closer review.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/forensics/payment-gateway-stan-replay/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Forensics / <span aria-current="page">The Transaction Number That Came Back Twice</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Transaction Number That Came Back Twice</h1>
+        <p class="lead">I started with bytes that looked encrypted. The byte counts told a different story: the gateway was speaking EBCDIC.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Identify the protocol and version, count repeated account numbers, and identify the repeated transaction number in an unusual payment-gateway capture.</p>
+<p><strong>What I did.</strong> I characterized the bytes, decoded cp037, parsed the message bitmap and LLVAR account field, then compared message types, accounts, transaction numbers, and ports.</p>
+<p><strong>The result.</strong> The recorded solve identifies ISO 8583:1987, four repeated account numbers, and repeated STAN 918939. The later reversal is suspicious, but the capture summary does not establish settlement or fraud outcome.</p>
+<p><strong>The limit.</strong> Packet counts and decoded fields come from the recorded packet review. Gateway decisions and settlement are not shown; linked defensive examples use invented events without account numbers.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Count packet bytes; Test the encoding; Read message types; Fix field parsing; Compare transaction IDs; Review reversal">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Count packet bytes</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">89 packets on port 5000</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Test the encoding</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">cp037 reveals readable fields</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Read message types</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">0100 and 0110 dominate</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Fix field parsing</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">LLVAR prefix shifts offsets</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Compare transaction IDs</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">STAN 918939 repeats</text>
+<line x1="180" y1="383" x2="180" y2="402" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="405" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="429" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Review reversal</text><text x="18" y="449" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">0400 and 0410 follow</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Network forensics / financial protocol analysis</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>EBCDIC, ISO-8583, transaction-replay, reversal-fraud, payment-protocol, dpkt</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved-Verified</td>
+</tr>
+<tr>
+<td>Recorded result</td>
+<td>The packet review counted 89 packets, identified an ISO 8583:1987 message convention, found four PANs seen more than once, and found STAN 918939 at ports 40010 and 40043.</td>
+</tr>
+<tr>
+<td>Evidence boundary</td>
+<td>The packet review does not establish authorization, settlement, or a gateway defect. The linked defensive examples use invented data.</td>
+</tr>
+</tbody>
+</table>
+<p>Defensive proofs of concept for adapting this case to real environments: <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/forensics/payment-gateway-stan-replay/artifacts">browse the GitHub artifacts folder</a>.</p>
+<pre><code class="language-mermaid">flowchart TD
+    ST1[&quot;ST.1 Triage\ndpkt enumerate\n89 pkts / port 5000&quot;] --&gt; ST2
+    ST2[&quot;ST.2 Byte distribution\nCounter histogram\nEBCDIC-range &gt;85% / entropy &lt;7.0&quot;] --&gt; ST2a &amp; ST3
+    ST2a -. &quot;rejected: encryption assumption\nuniform-distribution test failed&quot; .-&gt; DEAD1[&quot;Dead end&quot;]
+    ST3[&quot;ST.3 Decode\npayload.decode('cp037')\nreadable TID + MID strings&quot;] --&gt; ST4
+    ST4[&quot;ST.4 MTI extraction\nfirst 4 EBCDIC bytes\nleading 0 -&gt; ISO 8583:1987&quot;] --&gt; ST5
+    ST5[&quot;ST.5 MTI balance check\nCounter over session\n43 req / 42 resp -&gt; orphan port 40043&quot;] --&gt; ST5a
+    ST5a -. &quot;rejected: fixed-offset field read\nLLVAR prefix contaminated all fields&quot; .-&gt; DEAD2[&quot;Dead end -&gt; pivot&quot;]
+    DEAD2 --&gt; ST6
+    ST6[&quot;ST.6 Bitmap-cursor parser + LLVAR\ncustom Python\npan / stan / amount per packet&quot;] --&gt; ST7 &amp; ST8
+    ST7[&quot;ST.7 PAN deduplication\n4 PANs appear more than once&quot;]
+    ST8[&quot;ST.8 STAN deduplication\n918939 × 2 - same PAN, same amount&quot;] --&gt; ST9
+    ST9([&quot;ST.9 Reversal review\n0400/0410 at tail / trigger unresolved&quot;])
+</code></pre>
+<hr />
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>The case began with an 18.7 KB Ethernet capture from an internal payment gateway. The recorded analysis counted 89 packets. The payloads looked opaque in an ASCII view: no readable strings, obvious protocol header, or TLS handshake. I needed to identify the protocol and version, count accounts that appeared more than once, and find the repeated transaction number.</p>
+<p>The scenario invites a fraud hypothesis: a terminal or process with gateway access could replay an authorization and then request a reversal. My evidence boundary was narrower. The record contains packet analysis, without gateway state, application logs, settlement records, or proof of terminal compromise. A real gateway should check transaction identity and the original authorization state before acting on a reversal. I cannot tell from this packet summary whether that check existed or failed.</p>
+<hr />
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<pre><code>ST.1  [triage]    Enumerate PCAP - dpkt.pcap.Reader - transactions.pcap
+                  -&gt; 89 pkts, 2 hosts, server port 5000, client ports 40001-40044
+                  -&gt; one new TCP connection per transaction
+                  result: accept
+
+ST.2  [recon]     Byte distribution - Counter() - sampled payloads
+                  -&gt; EBCDIC-zone (0xC0-0xF9) density &gt;85%; ASCII-printable &lt;4%;
+                    Shannon entropy &lt;7.0 bits/byte
+                  result: accept - EBCDIC hypothesis
+
+ST.2a [pivot]     Encryption assumption - dismissed
+                  -&gt; sampled distribution did not resemble uniform random bytes;
+                    this did not rule out every encrypted or compressed format
+                  result: reject as initial explanation (dead end)
+
+ST.3  [decode]    EBCDIC cp037 - payload.decode('cp037') - sample payloads
+                  -&gt; readable terminal ID and merchant name on first call
+                  result: accept - encoding confirmed
+
+ST.4  [protocol]  MTI extraction - first 4 EBCDIC bytes per packet
+                  -&gt; set {0100, 0110, 0400, 0410, 0800, 0810}
+                  -&gt; leading digit 0 fits the ISO 8583:1987 MTI convention
+                  result: accept - recorded Q1: ISO 8583 / Q2: 1987 convention
+
+ST.5  [analysis]  MTI frequency count - Counter - all 89 packets
+                  -&gt; 43x0100, 42x0110, 1x0400, 1x0410; imbalance=1
+                  -&gt; orphaned source port: 40043
+                  result: accept
+
+ST.5a [pivot]     Fixed-offset field extraction - attempted payload[12:30]
+                  -&gt; 18-digit values inconsistent with monetary amounts
+                  -&gt; root cause: LLVAR 2-byte length prefix for F2 (PAN) consumed
+                    as PAN bytes, shifting all downstream field boundaries
+                  result: reject (dead end) -&gt; pivot to ST.6
+
+ST.6  [parse]     Bitmap-cursor parser + LLVAR handler - custom Python
+                  -&gt; 64-bit big-endian bitmap; bit N set = field N present;
+                    LLVAR: read 2-byte EBCDIC length, then that many value bytes
+                  -&gt; per-packet dict: pan, amount, stan, terminal_id, currency
+                  result: accept
+
+ST.7  [analysis]  PAN deduplication - Counter(pans) - all 0100 + 0400 messages
+                  -&gt; 4 PANs with count &gt; 1
+                  result: accept - Q3: 4
+
+ST.8  [analysis]  STAN deduplication - defaultdict(list) - all 0100 + 0400 messages
+                  -&gt; STAN 918939: port 40010 pkt 20 (first observed, responded)
+                               + port 40043 pkt 86 (repeat, no response observed)
+                  -&gt; same PAN (JCB), same amount ($187.85)
+                  result: accept - Q4: 918939
+
+ST.9  [conclude]  Reversal correlation - parser output
+                  -&gt; 0400/0410 pair immediately after orphaned 0100 on port 40043
+                  -&gt; same terminal ID / merchant ID in recorded parse;
+                    reversal trigger and financial outcome need gateway records
+                  result: suspicious sequence, not independently confirmed fraud
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Phase</th>
+<th>Tool / Code</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ST.1</td>
+<td>Triage</td>
+<td><code>dpkt.pcap.Reader</code></td>
+<td>Packet count, hosts, ports</td>
+</tr>
+<tr>
+<td>ST.2-ST.3</td>
+<td>Recon / Decode</td>
+<td><code>Counter</code>, <code>.decode('cp037')</code></td>
+<td>Encoding classification and confirmation</td>
+</tr>
+<tr>
+<td>ST.4</td>
+<td>Protocol ID</td>
+<td>First 4 EBCDIC bytes per packet</td>
+<td>MTI set, version digit</td>
+</tr>
+<tr>
+<td>ST.5</td>
+<td>Analysis</td>
+<td><code>Counter(mtis)</code></td>
+<td>Session imbalance</td>
+</tr>
+<tr>
+<td>ST.6</td>
+<td>Parse</td>
+<td>Custom bitmap-cursor parser</td>
+<td>Per-packet field dicts via correct LLVAR handling</td>
+</tr>
+<tr>
+<td>ST.7-ST.8</td>
+<td>Analysis</td>
+<td><code>Counter</code>, <code>defaultdict</code></td>
+<td>Duplicate PAN and STAN detection</td>
+</tr>
+<tr>
+<td>ST.9</td>
+<td>Review</td>
+<td>Parser output review</td>
+<td>Reversal sequence needs gateway-state confirmation</td>
+</tr>
+</tbody>
+</table>
+<hr />
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>I used <code>dpkt</code> to read TCP payloads and a case-specific bitmap cursor. The decisive parsing steps below include the LLVAR correction. This code assumes a whole message in each TCP payload and the field set listed here. A real deployment needs stream reassembly and the gateway's ISO 8583 profile. The linked <a href="./artifacts/gateway_session_review.py">normalized-event reviewer</a> is the executable defensive proof of concept; it accepts no account-number field.</p>
+<h3>Encoding probe</h3>
+<pre><code class="language-python"># First-pass EBCDIC hypothesis test on a packet payload
+with open('&lt;capture.pcap&gt;', 'rb') as f:
+    import dpkt
+    from collections import Counter
+    _, buf = next(dpkt.pcap.Reader(f))
+    payload = dpkt.ethernet.Ethernet(buf).data.data.data  # case-specific TCP assumption
+    c = Counter(payload)
+    density = sum(c[b] for b in range(0xC0, 0xFA)) / len(payload)
+    print(f&quot;EBCDIC-zone density: {density:.1%}&quot;)
+    if density &gt; 0.55:
+        print(payload[:32].decode('cp037'))  # inspect MTI and expected field shape
+</code></pre>
+<h3>ISO 8583 Session Analyzer</h3>
+<pre><code class="language-python">#!/usr/bin/env python3
+&quot;&quot;&quot;
+iso8583_analyzer.py - Case-specific ISO 8583 review for EBCDIC-encoded TCP payloads.
+Requires: dpkt (pip install dpkt)
+Usage:    python3 iso8583_analyzer.py &lt;capture.pcap&gt; [--verbose]
+&quot;&quot;&quot;
+import sys, dpkt
+from collections import Counter, defaultdict
+
+MTI_NAMES = {
+    '0100': 'Auth Request',     '0110': 'Auth Response',
+    '0400': 'Reversal Request', '0410': 'Reversal Response',
+    '0800': 'Netmgmt Request',  '0810': 'Netmgmt Response',
+}
+
+def e(b):
+    return b.decode('cp037')
+
+def bit(bmap, n):
+    return bool((bmap &gt;&gt; (64 - n)) &amp; 1)
+
+def parse(payload):
+    &quot;&quot;&quot;
+    ISO 8583:1987 EBCDIC message parser.
+    Layout: [MTI: 4B EBCDIC][Bitmap: 8B binary][Data Elements...]
+    Variable-length fields (LLVAR) carry a 2-byte EBCDIC decimal length prefix;
+    consuming this prefix before reading the value is mandatory.
+    &quot;&quot;&quot;
+    if len(payload) &lt; 12: raise ValueError('short message')
+    mti  = e(payload[0:4])
+    if len(mti) != 4 or not mti.isdigit(): raise ValueError('invalid MTI')
+    bmap = int.from_bytes(payload[4:12], 'big')  # 8-byte big-endian bitmap
+    supported = {2, 3, 4, 7, 11, 12, 13, 14, 41, 42, 49}
+    present = {n for n in range(1, 65) if bit(bmap, n)}
+    if present - supported: raise ValueError('unsupported bitmap field; use gateway profile')
+    pos  = 12
+    f    = {'mti': mti, '_name': MTI_NAMES.get(mti, 'Unknown')}
+
+    def fixed(n, key):
+        nonlocal pos
+        if pos + n &gt; len(payload): raise ValueError('truncated fixed field')
+        f[key] = e(payload[pos:pos+n]); pos += n
+
+    def llvar(key):
+        &quot;&quot;&quot;Consume 2-byte EBCDIC length prefix, then read that many bytes.&quot;&quot;&quot;
+        nonlocal pos
+        if pos + 2 &gt; len(payload): raise ValueError('truncated LLVAR length')
+        digits = e(payload[pos:pos+2]); pos += 2
+        if not digits.isdigit(): raise ValueError('nondecimal LLVAR length')
+        length = int(digits)
+        if length &gt; 19 or pos + length &gt; len(payload): raise ValueError('invalid PAN length')
+        f[key]  = e(payload[pos:pos+length]); pos += length
+
+    if bit(bmap,  2): llvar('pan')             # F2:  PAN (LLVAR, max 19)
+    if bit(bmap,  3): fixed(6,  'proc_code')   # F3:  Processing Code
+    if bit(bmap,  4):                          # F4:  Transaction Amount
+        raw = e(payload[pos:pos+12]); pos += 12
+        if not raw.isdigit(): raise ValueError('invalid amount')
+        f['amount_minor'] = int(raw)  # currency and exponent require profile context
+    if bit(bmap,  7): fixed(10, 'tx_dt')       # F7:  Transmission DateTime
+    if bit(bmap, 11): fixed(6,  'stan')         # F11: STAN (scope/retry rules vary by profile)
+    if bit(bmap, 12): fixed(6,  'local_time')   # F12: Local Time
+    if bit(bmap, 13): fixed(4,  'local_date')   # F13: Local Date
+    if bit(bmap, 14): fixed(4,  'expiry')       # F14: Expiry
+    if bit(bmap, 41): fixed(8,  'terminal_id')  # F41: Terminal ID
+    if bit(bmap, 42): fixed(15, 'merchant_id')  # F42: Merchant ID
+    if bit(bmap, 49): fixed(3,  'currency')     # F49: ISO 4217 currency code
+    return f
+
+def main(path, verbose=False):
+    pan_log = defaultdict(list)   # pan  -&gt; [(pkt, sport, mti, stan, amount)]
+    stan_log = defaultdict(list)  # stan -&gt; [(pkt, sport, pan)]
+    mti_cnt = Counter()
+    req_p, res_p = set(), set()
+
+    if __import__('os').path.getsize(path) &gt; 10_000_000:
+        raise ValueError('capture exceeds this example limit')
+    with open(path, 'rb') as fh:
+        pkts = list(dpkt.pcap.Reader(fh))
+
+    parse_errors = 0
+    for i, (_, buf) in enumerate(pkts):
+        try:
+            seg = dpkt.ethernet.Ethernet(buf).data.data
+            fld = parse(seg.data)
+            mti = fld.get('mti', '')
+            if mti not in MTI_NAMES: raise ValueError('unexpected MTI')
+            mti_cnt[mti] += 1
+            if mti == '0100': req_p.add(seg.sport)
+            if mti == '0110': res_p.add(seg.dport)
+            pan, stan, amt = fld.get('pan'), fld.get('stan'), fld.get('amount_minor', '?')
+            if mti in ('0100', '0400') and pan:
+                if stan: stan_log[stan].append((i, seg.sport, pan))
+                pan_log[pan].append((i, seg.sport, mti, stan, amt))
+            if verbose:
+                print(f&quot;\n[{i:3d}] {mti} - {fld.get('_name','')}&quot;)
+                for k, v in fld.items():
+                    if k not in ('mti', '_name'):
+                        print(f&quot;  {k:&lt;16}: {v[-4:] if k == 'pan' else v}&quot;)
+        except (ValueError, AttributeError, dpkt.UnpackError):
+            parse_errors += 1
+
+    print(f&quot;Packets skipped by this case parser: {parse_errors}&quot;)
+
+    print(f&quot;\n{'='*52}\nMTI SESSION SUMMARY\n{'='*52}&quot;)
+    for mti, cnt in sorted(mti_cnt.items()):
+        print(f&quot;  {mti}  {MTI_NAMES.get(mti,'Unknown'):&lt;22}  {cnt:&gt;3}&quot;)
+
+    print(f&quot;\nSESSION BALANCE CHECK&quot;)
+    for req, res in [('0100','0110'),('0400','0410'),('0800','0810')]:
+        r, s = mti_cnt.get(req,0), mti_cnt.get(res,0)
+        print(f&quot;  {req}/{res}: {r} req / {s} res{'  &lt;- MISMATCH' if r!=s else ''}&quot;)
+    orphaned = req_p - res_p
+    if orphaned: print(f&quot;  Orphaned ports: {sorted(orphaned)}&quot;)
+
+    print(f&quot;\nDUPLICATE PAN ANALYSIS&quot;)
+    dups = {p:t for p,t in pan_log.items() if len(t)&gt;1}
+    print(f&quot;  PANs appearing more than once: {len(dups)}&quot;)
+    for pan, txns in dups.items():
+        print(f&quot;  PAN ending: {pan[-4:]}&quot;)
+        for pkt,port,mti,stan,amt in txns: print(f&quot;    Pkt {pkt:3d} | Port {port} | {mti} | STAN {stan} | {amt}&quot;)
+
+    print(f&quot;\nREPEATED STAN REVIEW (retry or replay candidate)&quot;)
+    dup_stans = {s:t for s,t in stan_log.items() if len(t)&gt;1}
+    if dup_stans:
+        for stan, txns in dup_stans.items():
+            print(f&quot;  STAN: {stan}  &lt;- REVIEW REQUIRED&quot;)
+            for pkt,port,pan in txns: print(f&quot;    Pkt {pkt:3d} | Port {port} | PAN ending {pan[-4:]}&quot;)
+    else: print(&quot;  None detected.&quot;)
+
+if __name__ == '__main__': main(sys.argv[1], verbose='--verbose' in sys.argv)
+</code></pre>
+<hr />
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p><strong>EBCDIC (IBM Code Page 037).</strong> Once I counted the byte values, cp037 became a useful hypothesis. Its digits occupy <code>0xF0-0xF9</code>, and space is <code>0x40</code>; many letters land in high-byte ranges that look odd in an ASCII view. Decoding produced readable terminal and merchant strings and plausible message types. The histogram and entropy were clues, not a proof that encryption was absent. Small or structured encrypted records can also have nonuniform bytes. The decoded field layout was the stronger confirmation.</p>
+<p><strong>ISO 8583 message structure.</strong> The recorded payload layout was four EBCDIC MTI bytes, an eight-byte primary bitmap, then data elements in field order. In this profile, the leading <code>0</code> in the MTI fits the 1987 version convention. The next digits distinguish authorization (<code>1</code>), reversal (<code>4</code>), and network management (<code>8</code>), then request (<code>0</code>) from response (<code>1</code>). Field 2, the PAN, had a two-character EBCDIC LLVAR length prefix. I had to consume that length before moving the cursor to the other fields. Field 11 is the six-digit STAN. Its uniqueness and retry scope depend on the gateway profile and processing day, so a repeated value calls for review rather than an automatic fraud verdict.</p>
+<hr />
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p><strong>The repeated transaction number (ST.8).</strong> The recorded parse places a JCB account on port 40010, packet 20, in a <code>0100</code> with a response. Port 40043, packet 86, carries the same STAN <strong>918939</strong>, account, and stated amount <strong>$187.85</strong> in another <code>0100</code>. The record reports no matching <code>0110</code> in this capture for the later request. It does not show that the entire message bytes were identical, that the terminal deliberately suppressed a response, or that the gateway did not respond outside the capture.</p>
+<p><strong>The reversal sequence (ST.5, ST.9).</strong> A <code>0400</code> request and <code>0410</code> response followed near the end, after the request with no response observed on port 40043. A timeout or error can legitimately lead to a reversal under a gateway's rules. This ordering also fits a replay-and-reversal hypothesis. I cannot choose between those explanations from message types and ports alone. I would need the reversal's original-data reference, terminal logs, gateway decision, and settlement state.</p>
+<p><strong>Gateway decision boundary.</strong> I initially read the reversal response as approval, but the parser above does not read the response code or original-data reference field. A <code>0410</code> says a reversal response exists; it does not by itself prove approval, funds returned, or a missing gateway check. I treat that control failure as a testable hypothesis.</p>
+<p><strong>The parsing mistake (ST.5a).</strong> I first read fields from a fixed offset after the bitmap. Field 2 begins with an EBCDIC length, for example <code>\xF1\xF6</code> for <code>16</code>. Treating those two bytes as part of the PAN shifted later reads and produced implausible 18-digit "amounts." I stopped trusting the fixed offsets and advanced a cursor through the bitmap's declared fields.</p>
+<hr />
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned (Practitioner Perspective)</summary>
+<p><strong>What helped.</strong> A byte histogram gave me a fast cp037 lead, and decoding checked it against readable fields. Looking at MTIs, ports, account repeats, and STAN together gave me a stronger investigative lead than the reversal alone. The four repeated accounts answered one challenge question; the STAN repeat answered another. Neither count establishes criminal intent.</p>
+<p><strong>What I got wrong.</strong> I initially treated opaque bytes as possible encryption. Then I parsed a variable-length field at a fixed offset. Both mistakes were cheap to catch once I checked the byte distribution and read the bitmap order. The larger gap is the jump from a suspicious packet sequence to a gateway failure claim. I need response codes, original-data references, and financial state before making it.</p>
+<p><strong>Transferable principles:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Exercise behavior</th>
+<th>Operational analogue</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Byte histogram before encoding hypothesis</td>
+<td>Passive characterization before active engagement</td>
+</tr>
+<tr>
+<td>Spec-read before LLVAR parser</td>
+<td>Read the RFC/standard before writing any protocol parser</td>
+</tr>
+<tr>
+<td>Enumerate all 4 anomalies before concluding</td>
+<td>Complete threat enumeration before closing an IR ticket</td>
+</tr>
+</tbody>
+</table>
+<hr />
+
+</details>
+<details class="fold section-fold">
+<summary>7. Extrapolation</summary>
+<p><strong>Individual.</strong> I want to get faster at reading financial and other length-delimited protocols. The cursor mistake here translates directly to TLV and other variable-length formats. I would not assume the field set or encoding from ISO 8583 alone; the processor profile still matters.</p>
+<p><strong>Security operations.</strong> A parsed gateway log could surface repeated STANs within a terminal and processing day. Retries may legitimately reuse identifiers, so I would compare session IDs and the gateway's retry rules before escalating. Request/response imbalance is another review cue; capture loss, timeouts, and log gaps can cause it. Field 41 can help map a message to a configured terminal, but asset inventory must confirm the physical device before containment.</p>
+<p><strong>Intelligence operations.</strong> I would keep EBCDIC among the candidate decoders for an authorized payment-traffic collection pipeline. A four-digit MTI followed by a plausible bitmap is a useful protocol lead even when the port is unfamiliar. It still needs framing, field-order, and environment checks; a four-digit string alone is too weak a fingerprint.</p>
+<hr />
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>For operational review, I added a <a href="./artifacts/gateway_session_review.py">bounded normalized-event reviewer</a>, <a href="./artifacts/fixture.jsonl">invented event fixture</a>, and <a href="./artifacts/test_gateway_session_review.py">positive, retry, near-miss, and PAN-rejection tests</a>. The <a href="./artifacts/README.md">artifact guide</a> explains the log fields and what the findings do not prove. The Sigma and SPL examples below are linked separately in Section 12.</p>
+<h3>Universal encoding probe</h3>
+<pre><code class="language-python">import math
+from collections import Counter
+
+def probe_encoding(payload, threshold=0.62):
+    &quot;&quot;&quot;Suggest a codec for inspection; do not classify encryption from entropy.&quot;&quot;&quot;
+    if not payload: return None, 'Empty payload'
+    c = Counter(payload); t = len(payload)
+    ent = -sum((v/t)*math.log2(v/t) for v in c.values() if v)
+    for codec in ['cp037', 'cp500', 'utf-8']:
+        try:
+            decoded = payload.decode(codec, errors='strict')
+            if (decoded[:4].isdigit() and len(decoded[:4]) == 4 and
+                    sum(1 for ch in decoded if ch.isprintable()) / len(decoded) &gt;= threshold):
+                return codec, decoded
+        except Exception: continue
+    return None, f'No candidate confirmed (entropy={ent:.2f})'
+</code></pre>
+<h3>ISO 8583 bitmap decoder</h3>
+<pre><code class="language-python">def decode_bitmap(bitmap_bytes):
+    &quot;&quot;&quot;Return declared fields; require a secondary bitmap when field 1 is set.&quot;&quot;&quot;
+    if len(bitmap_bytes) &lt; 8: raise ValueError('short primary bitmap')
+    bmap   = int.from_bytes(bitmap_bytes[:8], 'big')
+    fields = [n for n in range(1, 65) if (bmap &gt;&gt; (64 - n)) &amp; 1]
+    if 1 in fields:
+        if len(bitmap_bytes) &lt; 16: raise ValueError('secondary bitmap missing')
+        bmap2   = int.from_bytes(bitmap_bytes[8:16], 'big')
+        fields += [n for n in range(65, 129) if (bmap2 &gt;&gt; (128 - n)) &amp; 1]
+    return fields
+</code></pre>
+<h3>STAN deduplication registry</h3>
+<pre><code class="language-python">class STANRegistry:
+    &quot;&quot;&quot;Demonstration of repeated STAN lookup within one already-scoped session.&quot;&quot;&quot;
+    def __init__(self): self._seen = {}
+    def check(self, stan, pkt, port, pan):
+        &quot;&quot;&quot;Returns (is_repeat: bool, first_entry: dict or None); intent is unknown.&quot;&quot;&quot;
+        if stan in self._seen: return True, self._seen[stan]
+        self._seen[stan] = {'pkt': pkt, 'port': port, 'pan': pan}; return False, None
+</code></pre>
+<hr />
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Mapping</summary>
+<p>The recorded sequence gives me useful defensive questions, but it does not prove terminal compromise or a fraudulent gateway approval. These mappings are analysis aids, not confirmed adversary techniques or software weaknesses.</p>
+<h3>Tier 1 - Completeness Checklist</h3>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>Mapping</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MITRE ATT&amp;CK</td>
+<td>ICS T0856 and T0855 may look like analogies, but a payment gateway is outside the ICS scope. I would consider Enterprise <a href="https://attack.mitre.org/techniques/T1565/002/">T1565.002, Transmitted Data Manipulation</a> only if evidence later showed someone altered messages in transit. This record does not show that.</td>
+</tr>
+<tr>
+<td>MITRE ATLAS</td>
+<td>N/A - no adversarial ML or AI-system content.</td>
+</tr>
+<tr>
+<td>OWASP Top 10</td>
+<td>N/A - not a web application context.</td>
+</tr>
+<tr>
+<td>OWASP Top 10 for LLM Apps</td>
+<td>N/A - no LLM content.</td>
+</tr>
+<tr>
+<td>CVSS / EPSS / CISA KEV</td>
+<td>N/A - no CVE or confirmed product vulnerability to score or check against exploit catalogs.</td>
+</tr>
+<tr>
+<td>CIS Benchmarks (cloud) / CSA CCM</td>
+<td>N/A on this evidence - no cloud infrastructure is described.</td>
+</tr>
+</tbody>
+</table>
+<h3>Tier 2 - Applied Where They Add Value</h3>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>ID</th>
+<th>Applicability</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>D3FEND</td>
+<td><a href="https://next.d3fend.mitre.org/technique/d3f%3ANetworkTrafficAnalysis/">D3-NTA, Network Traffic Analysis</a></td>
+<td>Decode and correlate MTIs and transaction identifiers from authorized traffic. I could not verify a D3-BACA entry, so I leave that ID out.</td>
+</tr>
+<tr>
+<td>CAPEC</td>
+<td><a href="https://capec.mitre.org/data/definitions/60.html">CAPEC-60</a>, <a href="https://capec.mitre.org/data/definitions/196.html">CAPEC-196</a></td>
+<td>Both concern session credentials. A STAN is a transaction trace number, not an authentication credential; neither is a direct mapping here.</td>
+</tr>
+<tr>
+<td>CWE</td>
+<td><a href="https://cwe.mitre.org/data/definitions/284.html">CWE-284</a>, <a href="https://cwe.mitre.org/data/definitions/345.html">CWE-345</a>, <a href="https://cwe.mitre.org/data/definitions/302.html">CWE-302</a></td>
+<td>Review prompts if gateway code or complete audit logs later show a defect. This packet summary establishes none of them.</td>
+</tr>
+<tr>
+<td>STRIDE</td>
+<td>Spoofing and repudiation</td>
+<td>Threat-model questions: could an authorized terminal replay an identifier, and could missing response evidence create an audit dispute? Neither is an observed outcome.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intel and Standards Integration</summary>
+<p>The useful shareable idea is a <em>review pattern</em>: repeated F11/STAN within a terminal's processing-day scope, a later authorization request with no response visible in the available telemetry, and a nearby reversal. Each part needs context. Retries can repeat identifiers, a capture can miss a response, and a reversal can be legitimate. I would share the pattern with those qualifiers, its normalized field definitions, observation window, and data source, without PAN data or an allegation about this gateway.</p>
+<p>For a corroborated case, a STIX 2.1 <code>attack-pattern</code> could describe confirmed behavior and a <code>course-of-action</code> could describe duplicate handling and reversal-reference checks. A <code>mitigates</code> relationship could connect them. An <code>indicator</code> requires a pattern language and observable fields that actually represent the parsed gateway events; the local <code>terminal_id</code> and <code>stan</code> fields are not automatically portable STIX cyber observables. I have not created STIX objects or published over TAXII because I have no independently replayable capture, gateway decision record, or confirmed malicious infrastructure to package as intelligence.</p>
+<hr />
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<table>
+<thead>
+<tr>
+<th>Standard</th>
+<th>Control</th>
+<th>Realization</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>SI-10 - Information Input Validation</td>
+<td>In a gateway design review, validate F11's scope, handling of legitimate retries, and the reversal's original-transaction reference and permitted state. Rejecting every repeated STAN would be unsafe. The <a href="./artifacts/gateway_session_review.py">reviewer</a> flags examples; it does not enforce a gateway policy.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>AU-2 / AU-12 - Event Logging</td>
+<td>Capture MTI, tokenized transaction reference, terminal ID, session ID, processing day, response code, and reversal reference with a reliable timestamp. Minimize account data in logs.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>IA-9 - Service Identification and Authentication</td>
+<td>Consider authenticated terminal-to-gateway service connections. This would address an impersonation path, while a compromised or authorized terminal could still send problematic transactions.</td>
+</tr>
+<tr>
+<td>CIS Controls v8</td>
+<td>8.2 - Collect Audit Logs</td>
+<td>Send normalized gateway audit events to a protected log pipeline so requests, responses, and reversals can be reconciled.</td>
+</tr>
+<tr>
+<td>CIS Controls v8</td>
+<td>13.6 - Collect Network Traffic Flow Logs</td>
+<td>Use authorized flow telemetry to find unusual session patterns. A flow log alone cannot decode F11, so pair it with gateway application events or an approved parser.</td>
+</tr>
+<tr>
+<td>PCI DSS v4.0</td>
+<td>Req 6.2.4 - Prevent Common Software Attacks</td>
+<td>Review duplicate and reversal-reference validation during secure development. This is a design pointer, not evidence that this requirement applies to or has been met by the example gateway.</td>
+</tr>
+<tr>
+<td>PCI DSS v4.0</td>
+<td>Req 10.2.1 - Audit Log Events</td>
+<td>Review whether gateway event logging supports transaction reconstruction without storing prohibited account data. This case is not a compliance assessment.</td>
+</tr>
+</tbody>
+</table>
+<p>I would test these controls with a legitimate retry, a cross-session duplicate, an unmatched request caused by incomplete capture, a properly referenced reversal, and an invalid reversal. The <a href="./artifacts/test_gateway_session_review.py">synthetic tests</a> cover analytic distinctions, not live gateway enforcement.</p>
+<hr />
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p><strong>Detection maturity: locally tested concept.</strong> I ran the normalized-event reviewer against invented positive and near-miss events. The Sigma and SPL queries are examples awaiting backend conversion, real log mapping, and tuning. I have no measured false-positive rate or production deployment.</p>
+<p><strong>Data pipeline requirement:</strong> An authorized parser must reconstruct TCP messages and apply the gateway's ISO 8583 profile before any query can use <code>mti</code>, <code>stan</code>, <code>terminal_id</code>, <code>processing_date</code>, <code>session_id</code>, and a reliable event time. The case-specific parser in Section 3 illustrates the LLVAR step but is not a production ingest component. My <a href="./artifacts/README.md">field and test guide</a> records the assumptions. Neither the queries nor the reviewer need a PAN.</p>
+<h3>Sigma rule - STAN replay detection</h3>
+<p>The <a href="./artifacts/repeated_stan.sigma.yml">Sigma correlation rule</a> contains a base authorization-request selection and an <code>event_count</code> correlation over terminal, processing date, and STAN. The second document counts repeats; a bare <code>mti: '0100'</code> selection would alert on every authorization. It is a review signal, with legitimate retries as an expected false positive.</p>
+<pre><code class="language-yaml">title: Repeated ISO 8583 Authorization STAN Within Terminal and Processing Day
+status: experimental
+correlation:
+    type: event_count
+    rules:
+        - iso8583_authorization_request
+    group-by:
+        - terminal_id
+        - processing_date
+        - stan
+    timespan: 1d
+    condition:
+        gte: 2
+</code></pre>
+<h3>Splunk SPL - session balance and reversal correlation</h3>
+<p>The <a href="./artifacts/session_balance.spl">session-balance SPL</a> counts all four relevant MTIs by terminal, processing date, and session. It preserves first and last event times before the final table. The companion <a href="./artifacts/repeated_stan.spl">repeated-STAN SPL</a> searches across sessions. Both require a complete enough event stream to interpret missing responses.</p>
+<pre><code class="language-splunk">index=payment_gateway sourcetype=iso8583_parsed mti IN (&quot;0100&quot;,&quot;0110&quot;,&quot;0400&quot;,&quot;0410&quot;)
+| stats count(eval(mti=&quot;0100&quot;)) AS auth_requests count(eval(mti=&quot;0110&quot;)) AS auth_responses count(eval(mti=&quot;0400&quot;)) AS reversal_requests count(eval(mti=&quot;0410&quot;)) AS reversal_responses earliest(_time) AS first_seen latest(_time) AS last_seen BY terminal_id processing_date session_id
+| eval unmatched_auth=auth_requests-auth_responses
+| where unmatched_auth&gt;0 AND reversal_requests&gt;0
+| table first_seen last_seen terminal_id processing_date session_id auth_requests auth_responses reversal_requests reversal_responses unmatched_auth
+</code></pre>
+<p>I would join any alert back to the gateway's original transaction reference, response code, retry policy, and settlement record before calling it replay or fraud. The <a href="./artifacts/fixture.jsonl">invented fixture</a> and <a href="./artifacts/test_gateway_session_review.py">tests</a> let me check the analytic boundaries without payment data.</p>
+<hr />
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">analysis flow</a> near the top shows the solve path, including the fixed-offset dead end. This second view separates what the recorded packets suggest from what an investigation would still need to establish. It is a hypothesis flow, not a confirmed attack chain.</p>
+<pre><code class="language-mermaid">flowchart LR
+    A[&quot;Recorded traffic\nEBCDIC ISO 8583 messages&quot;]
+    B[&quot;Repeated F11/STAN\n918939 at two client ports\nReview retries and scope&quot;]
+    C[&quot;Second 0100\nNo paired 0110 in summary\nCheck complete gateway logs&quot;]
+    D[&quot;0400 / 0410 near tail\nValidate original reference\nand response code&quot;]
+    E[&quot;Outcome unknown\nCheck terminal identity,\nauthorization, and settlement&quot;]
+    A --&gt; B --&gt; C --&gt; D --&gt; E
+</code></pre>
+<hr />
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<ul>
+<li><a href="https://www.iso.org/standard/15870.html">ISO 8583:1987 overview</a>, International Organization for Standardization; this edition is withdrawn, and gateway-specific encoding still requires its implementation profile.</li>
+<li><a href="https://www.iso.org/iso-4217-currency-codes.html">ISO 4217</a>, currency-code reference; the recorded amount is expressed as $187.85, without an independently checked F49 value.</li>
+<li><a href="https://attack.mitre.org/techniques/T1565/002/">MITRE ATT&amp;CK T1565.002</a> and the <a href="https://attack.mitre.org/matrices/ics/">ICS matrix</a>. ICS T0856/T0855 were considered but not applied.</li>
+<li><a href="https://next.d3fend.mitre.org/technique/d3f%3ANetworkTrafficAnalysis/">MITRE D3FEND Network Traffic Analysis</a>.</li>
+<li><a href="https://capec.mitre.org/data/definitions/60.html">MITRE CAPEC-60</a> and <a href="https://capec.mitre.org/data/definitions/196.html">CAPEC-196</a>, considered and rejected as direct STAN mappings.</li>
+<li><a href="https://cwe.mitre.org/data/definitions/284.html">CWE-284</a>, <a href="https://cwe.mitre.org/data/definitions/345.html">CWE-345</a>, and <a href="https://cwe.mitre.org/data/definitions/302.html">CWE-302</a>, review prompts only.</li>
+<li><a href="https://doi.org/10.6028/NIST.SP.800-53r5">NIST SP 800-53 Rev. 5</a> and <a href="https://doi.org/10.6028/NIST.SP.800-86">NIST SP 800-86</a>.</li>
+<li><a href="https://www.pcisecuritystandards.org/document_library/">PCI DSS</a>, for checking current applicable requirement text and scope.</li>
+<li><a href="https://www.ibm.com/docs/en/db2-for-zos/12.0.0?topic=schemes-ebcdic">IBM EBCDIC code page 37</a>, the encoding used in the recorded decode.</li>
+<li><a href="https://github.com/kbandla/dpkt">dpkt</a>, the packet-reading library used in the case analysis.</li>
+<li><a href="https://sigmahq.io/sigma-specification/specification/sigma-correlation-rules-specification.html">Sigma correlation specification</a>, for the <code>event_count</code> rule structure.</li>
+</ul>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>

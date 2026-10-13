@@ -1,0 +1,5 @@
+{"event_id":"a1","terminal_id":"TERM-A","processing_date":"2026-01-01","session_id":"S1","mti":"0100","stan":"918939"}
+{"event_id":"a2","terminal_id":"TERM-A","processing_date":"2026-01-01","session_id":"S1","mti":"0110","stan":"918939","response_code":"00"}
+{"event_id":"a3","terminal_id":"TERM-A","processing_date":"2026-01-01","session_id":"S2","mti":"0100","stan":"918939"}
+{"event_id":"a4","terminal_id":"TERM-A","processing_date":"2026-01-01","session_id":"S3","mti":"0400","stan":"000001","original_stan":"918939"}
+{"event_id":"a5","terminal_id":"TERM-A","processing_date":"2026-01-01","session_id":"S3","mti":"0410","stan":"000001","response_code":"00"}

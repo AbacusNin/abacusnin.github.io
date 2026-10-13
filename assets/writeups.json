@@ -529,5 +529,27 @@
     ],
     "status": "Solved-Verified",
     "url": "/cyber-ops/ctf-writeups/forensics/temporal-frame-differential/"
+  },
+  {
+    "title": "The Transaction Number That Came Back Twice",
+    "category": "Forensics",
+    "difficulty": "Medium",
+    "date": "2026-10-12",
+    "tags": [
+      "EBCDIC",
+      "ISO-8583",
+      "transaction-replay",
+      "reversal-fraud",
+      "payment-protocol",
+      "dpkt"
+    ],
+    "summary": "An 89-packet payment-gateway capture looked opaque until an EBCDIC decode exposed ISO 8583 messages, a repeated STAN, and a reversal sequence that needed closer review.",
+    "aliases": [
+      "ISO 8583",
+      "payment gateway",
+      "STAN reuse"
+    ],
+    "status": "Solved-Verified",
+    "url": "/cyber-ops/ctf-writeups/forensics/payment-gateway-stan-replay/"
   }
 ]
