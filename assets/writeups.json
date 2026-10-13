@@ -1390,5 +1390,28 @@
     ],
     "status": "Solved-External",
     "url": "/cyber-ops/ctf-writeups/osint/titan-underwater-photoshoot/"
+  },
+  {
+    "title": "The Private Key Behind a Common Word",
+    "category": "Crypto",
+    "difficulty": "Medium",
+    "date": "2026-10-12",
+    "tags": [
+      "PKCS#8",
+      "PBES2",
+      "PBKDF2-HMAC-SHA256",
+      "AES-256-CBC",
+      "RSA-4096",
+      "dictionary attack",
+      "rockyou",
+      "PKCS#1 v1.5"
+    ],
+    "summary": "A PEM key and a 512-byte ciphertext looked like an RSA problem. The weak passphrase protecting the key was the first lock I had to open.",
+    "aliases": [
+      "Cracking a PBES2-Protected RSA Key to Recover an Encrypted Flag",
+      "encrypted private key"
+    ],
+    "status": "Solved",
+    "url": "/cyber-ops/ctf-writeups/crypto/pbes2-rsa-key-recovery/"
   }
 ]

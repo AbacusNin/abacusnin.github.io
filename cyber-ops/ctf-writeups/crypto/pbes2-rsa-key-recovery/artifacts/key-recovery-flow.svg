@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 610" role="img" aria-labelledby="title desc">
+  <title id="title">Two locks in the PBES2 and RSA challenge</title>
+  <desc id="desc">An encrypted PKCS#8 key and bounded wordlist lead to a parseable RSA-4096 key. That key and a 512-byte ciphertext lead to a flag-shaped candidate. Platform acceptance is reported but cannot be replayed from the supplied record.</desc>
+  <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#35e0d0"/></marker></defs>
+  <rect width="640" height="610" rx="12" fill="#0c1018"/>
+  <text x="24" y="35" fill="#e6e9f0" font-family="system-ui, sans-serif" font-size="19" font-weight="700">The key had to open first</text>
+  <g fill="#151c27" stroke="#35656c" stroke-width="1.5">
+    <rect x="24" y="58" width="282" height="76" rx="8"/><rect x="334" y="58" width="282" height="76" rx="8"/>
+    <rect x="102" y="179" width="436" height="76" rx="8"/>
+    <rect x="24" y="300" width="282" height="76" rx="8"/><rect x="334" y="300" width="282" height="76" rx="8"/>
+    <rect x="102" y="421" width="436" height="76" rx="8"/>
+  </g>
+  <g fill="none" stroke="#35e0d0" stroke-width="2" marker-end="url(#arrow)">
+    <path d="M165 134 V160 H280 V172"/><path d="M475 134 V160 H360 V172"/>
+    <path d="M320 255 V282 H165 V293"/>
+    <path d="M165 376 V397 H280 V414"/><path d="M475 376 V397 H360 V414"/>
+  </g>
+  <g fill="#35e0d0" font-family="system-ui, sans-serif" font-size="14" font-weight="650">
+    <text x="40" y="83">Encrypted PKCS#8 key</text><text x="350" y="83">Hinted wordlist slice</text>
+    <text x="120" y="204">PBES2 candidate check</text><text x="40" y="325">Unlocked RSA-4096 key</text>
+    <text x="350" y="325">Ciphertext block</text>
+    <text x="120" y="446">RSA plaintext candidate</text>
+  </g>
+  <g fill="#e6e9f0" font-family="system-ui, sans-serif" font-size="12.5">
+    <text x="40" y="108">PBKDF2-HMAC-SHA256; AES-CBC</text><text x="350" y="108">Top entries, bounded locally</text>
+    <text x="120" y="229">A passphrase yields a parseable private key</text>
+    <text x="40" y="350">Parseable key from candidate</text><text x="350" y="350">512 bytes, one RSA block</text>
+    <text x="120" y="471">PKCS#1 v1.5 gave flag-shaped text in the record</text>
+  </g>
+  <rect x="24" y="523" width="592" height="65" rx="8" fill="#241b28" stroke="#a45a75"/>
+  <text x="40" y="548" fill="#ff4d9d" font-family="system-ui, sans-serif" font-size="13" font-weight="650">Result boundary</text>
+  <text x="40" y="571" fill="#e6e9f0" font-family="system-ui, sans-serif" font-size="12">Acceptance is reported. Original key, block, fixture, and receipt are unavailable.</text>
+</svg>

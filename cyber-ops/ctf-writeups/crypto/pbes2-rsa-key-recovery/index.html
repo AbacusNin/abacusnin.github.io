@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Private Key Behind a Common Word - CTF Writeups</title>
+  <link rel="stylesheet" href="/assets/css/site.css?v=20261009-2">
+  <meta name="description" content="A PEM key and a 512-byte ciphertext looked like an RSA problem. The weak passphrase protecting the key was the first lock I had to open.">
+  <link rel="canonical" href="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/pbes2-rsa-key-recovery/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Abacus">
+  <meta property="og:title" content="The Private Key Behind a Common Word">
+  <meta property="og:description" content="A PEM key and a 512-byte ciphertext looked like an RSA problem. The weak passphrase protecting the key was the first lock I had to open.">
+  <meta property="og:url" content="https://abacusnin.github.io/cyber-ops/ctf-writeups/crypto/pbes2-rsa-key-recovery/">
+  <meta property="og:image" content="https://abacusnin.github.io/assets/og/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body class="plain">
+  <div class="wrap">
+    <header class="site-header">
+      <a class="handle" href="/">Abacus</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="/cyber-ops/">Cyber Ops</a>
+        <a href="/grc/">GRC</a>
+        <a href="/intel/">Intel</a>
+        <a href="/ai-ml/">AI/ML</a>
+        <a href="/infra/">Infra</a>
+        <a href="/creative/">Creative</a>
+      </nav>
+    </header>
+    <main>
+      <p class="crumb"><a href="/">Abacus</a> / <a href="/cyber-ops/">Cyber Ops</a> / <a href="/cyber-ops/ctf-writeups/">CTF Writeups</a> / Crypto / <span aria-current="page">The Private Key Behind a Common Word</span></p>
+      <div class="page-head">
+        <h1 class="page-title">The Private Key Behind a Common Word</h1>
+        <p class="lead">I could not use the encrypted key until I understood its wrapper. The ASN.1 parameters gave me a smaller, more useful problem: try the hinted wordlist against the exact PBES2 profile.</p>
+      </div>
+      <div class="layout">
+        <nav class="toc" data-toc aria-label="On this page"></nav>
+        <div class="prose">
+          <p class="tldr-label">Summary</p>
+          <div class="tldr">
+<p><strong>The challenge.</strong> Unlock a password-protected private key and recover the flag from a single RSA ciphertext block.</p>
+<p><strong>What I did.</strong> I identified the PKCS#8 protection parameters, tried a bounded dictionary with a key loader, then checked RSA padding against the recovered plaintext shape.</p>
+<p><strong>The result.</strong> The case record reports a printable flag and platform acceptance; the passphrase and flag are withheld.</p>
+<p><strong>The limit.</strong> The challenge key, ciphertext, original scripts, fixture, and acceptance receipt were not supplied for independent replay.</p>
+          </div>
+<figure class="diagram" id="analysis-flow"><svg viewBox="0 0 360 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Inspect the two files; Read PBES2 parameters; Try hinted wordlist; Test RSA padding; Report the flag">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,7 Z" fill="#35e0d0"/></marker></defs>
+<rect x="5" y="5" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="29" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Inspect the two files</text><text x="18" y="49" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">PEM and 512-byte block</text>
+<line x1="180" y1="63" x2="180" y2="82" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="85" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="109" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Read PBES2 parameters</text><text x="18" y="129" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">PBKDF2 and AES-CBC</text>
+<line x1="180" y1="143" x2="180" y2="162" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="165" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="189" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Try hinted wordlist</text><text x="18" y="209" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">load the RSA private key</text>
+<line x1="180" y1="223" x2="180" y2="242" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="245" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="269" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Test RSA padding</text><text x="18" y="289" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">inspect printable plaintext</text>
+<line x1="180" y1="303" x2="180" y2="322" stroke="#35e0d0" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="5" y="325" width="350" height="58" rx="6" fill="#10141d" stroke="#23293a"/><text x="18" y="349" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#ff4d9d">Report the flag</text><text x="18" y="369" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#e6e9f0">platform acceptance recorded</text>
+</svg><figcaption>My checkpoints from the challenge record.</figcaption></figure>
+<h2>Case details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Category</td>
+<td>Password Cracking / Applied Cryptography</td>
+</tr>
+<tr>
+<td>Difficulty</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>PKCS#8, PBES2, PBKDF2-HMAC-SHA256, AES-256-CBC, RSA-4096, dictionary attack, rockyou, PKCS#1 v1.5</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Solved</td>
+</tr>
+<tr>
+<td>Recorded result</td>
+<td>A passphrase unlocked the RSA-4096 key; PKCS#1 v1.5 yielded a printable flag that the case says the platform accepted. The secret values remain withheld.</td>
+</tr>
+<tr>
+<td>Evidence boundary</td>
+<td>I have the written case record, but not the challenge files, original scripts, fixture, or acceptance receipt. The linked tools were newly built and tested with synthetic material.</td>
+</tr>
+</tbody>
+</table>
+<p>The reusable local proofs of concept are in the <a href="https://github.com/AbacusNin/abacusnin.github.io/tree/main/cyber-ops/ctf-writeups/crypto/pbes2-rsa-key-recovery/artifacts">GitHub artifacts folder</a>. Their tests do not replay the challenge.</p>
+<p>The case record assessed the difficulty as Moderate; Medium is the portfolio's closest level.</p>
+<h2>1. Problem Statement and Threat Scenario</h2>
+<p>I was given an encrypted private key in PEM form and a small binary file described as an unreadable flag. The hint said a short script and the first few thousand entries of a common wordlist would be enough. My job was to recover one flag string. The source account withholds the passphrase and flag, so this page does too.</p>
+<p>I treated this as a cryptography puzzle. No target host, defender telemetry, or adversary operation came with it. Later sections use the puzzle to examine a real key-management failure mode, but that is an operational analogy, not something observed in the challenge.</p>
+<details class="fold section-fold">
+<summary>2. Techniques, Tooling, and Actions Taken</summary>
+<p>I first checked what the two files actually were. The key began with <code>ENCRYPTED PRIVATE KEY</code>, the PKCS#8 encrypted-key PEM label. The ciphertext was exactly 512 bytes, the size of one RSA-4096 block. The case notes say I hashed both files during triage, although their digests are not in the record.</p>
+<p>I then used <code>openssl asn1parse</code> to read the key wrapper. It identified PBES2, PBKDF2 with HMAC-SHA256, a low iteration count, and AES-256-CBC. The exact count was not retained. This was the useful fork: I needed guesses against this serialized key, and the challenge hint favored a small custom loop. I did not independently test which Hashcat or John the Ripper builds supported that profile; the solve record says the available mainstream options were unsuitable.</p>
+<p>I fed wordlist candidates to <code>load_pem_private_key</code>. A wrong candidate failed decryption or key parsing. Within the hinted top entries, one candidate loaded a 4096-bit RSA private key. That let me move to the 512-byte ciphertext. The source says OAEP with SHA-256 and SHA-1 failed, while PKCS#1 v1.5 produced a printable, flag-shaped message. It reports platform acceptance. There is no receipt here to independently confirm that last step.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>3. Tooling and Scripts</summary>
+<p>The solve-time sequence began with format checks and ASN.1 inspection:</p>
+<pre><code class="language-bash">file key.pem ciphertext.bin
+wc -c ciphertext.bin
+openssl asn1parse -in key.pem | head -40
+# Recorded: ENCRYPTED PRIVATE KEY, 512-byte ciphertext,
+# PBES2 / PBKDF2-HMAC-SHA256 / AES-256-CBC.
+</code></pre>
+<p>The core of the reported recovery was a load-and-catch loop. It did not need to implement PBKDF2 or AES itself:</p>
+<pre><code class="language-python">from cryptography.hazmat.primitives.serialization import load_pem_private_key
+
+pem = open(&quot;key.pem&quot;, &quot;rb&quot;).read()
+with open(&quot;wordlist.txt&quot;, &quot;rb&quot;) as words:
+    for raw in words:
+        candidate = raw.rstrip(b&quot;\r\n&quot;)
+        try:
+            key = load_pem_private_key(pem, password=candidate)
+        except (ValueError, TypeError):
+            continue
+        print(&quot;candidate line matched&quot;)
+        break
+</code></pre>
+<p>The recorded run was limited to the first 10,000 <code>rockyou</code> entries, then tested OAEP-SHA256, OAEP-SHA1, and PKCS#1 v1.5. For reuse, I linked a <a href="./artifacts/crack_pkcs8.py">bounded key checker</a>, <a href="./artifacts/decrypt_rsa.py">RSA block reviewer</a>, <a href="./artifacts/test_recovery.py">synthetic tests</a>, and <a href="./artifacts/README.md">guide</a>. They use no challenge secret. The checker reports a matching wordlist line by default; the decryptor prompts for the password and needs an expected plaintext prefix to choose a candidate.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>4. Concept Explanation</summary>
+<p>PKCS#8 describes the private-key container. In this case PBES2 protected that container: PBKDF2-HMAC-SHA256 derived an AES-256-CBC key from a passphrase and salt, then AES encrypted the serialized private key. The iteration count controls part of the cost of each guess. A low count and a common-word passphrase made the hinted dictionary search practical. <a href="https://www.rfc-editor.org/rfc/rfc8018">RFC 8018</a> defines PBES2 and PBKDF2.</p>
+<p>There is a detail I would not gloss over: AES-CBC in this PBES2 profile has no authentication tag. A successful <code>load_pem_private_key</code> call means the bytes decrypted into a parseable private key. It is strong practical evidence for the candidate, but the code is not checking a PBES2 message-authentication code. The <a href="https://cryptography.io/en/latest/hazmat/primitives/asymmetric/serialization/">library documentation</a> describes decryption and structural errors for this loader.</p>
+<p>The second lock was RSA padding. A 4096-bit modulus produces 512-byte ciphertext blocks. OAEP and PKCS#1 v1.5 encode plaintext differently, so the matching scheme must be used to recover it. Even here, a decryption API returning bytes is not alone proof of the intended message. Some implementations deliberately return synthetic bytes for invalid PKCS#1 v1.5 padding to reduce oracle risks. I need the expected flag shape and, ideally, platform feedback before saying I have the challenge answer.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>5. Exploit / Analysis Mechanics</summary>
+<p>The chain had two dependencies. I needed the weak passphrase before the RSA private key was usable; I needed the private key before I could read the ciphertext.</p>
+<ol>
+<li><strong>Unlock the key.</strong> The encrypted PKCS#8 file and hinted wordlist gave me a bounded offline search. For each candidate, the loader ran the file's PBKDF2 and AES-CBC profile and attempted to parse the result. The source reports one clean load and a 4096-bit RSA key. A dictionary passphrase and low KDF cost were the weaknesses. The exact work factor cannot be recalculated because the iteration count and original key are absent.</li>
+<li><strong>Recover the flag.</strong> The ciphertext length matched the modulus. The record says both OAEP choices failed and PKCS#1 v1.5 yielded printable text in the expected flag format. The challenge platform reportedly accepted it. No raw flag or receipt was provided for this publication.</li>
+</ol>
+<p>The first stage is a key-load check, not a free-standing proof of authenticity. The second is a padding and plaintext-shape check, with reported platform acceptance as a separate result. I keep those claims apart because the local artifacts are unavailable for replay.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>6. Lessons Learned</summary>
+<p>I got the most value from reading the wrapper before trying passwords. <code>ENCRYPTED PRIVATE KEY</code> told me what to inspect; ASN.1 gave me the KDF and cipher. Once I knew the profile, the short loader loop was a better fit than guessing which off-the-shelf mode might apply.</p>
+<p>I would repeat that order on the next encrypted-key task: identify the serialization, record the salt/PRF/iteration/cipher parameters, then choose an appropriate recovery or audit method. When an unknown parameter has a short plausible set, as RSA padding did here, I can test each deliberately and check the resulting plaintext against independent expectations.</p>
+<table>
+<thead>
+<tr>
+<th>Exercise behavior</th>
+<th>Operational analogue</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Common-word key passphrase</td>
+<td>Exported private keys can be left behind weak human secrets</td>
+</tr>
+<tr>
+<td>Low PBKDF2 work factor</td>
+<td>Legacy wrapping settings make offline guessing cheaper</td>
+</tr>
+<tr>
+<td>Local dictionary attempts</td>
+<td>An attacker with a copy of key material faces no account lockout</td>
+</tr>
+</tbody>
+</table>
+
+</details>
+<details class="fold section-fold">
+<summary>7. Operational Extrapolation</summary>
+<h3>Individual Practitioner Development</h3>
+<p>This gave me practice reading PKCS#8/PBES2 parameters, reasoning about password-based KDF cost, and identifying an RSA padding scheme from the result. A useful next exercise would compare the same workflow against a properly costed key export or a supported memory-hard wrapping format. The result would show how the economics change, rather than assuming a fixed count is universally safe.</p>
+<h3>Security Operations</h3>
+<p>An offline cracker operating on copied key material does not emit a defender-side login failure. I would focus on where private keys are created, stored, exported, and moved. A managed-endpoint or repository scan for encrypted-key PEM headers could find inventory candidates; authorized review of their KDF parameters could prioritize weak wraps. Such a scan needs careful access controls and false-positive handling because legitimate encrypted keys are common. Section 12 scopes this as a proposed hygiene workflow, not a deployed detector.</p>
+<h3>Intelligence Operations</h3>
+<p>The record does not support a separate intelligence-operation claim. I keep the heading to account for that limit.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>8. Reusable Tools, Scripts, and Artifacts</summary>
+<p>The <a href="./artifacts/crack_pkcs8.py">key checker</a> takes a PEM key, a wordlist, and a candidate cap. The <a href="./artifacts/decrypt_rsa.py">RSA block reviewer</a> takes that key and one ciphertext block, prompts for the passphrase, tests the three schemes described above, and writes only a candidate matching an expected prefix to a new file. Neither has hardcoded challenge secrets. The <a href="./artifacts/README.md">guide</a> states the inputs, secret-handling behavior, and limits.</p>
+<p>I tested them with a throwaway key and ciphertext created at test time. The <a href="./artifacts/test_recovery.py">test suite</a> covers a wordlist hit, a capped miss, PKCS#1 v1.5, OAEP-SHA256, and a length mismatch. It is a functional proof of the local approach. The original case fixture, passphrase, key, ciphertext, and accepted flag were not available, so the published test is not a challenge replay or a performance benchmark. The checker is single-threaded and performs no word mutations.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>9. Framework Applicability and Mapping</summary>
+<p>This was a puzzle, not an observed adversary. I use the mappings as comparisons for a captured-key scenario:</p>
+<table>
+<thead>
+<tr>
+<th>Behavior</th>
+<th>Framework</th>
+<th>ID</th>
+<th>Why it fits</th>
+<th>Scope</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Offline wordlist recovery of a key passphrase</td>
+<td>MITRE ATT&amp;CK</td>
+<td><a href="https://attack.mitre.org/techniques/T1110/002/">T1110.002</a></td>
+<td>Password cracking after access to protected material</td>
+<td>Analogical; no adversary observed</td>
+</tr>
+<tr>
+<td>Dictionary candidates</td>
+<td>CAPEC</td>
+<td><a href="https://capec.mitre.org/data/definitions/16.html">CAPEC-16</a></td>
+<td>The wordlist method used in the exercise</td>
+<td>Method comparison, not a system finding</td>
+</tr>
+<tr>
+<td>Repeated candidate guesses</td>
+<td>CAPEC</td>
+<td><a href="https://capec.mitre.org/data/definitions/49.html">CAPEC-49</a></td>
+<td>General parent pattern</td>
+<td>Broad analogy</td>
+</tr>
+</tbody>
+</table>
+<p>I do not map STRIDE or OWASP here. There was no application design or web target to model.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>10. Threat Intelligence and Standards Integration</summary>
+<p>I found no network address, host behavior, infrastructure, or reusable adversary indicator in this challenge. A STIX bundle, TAXII feed, or STIG finding would imply evidence the record does not contain. For real investigations, I would exchange the behavior only after obtaining actual context: how key material was exposed, which systems held copies, and whether its corresponding public key is trusted anywhere.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>11. Controls Mapping and Mitigation Realization</summary>
+<h3>Standards Mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Reference</th>
+<th>ID</th>
+<th>Relevance</th>
+<th>Boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MITRE CWE</td>
+<td><a href="https://cwe.mitre.org/data/definitions/521.html">CWE-521</a></td>
+<td>A common dictionary passphrase is a weak secret</td>
+<td>Analogy to a real product's password policy</td>
+</tr>
+<tr>
+<td>MITRE CWE</td>
+<td><a href="https://cwe.mitre.org/data/definitions/916.html">CWE-916</a></td>
+<td>Low KDF effort makes offline guessing cheaper</td>
+<td>The exact iteration count is absent</td>
+</tr>
+<tr>
+<td>MITRE CWE</td>
+<td><a href="https://cwe.mitre.org/data/definitions/326.html">CWE-326</a></td>
+<td>Broad inadequate-protection concern</td>
+<td>Too general for a direct defect finding</td>
+</tr>
+<tr>
+<td>NIST</td>
+<td><a href="https://www.nist.gov/publications/recommendation-password-based-key-derivation-part-1-storage-applications">SP 800-132</a></td>
+<td>Password-based derivation for stored key protection</td>
+<td>Guidance to evaluate, not proof of compliance</td>
+</tr>
+<tr>
+<td>NIST</td>
+<td><a href="https://pages.nist.gov/800-63-4/sp800-63b.html">SP 800-63B</a></td>
+<td>Blocklists and longer secrets inform password practice</td>
+<td>Authentication guidance, applied by analogy to key wrapping</td>
+</tr>
+</tbody>
+</table>
+<h3>Mitigation Realization</h3>
+<p>For a key I owned, I would replace a common-word passphrase, review the KDF settings supported by the consuming applications, and re-wrap the key with an appropriate cost. OpenSSL's PKCS#8 tool supports an iteration setting. The source proposed this illustrative command:</p>
+<pre><code class="language-bash">openssl pkcs8 -topk8 -in plain_key.pem -out key_hardened.pem \
+  -v2 aes-256-cbc -v2prf hmacWithSHA256 -iter 600000
+</code></pre>
+<p>The command needs a plaintext input key and a securely handled output. Its <code>600000</code> value is an example, not a current universal target or a challenge-tested configuration. I would test compatibility and measure cost on the actual environment. I would also screen newly chosen passphrases against common and compromised values and favor length. No real key rotation was performed for this CTF.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>12. Indicators, Artifacts, and Detection Engineering</summary>
+<p>There is no reliable network or SIEM event for the offline guesses themselves. I do not call a PEM header an IOC. It is a file type marker that could start an authorized key-inventory workflow.</p>
+<p>The proposed workflow is: find <code>BEGIN ENCRYPTED PRIVATE KEY</code> blocks in allowed repositories or managed endpoint locations, record only the path and metadata needed for ownership review, inspect KDF parameters under access control, and notify the key owner when a weak wrap is confirmed. Benign encrypted keys will dominate the first pass. A DLP or file-content scanner is required; proxy logs alone cannot see a local PBES2 search. I did not run such a scan or validate a production rule.</p>
+
+</details>
+<details class="fold section-fold">
+<summary>13. Visual Artifact</summary>
+<p>The <a href="#analysis-flow">short analysis flow</a> at the top and this <a href="./artifacts/key-recovery-flow.svg">standalone SVG</a> show why the two locks had to be opened in order. The diagram also marks the reported acceptance as distinct from the synthetic tests.</p>
+<p><img src="./artifacts/key-recovery-flow.svg" alt="An encrypted PKCS#8 key and bounded wordlist lead to a recovered RSA key; that key and a 512-byte ciphertext lead to a plaintext candidate and reported platform acceptance." style="display:block;max-width:100%;height:auto"></p>
+<p>The original Mermaid sketch expresses the same dependency:</p>
+<pre><code class="language-mermaid">flowchart LR
+    A[Encrypted PKCS8 private key] --&gt; B[Dictionary attack on passphrase]
+    W[Wordlist top entries] --&gt; B
+    B --&gt; C[Unlocked RSA-4096 private key]
+    D[Single RSA ciphertext block] --&gt; E[RSA decrypt with PKCS1 v1.5]
+    C --&gt; E
+    E --&gt; F[Recovered flag withheld]
+</code></pre>
+
+</details>
+<details class="fold section-fold">
+<summary>14. References</summary>
+<p>The source account used these references for its method and mappings. I checked the primary documentation for PBES2, the loader, OpenSSL's PKCS#8 options, and the cited technique pages while preparing this page.</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Source</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R1</td>
+<td><a href="https://attack.mitre.org/techniques/T1110/002/">MITRE ATT&amp;CK T1110.002</a></td>
+<td>Analogical offline password-cracking mapping</td>
+</tr>
+<tr>
+<td>R2</td>
+<td><a href="https://capec.mitre.org/data/definitions/16.html">MITRE CAPEC-16</a></td>
+<td>Dictionary method</td>
+</tr>
+<tr>
+<td>R3</td>
+<td><a href="https://capec.mitre.org/data/definitions/49.html">MITRE CAPEC-49</a></td>
+<td>General password brute forcing</td>
+</tr>
+<tr>
+<td>R4</td>
+<td><a href="https://cwe.mitre.org/data/definitions/521.html">MITRE CWE-521</a></td>
+<td>Weak passphrase analogy</td>
+</tr>
+<tr>
+<td>R5</td>
+<td><a href="https://cwe.mitre.org/data/definitions/916.html">MITRE CWE-916</a></td>
+<td>Insufficient password-hash effort analogy</td>
+</tr>
+<tr>
+<td>R6</td>
+<td><a href="https://cwe.mitre.org/data/definitions/326.html">MITRE CWE-326</a></td>
+<td>Broad encryption-strength category</td>
+</tr>
+<tr>
+<td>R7</td>
+<td><a href="https://www.nist.gov/publications/recommendation-password-based-key-derivation-part-1-storage-applications">NIST SP 800-132</a></td>
+<td>Password-based key derivation</td>
+</tr>
+<tr>
+<td>R8</td>
+<td><a href="https://pages.nist.gov/800-63-4/sp800-63b.html">NIST SP 800-63B</a></td>
+<td>Common-password screening guidance</td>
+</tr>
+<tr>
+<td>R9</td>
+<td><a href="https://www.rfc-editor.org/rfc/rfc8018">RFC 8018</a></td>
+<td>PBES2 and PBKDF2 specification</td>
+</tr>
+<tr>
+<td>R10</td>
+<td><a href="https://cryptography.io/en/latest/hazmat/primitives/asymmetric/serialization/">cryptography key serialization</a></td>
+<td>Loader behavior and errors</td>
+</tr>
+<tr>
+<td>Additional</td>
+<td><a href="https://docs.openssl.org/3.5/man1/openssl-pkcs8/">OpenSSL pkcs8 manual</a></td>
+<td>Re-wrapping example and supported options</td>
+</tr>
+</tbody>
+</table>
+</details>
+
+        </div>
+      </div>
+      <a class="backlink" href="/cyber-ops/ctf-writeups/">&lt;- back to writeups</a>
+    </main>
+    <footer class="site-footer">
+      <span>Abacus</span>
+      <span><a href="/credentials/">Credentials</a></span>
+      <span>Contact: <a href="mailto:abacusnin@gmail.com">abacusnin@gmail.com</a></span>
+    </footer>
+  </div>
+  <script src="/assets/js/toc.js?v=20261009-2"></script>
+</body>
+</html>
