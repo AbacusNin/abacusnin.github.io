@@ -2,7 +2,7 @@
   {
     "title": "Rotation and Recovery",
     "url": "/cyber-ops/ctf-writeups/crypto/rotation-and-recovery/",
-    "category": "Crypto",
+    "category": "Cryptography",
     "difficulty": "Advanced",
     "date": "2026-05",
     "tags": [
@@ -68,7 +68,7 @@
   },
   {
     "title": "When the Answer File Stopped Carrying Information",
-    "category": "Reversing",
+    "category": "Reverse Engineering",
     "difficulty": "Hard",
     "date": "2026-10",
     "tags": [
@@ -182,7 +182,7 @@
   },
   {
     "title": "The Voicemail That Read the Ciphertext",
-    "category": "Crypto",
+    "category": "Cryptography",
     "difficulty": "Hard",
     "date": "2026-10",
     "tags": [
@@ -302,7 +302,7 @@
   },
   {
     "title": "The Shuffle Gave Away the Groups",
-    "category": "Reversing / Cryptography",
+    "category": "Reverse Engineering",
     "difficulty": "Hard",
     "date": "2026-10",
     "tags": [
@@ -319,7 +319,7 @@
   },
   {
     "title": "Six Fast Signatures and a Private Key",
-    "category": "Crypto",
+    "category": "Cryptography",
     "difficulty": "Hard",
     "date": "2026-10",
     "tags": [
