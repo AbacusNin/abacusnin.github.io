@@ -60,14 +60,15 @@
           <h2>Method</h2>
           <ol>
             <li>Normalize the source into one canonical record schema.</li>
-            <li>Compute behavioral signals per account and per account pair: co-repost timing, duplicate text, hashtag flooding, mention and reply swarming, automation.</li>
-            <li>Build a weighted co-activity network from those signals.</li>
+            <li>Compute behavioral signals. Co-repost timing and duplicate text are scored per account pair, automation per account, and hashtag flooding and mention or reply swarming across the whole file.</li>
+            <li>Build a weighted co-activity network from the two pairwise signals, co-repost timing and duplicate text. Those two are the only signals that decide which accounts get flagged.</li>
             <li>Extract dense clusters from that network. A coordinated group knots together into a small, heavily weighted cluster. Ordinary accounts sit in a sparse web, and the extraction keys on that difference.</li>
-            <li>Sort each flagged cluster into a likely-automated core and the accounts that amplify it.</li>
-            <li>Tag behaviors with DISARM techniques.</li>
+            <li>Sort each flagged cluster into a likely-automated core and the accounts that amplify it, using each account's automation share.</li>
+            <li>Record which DISARM techniques show up anywhere in the file.</li>
             <li>Score the flagged set against the published labels.</li>
           </ol>
           <p>The pipeline outputs DISARM tags and never reads them back. No tag or label reaches the feature, detection, or scoring path to decide what gets flagged.</p>
+          <p>The tags describe the file as a whole. Each one fires when its signal turns up anywhere in the data, even once. Two accounts sharing one hashtag in the same five-minute window are enough to fire T0043. So a tag says that a behavior exists somewhere in the file. It does not tie that behavior to a cluster or an account. On Russia_2, the 2,175 control accounts on their own produce exactly the same four tags as the full file.</p>
 
           <h2>Results</h2>
           <p>I scored Russia_2 at account granularity.</p>
@@ -82,6 +83,7 @@
               <tr><td>IO-labeled accounts</td><td>361</td></tr>
               <tr><td>Accounts flagged</td><td>447</td></tr>
               <tr><td>Clusters detected</td><td>22</td></tr>
+              <tr><td>Precision at chance (447 random flags)</td><td>0.1424</td></tr>
             </tbody>
           </table>
           <p>The file holds 1,011,052 posts across 21 parts, 920,761 of them IO rows and 90,291 control rows. Those span 2,536 unique accounts: 361 IO-labeled, 2,175 control-labeled. Loading took 0.29s and the full pipeline 4.04s.</p>
@@ -93,7 +95,7 @@
 
           <h2>Limits</h2>
           <p>Lab metrics like these set an upper bound. This dataset is curated and labeled, with a native control class built in. Live traffic has none of that structure.</p>
-          <p>Indiana built Russia_2 at 91% IO rows. No real feed looks like that. Precision degrades as the base rate drops toward natural, much lower levels of IO, because the same false-positive rate produces much worse precision at that lower rate. The 0.54 above describes Russia_2. It does not predict what a live feed would produce.</p>
+          <p>Indiana built Russia_2 at 91% IO rows. I score accounts, though, and the account-level base rate is lower: 361 of 2,536 accounts, or 14.2%. Read precision against that rate. Flagging 447 accounts at random would score about 0.14 precision and 0.18 recall, so 0.54 is roughly 3.8 times chance. No real feed carries 14% IO accounts either. Precision degrades as the base rate drops toward natural, much lower levels of IO, because the same false-positive rate produces much worse precision at that lower rate. The 0.54 above describes Russia_2. It does not predict what a live feed would produce.</p>
           <p>Co-repost timing, duplicate content, hashtag floods and mention swarms signal coordination. They say nothing about authenticity. A tightly organized genuine community trips the same thresholds a paid one does, so a flag from this pipeline is not attribution. Neither is it proof that an account is fake. Someone still has to look at it before anyone acts on the result.</p>
           <p>The parquet release hashes the posting-application field instead of shipping a readable client string. That kills the automation signal on this data. Russia_2 carries 304 distinct hash values, and none match the literal markers the automation check looks for. The automated share comes back 0.0 for every account, the bot-account technique never fires, and triage gets no automation signal here. That zero came out of the anonymized field. It says nothing about whether Russia_2 actually used automation, and I did not invent automation results to fill the gap.</p>
 
@@ -104,7 +106,7 @@
           <p>The analyst-coded persona label only annotates. Clemson ships Linvill and Warren's own categories (RightTroll, NewsFeed, and so on). They exist only on Clemson rows. Nothing in the detection path reads them, because building on them would make my results source-dependent.</p>
 
           <h2>Build</h2>
-          <p>I wrote the tool in Python. polars handles the data work and networkx builds the graph. I developed it test-first, so it ships with 30 tests. I license it under Apache 2.0. A synthetic fixture drives a one-command demo of the full pipeline, so the tool runs without the gated dataset.</p>
+          <p>I wrote the tool in Python. polars handles the data work and networkx builds the graph. I developed it test-first, so it ships with 30 tests. I license it under Apache 2.0. A synthetic fixture drives a one-command demo of the full pipeline, so the tool runs without the gated dataset. The code is public at <a href="https://github.com/AbacusNin/io-detect">AbacusNin/io-detect</a>.</p>
 
           <h2>Data note</h2>
           <p>I work from public and licensed research datasets only. I redistribute no dataset here and publish no account identifiers, cluster memberships, or post content. Only aggregate measurements appear on this page. Nothing here identifies individuals or attributes the campaign to an actor.</p>
