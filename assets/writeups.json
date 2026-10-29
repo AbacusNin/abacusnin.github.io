@@ -252,7 +252,7 @@
   {
     "title": "The Recovery Key That Survived the Fire",
     "category": "Forensics",
-    "difficulty": "Medium",
+    "difficulty": "Hard",
     "date": "2026-10",
     "tags": [
       "BitLocker",
@@ -358,7 +358,7 @@
   {
     "title": "The One Tile That Didn't Belong",
     "category": "Forensics",
-    "difficulty": "Medium",
+    "difficulty": "Hard",
     "date": "2026-10",
     "tags": [
       "forensics",
@@ -413,7 +413,7 @@
   {
     "title": "The Phone Call That Repeated Itself",
     "category": "Network Forensics",
-    "difficulty": "Medium",
+    "difficulty": "Hard",
     "date": "2026-10",
     "tags": [
       "VoIP",
