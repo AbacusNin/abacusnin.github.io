@@ -88,6 +88,16 @@
           </table>
           <p>The file holds 1,011,052 posts across 21 parts, 920,761 of them IO rows and 90,291 control rows. Those span 2,536 unique accounts: 361 IO-labeled, 2,175 control-labeled. Loading took 0.29s and the full pipeline 4.04s.</p>
           <p>Cluster sizes: 147, 64, 54, 43, 16, 16, 14, 10, 9, 9, 9, 8, 8, 7, 6, 5, 4, 4, 4, 4, 3, 3.</p>
+          <p>To see which signal produces that number, the ablation command turns each graph signal off in turn and re-scores:</p>
+          <table>
+            <thead><tr><th>Graph built from</th><th>Account pairs</th><th>Flagged</th><th>Precision</th><th>Recall</th></tr></thead>
+            <tbody>
+              <tr><td>Both signals, as shipped</td><td>11,309</td><td>447</td><td>0.5436</td><td>0.6731</td></tr>
+              <tr><td>Duplicate text only</td><td>11,146</td><td>443</td><td>0.5485</td><td>0.6731</td></tr>
+              <tr><td>Co-repost timing only</td><td>163</td><td>36</td><td>0.8056</td><td>0.0803</td></tr>
+            </tbody>
+          </table>
+          <p>Duplicate text carries the result. Dropping co-repost timing leaves recall identical and nudges precision up. Co-repost timing on its own is precise and nearly blind, with 163 account pairs against duplicate text's 11,146. I read 0.5436 as a duplicate-text number.</p>
 
           <h2>Scoring and controls</h2>
           <p>The negative class comes from the <code>is_control</code> field that ships with the data. Indiana includes organic control posts beside the campaign posts. Those come from accounts discussing the same topics in the same windows. Without a native control class the detector has nothing to be wrong about, so no honest precision figure exists.</p>

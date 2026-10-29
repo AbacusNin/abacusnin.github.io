@@ -51,7 +51,7 @@
 
       <section class="lens">
         <p class="label">Analyst</p>
-        <p>Precision is scored per account, and 361 of the file's 2,536 accounts are labeled influence-operation, a base rate of 14.2%. Flagging the same 447 accounts at random would score about 0.14, so 0.54 is roughly 3.8 times chance. It is still a lab ceiling. The file is curated, natural prevalence is far lower, and the same false-positive rate produces much worse precision against it. The honest reading is that the method finds most of a known operation and is right slightly more often than not when it raises a flag.</p>
+        <p>Precision is scored per account, and 361 of the file's 2,536 accounts are labeled influence-operation, a base rate of 14.2%. Flagging the same 447 accounts at random would score about 0.14, so 0.54 is roughly 3.8 times chance. It is still a lab ceiling. The file is curated, natural prevalence is far lower, and the same false-positive rate produces much worse precision against it. The honest reading is that the method finds most of a known operation and is right slightly more often than not when it raises a flag. An ablation run shows duplicate text produces almost all of that: on its own it flags 443 of the 447 accounts at the same recall.</p>
         <p>Coordination is also not authenticity. A tightly organized genuine community trips the same thresholds as a paid one, so a flag is a candidate for review rather than a finding. The pipeline does not attribute operations to any actor, and nothing here identifies individuals.</p>
       </section>
 
